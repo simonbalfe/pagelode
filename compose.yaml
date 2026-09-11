@@ -1,0 +1,14 @@
+services:
+  pagelode:
+    build: .
+    environment:
+      PORT: 8083
+      PAGELODE_PATCHRIGHT_COMMAND: bun
+      PAGELODE_PATCHRIGHT_WORKER: /app/browser/src/worker.ts
+      PAGELODE_PATCHRIGHT_HEADLESS: ${PAGELODE_PATCHRIGHT_HEADLESS:-true}
+      PAGELODE_PROXY_URL: ${PAGELODE_PROXY_URL:-}
+      PAGELODE_PROTECTED_DOMAINS: ${PAGELODE_PROTECTED_DOMAINS:-crunchbase.com}
+      PAGELODE_ROD_ENABLED: ${PAGELODE_ROD_ENABLED:-true}
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
