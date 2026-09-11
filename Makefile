@@ -12,7 +12,7 @@ check:
 	cd browser && bun test
 
 run:
-	go run ./cmd/pagelode
+	go run ./cmd/pagelode serve
 
 setup:
 	go mod download

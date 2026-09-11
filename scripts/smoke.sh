@@ -24,7 +24,7 @@ printf '%s\n' '<!doctype html><html><head><title>PageLode shell</title></head><b
 python3 -m http.server "$fixture_port" --bind 127.0.0.1 --directory "$work_dir" >"$work_dir/fixture.log" 2>&1 &
 fixture_pid="$!"
 
-PORT="$api_port" PAGELODE_PATCHRIGHT_WORKER="browser/src/worker.ts" PAGELODE_PROTECTED_DOMAINS="localhost" PAGELODE_ROD_ENABLED=true go run ./cmd/pagelode >"$work_dir/api.log" 2>&1 &
+PORT="$api_port" PAGELODE_PATCHRIGHT_WORKER="browser/src/worker.ts" PAGELODE_PROTECTED_DOMAINS="localhost" PAGELODE_ROD_ENABLED=true go run ./cmd/pagelode serve >"$work_dir/api.log" 2>&1 &
 api_pid="$!"
 
 attempt=0

@@ -35,7 +35,7 @@ flowchart LR
     Result --> Caller
 ```
 
-The Go process owns every product decision. The TypeScript worker can render a URL and return browser state, but it cannot choose targets, select routes, extract content, or decide whether a result is acceptable.
+The Go process owns every product decision. The TypeScript worker can render a URL and return browser state, but it cannot choose targets, select routes, extract content, or decide whether a result is acceptable. The same application graph serves one-shot CLI requests and the long-running HTTP API.
 
 ## Request lifecycle
 
@@ -235,7 +235,7 @@ Request contexts carry deadlines through the API, orchestrator, loaders, browser
 
 | Path | Responsibility |
 |---|---|
-| `cmd/pagelode` | Process wiring, HTTP lifecycle, graceful shutdown |
+| `cmd/pagelode` | CLI parsing, process wiring, HTTP lifecycle, graceful shutdown |
 | `internal/api` | HTTP contract, validation, timeouts, health reporting |
 | `internal/orchestrator` | Waterfall, attempt evidence, escalation, final results |
 | `internal/httpfetch` | Profiled direct HTTP loader and session capture |
@@ -256,7 +256,7 @@ This separation makes an extraction failure observable without pretending that b
 
 ## Deployment model
 
-The provided container builds a static Go binary, installs Bun and Chromium, installs Patchright's Chromium build, and runs both language layers in one service container. The TypeScript worker remains a child process of PageLode rather than a separately deployed network service.
+The provided container builds a static Go binary, installs Bun and Chromium, installs Patchright's Chromium build, and runs both language layers in one service container. The TypeScript worker remains a child process of PageLode rather than a separately deployed network service. The image defaults to `pagelode serve`; supplying a URL instead runs a one-shot extraction.
 
 ```mermaid
 flowchart TB

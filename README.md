@@ -22,10 +22,25 @@ You need Go, Bun, and Chromium installed.
 
 ```sh
 make setup
-make run
+make build
+./bin/pagelode example.com
 ```
 
-PageLode starts at `http://localhost:8083`.
+PageLode prints the cleaned page as Markdown.
+
+For the complete result, including the loader attempts:
+
+```sh
+./bin/pagelode --json example.com
+```
+
+## Run as a service
+
+```sh
+./bin/pagelode serve
+```
+
+The API starts at `http://localhost:8083`. Send it a page:
 
 Send it a page:
 
@@ -48,6 +63,8 @@ The response contains:
 ```sh
 docker compose up --build
 ```
+
+The container starts PageLode in service mode.
 
 ## Current scope
 
