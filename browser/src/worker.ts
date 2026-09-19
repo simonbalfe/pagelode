@@ -1,12 +1,22 @@
 import { once } from "node:events";
+import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { chromium, type Browser, type BrowserContextOptions, type Page } from "patchright";
+import { chromium, type BrowserContext, type Page } from "patchright";
 import { ZodError } from "zod";
 import { renderRequestSchema, type RenderData, type RenderEnvelope, type RenderRequest } from "./contract";
 
-let browserPromise: Promise<Browser> | undefined;
+let contextPromise: Promise<BrowserContext> | undefined;
+let activeProxyURL: string | undefined;
 let writes = Promise.resolve();
-type ProxySettings = NonNullable<BrowserContextOptions["proxy"]>;
+type PersistentContextOptions = NonNullable<Parameters<typeof chromium.launchPersistentContext>[1]>;
+type ProxySettings = NonNullable<PersistentContextOptions["proxy"]>;
+
+function debug(event: string, values: Record<string, unknown> = {}): void {
+  if (process.env.PAGELODE_DEBUG !== "true") return;
+  process.stderr.write(`${JSON.stringify({ component: "patchright", event, ...values })}\n`);
+}
 
 function booleanEnvironment(name: string, fallback: boolean): boolean {
   const raw = process.env[name];
@@ -16,15 +26,29 @@ function booleanEnvironment(name: string, fallback: boolean): boolean {
   throw new Error(`${name} must be true or false`);
 }
 
-async function browser(): Promise<Browser> {
-  if (browserPromise === undefined) {
-    const headless = booleanEnvironment("PAGELODE_PATCHRIGHT_HEADLESS", true);
-    browserPromise = chromium.launch({ headless }).catch((error: unknown) => {
-      browserPromise = undefined;
+function profileDirectory(): string {
+  const configured = process.env.PAGELODE_PATCHRIGHT_PROFILE;
+  if (configured !== undefined && configured !== "") return configured;
+  if (process.platform === "darwin") return join(homedir(), "Library", "Application Support", "PageLode", "Patchright");
+  if (process.platform === "win32") return join(process.env.LOCALAPPDATA ?? homedir(), "PageLode", "Patchright");
+  return join(homedir(), ".local", "share", "pagelode", "patchright");
+}
+
+async function browserContext(input: RenderRequest): Promise<BrowserContext> {
+  if (contextPromise === undefined) {
+    activeProxyURL = input.proxy_url;
+    const directory = profileDirectory();
+    await mkdir(directory, { recursive: true });
+    const options = launchOptions(input);
+    debug("browser_launch", { channel: options.channel ?? "bundled", headless: options.headless, profile: directory, proxy: input.proxy_url !== undefined });
+    contextPromise = chromium.launchPersistentContext(directory, options).catch((error: unknown) => {
+      contextPromise = undefined;
+      activeProxyURL = undefined;
       throw error;
     });
   }
-  return browserPromise;
+  if (activeProxyURL !== input.proxy_url) throw new Error("proxy cannot change while the persistent browser is running");
+  return contextPromise;
 }
 
 function proxySettings(raw: string | undefined): ProxySettings | undefined {
@@ -37,12 +61,17 @@ function proxySettings(raw: string | undefined): ProxySettings | undefined {
   return settings;
 }
 
-function contextOptions(input: RenderRequest): BrowserContextOptions {
-  const result: BrowserContextOptions = {
+function launchOptions(input: RenderRequest): PersistentContextOptions {
+  const result: PersistentContextOptions = {
+    headless: booleanEnvironment("PAGELODE_PATCHRIGHT_HEADLESS", false),
     locale: "en-GB",
     timezoneId: "Europe/London",
+    viewport: null,
   };
-  if (input.user_agent !== undefined) result.userAgent = input.user_agent;
+  const executablePath = process.env.PAGELODE_PATCHRIGHT_EXECUTABLE_PATH;
+  if (executablePath !== undefined && executablePath !== "") result.executablePath = executablePath;
+  const channel = process.env.PAGELODE_PATCHRIGHT_CHANNEL ?? (process.platform === "linux" ? "" : "chrome");
+  if (channel !== "") result.channel = channel;
   const proxy = proxySettings(input.proxy_url);
   if (proxy !== undefined) result.proxy = proxy;
   return result;
@@ -68,9 +97,10 @@ async function addCookies(page: Page, input: RenderRequest): Promise<void> {
 
 async function challenged(page: Page): Promise<boolean> {
   const title = (await page.title()).toLowerCase();
-  if (["just a moment", "attention required", "security verification", "checking your browser"].some((value) => title.includes(value))) return true;
+  if (["just a moment", "one moment", "attention required", "security verification", "checking your browser"].some((value) => title.includes(value))) return true;
   const body = (await page.locator("body").innerText({ timeout: 2_000 }).catch(() => "")).toLowerCase();
-  return ["verify you are human", "performing security verification", "cloudflare ray id", "enable javascript and cookies"].some((value) => body.includes(value));
+  if (["verify you are human", "verify your session", "performing security verification", "cloudflare ray id", "enable javascript and cookies"].some((value) => body.includes(value))) return true;
+  return (await page.locator("#challenge-form, form[action*='/cdn-cgi/challenge-platform'], iframe[src*='challenges.cloudflare.com'], .cf-turnstile").count()) > 0;
 }
 
 async function challengeTarget(page: Page) {
@@ -87,6 +117,7 @@ async function challengeTarget(page: Page) {
 async function settleChallenge(page: Page): Promise<void> {
   for (let attempt = 0; attempt < 3 && await challenged(page); attempt += 1) {
     const target = await challengeTarget(page);
+    debug("challenge_detected", { attempt: attempt + 1, title: await page.title(), target: target !== undefined });
     if (target !== undefined) {
       const box = await target.boundingBox();
       if (box !== null) {
@@ -95,23 +126,25 @@ async function settleChallenge(page: Page): Promise<void> {
         await page.mouse.move(x, y, { steps: 12 + Math.floor(Math.random() * 9) });
         await page.waitForTimeout(150 + Math.floor(Math.random() * 250));
         await page.mouse.click(x, y);
+        debug("challenge_clicked", { attempt: attempt + 1 });
       }
     }
     for (let elapsed = 0; elapsed < 15_000 && await challenged(page); elapsed += 500) await page.waitForTimeout(500);
   }
+  debug("challenge_settled", { challenged: await challenged(page), title: await page.title(), url: page.url() });
 }
 
 async function render(input: RenderRequest): Promise<RenderData> {
-  const activeBrowser = await browser();
-  const context = await activeBrowser.newContext(contextOptions(input));
+  const context = await browserContext(input);
+  const page = await context.newPage();
   try {
-    const page = await context.newPage();
     let statusCode = 0;
     page.on("response", (response) => {
       if (response.request().resourceType() === "document" && response.frame() === page.mainFrame()) statusCode = response.status();
     });
     await addCookies(page, input);
     const response = await page.goto(input.url, { timeout: input.timeout_ms, waitUntil: input.wait_until });
+    debug("navigation_complete", { status: response?.status() ?? 0, title: await page.title(), url: page.url() });
     if (input.settle_challenge) await settleChallenge(page);
     await page.waitForTimeout(500);
     const cookies = await context.cookies();
@@ -133,7 +166,7 @@ async function render(input: RenderRequest): Promise<RenderData> {
       })),
     };
   } finally {
-    await context.close();
+    await page.close();
   }
 }
 
@@ -172,4 +205,4 @@ for await (const line of input) {
 
 await Promise.allSettled(active);
 await writes;
-if (browserPromise !== undefined) await (await browserPromise).close();
+if (contextPromise !== undefined) await (await contextPromise).close();
