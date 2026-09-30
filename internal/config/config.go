@@ -4,17 +4,22 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type Config struct {
+	ProfilesDirectory  string
 	Address            string
 	PatchrightCommand  string
 	PatchrightWorker   string
+	CapSolverAPIKey    string
+	CapSolverURL       string
+	CapSolverProxyURL  string
 	ProxyURL           string
-	RodEnabled         bool
+	ChromedpEnabled    bool
 	ProtectedDomains   []string
 	MaxConcurrency     int
 	BrowserConcurrency int
@@ -43,7 +48,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	rodEnabled, err := boolean("PAGELODE_ROD_ENABLED", true)
+	chromedpEnabled, err := boolean("PAGELODE_CHROMEDP_ENABLED", true)
 	if err != nil {
 		return Config{}, err
 	}
@@ -61,13 +66,35 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("config: invalid PAGELODE_PROXY_URL: %w", err)
 		}
 	}
+	capSolverProxyURL := configuredCapSolverProxyURL(proxyURL)
+	if capSolverProxyURL != "" {
+		if err := validateURL(capSolverProxyURL, "http", "https", "socks4", "socks5"); err != nil {
+			return Config{}, fmt.Errorf("config: invalid PAGELODE_CAPSOLVER_PROXY_URL: %w", err)
+		}
+	}
+	capSolverURL := value("PAGELODE_CAPSOLVER_URL", "https://api.capsolver.com")
+	if err := validateURL(capSolverURL, "http", "https"); err != nil {
+		return Config{}, fmt.Errorf("config: invalid PAGELODE_CAPSOLVER_URL: %w", err)
+	}
 
+	profilesDirectory := os.Getenv("PAGELODE_PROFILES_DIR")
+	if profilesDirectory == "" {
+		directory, err := os.UserConfigDir()
+		if err != nil {
+			return Config{}, fmt.Errorf("config: profiles directory: %w", err)
+		}
+		profilesDirectory = filepath.Join(directory, "pagelode", "profiles")
+	}
 	return Config{
+		ProfilesDirectory:  profilesDirectory,
 		Address:            fmt.Sprintf(":%d", port),
 		PatchrightCommand:  value("PAGELODE_PATCHRIGHT_COMMAND", "bun"),
 		PatchrightWorker:   value("PAGELODE_PATCHRIGHT_WORKER", "browser/src/worker.ts"),
+		CapSolverAPIKey:    os.Getenv("CAPSOLVER_API_KEY"),
+		CapSolverURL:       capSolverURL,
+		CapSolverProxyURL:  capSolverProxyURL,
 		ProxyURL:           proxyURL,
-		RodEnabled:         rodEnabled,
+		ChromedpEnabled:    chromedpEnabled,
 		ProtectedDomains:   domains(value("PAGELODE_PROTECTED_DOMAINS", "crunchbase.com")),
 		MaxConcurrency:     maxConcurrency,
 		BrowserConcurrency: browserConcurrency,
@@ -75,6 +102,13 @@ func Load() (Config, error) {
 		RequestTimeout:     requestTimeout,
 		RouteTTL:           routeTTL,
 	}, nil
+}
+
+func configuredCapSolverProxyURL(sharedProxyURL string) string {
+	if configured := os.Getenv("PAGELODE_CAPSOLVER_PROXY_URL"); configured != "" {
+		return configured
+	}
+	return sharedProxyURL
 }
 
 func integer(name string, fallback int, minimum int) (int, error) {

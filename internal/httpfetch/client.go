@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/url"
 	"strings"
+	"time"
 
 	http "github.com/bogdanfinn/fhttp"
 	tlsclient "github.com/bogdanfinn/tls-client"
@@ -27,7 +28,7 @@ func New(proxyURL string) *Client {
 	return &Client{proxyURL: proxyURL}
 }
 
-func (c *Client) Fetch(ctx context.Context, targetURL string, _ page.Session) (page.Document, error) {
+func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
 	jar := tlsclient.NewCookieJar()
 	options := []tlsclient.HttpClientOption{
 		tlsclient.WithTimeoutSeconds(30),
@@ -42,10 +43,21 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, _ page.Session) (p
 		return page.Document{}, fmt.Errorf("http fetch: create TLS client: %w", err)
 	}
 	defer client.CloseIdleConnections()
+	parsedTargetURL, err := url.Parse(targetURL)
+	if err != nil {
+		return page.Document{}, fmt.Errorf("http fetch: parse target URL: %w", err)
+	}
+	if len(session.Cookies) > 0 {
+		jar.SetCookies(parsedTargetURL, requestCookies(session.Cookies))
+	}
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
 		return page.Document{}, fmt.Errorf("http fetch: create request: %w", err)
+	}
+	effectiveUserAgent := userAgent
+	if session.UserAgent != "" {
+		effectiveUserAgent = session.UserAgent
 	}
 	request.Header = http.Header{
 		"accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7"},
@@ -53,7 +65,7 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, _ page.Session) (p
 		"cache-control":             {"no-cache"},
 		"pragma":                    {"no-cache"},
 		"upgrade-insecure-requests": {"1"},
-		"user-agent":                {userAgent},
+		"user-agent":                {effectiveUserAgent},
 		http.HeaderOrderKey: {
 			"accept",
 			"accept-language",
@@ -96,7 +108,7 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, _ page.Session) (p
 		FinalURL:   finalURL,
 		Type:       contentType,
 		Session: page.Session{
-			UserAgent: userAgent,
+			UserAgent: effectiveUserAgent,
 			Cookies:   portableCookies(client.GetCookies(parsedFinalURL), parsedFinalURL.Hostname()),
 		},
 	}
@@ -106,6 +118,25 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, _ page.Session) (p
 		document.Text = strings.TrimSpace(string(body))
 	}
 	return document, nil
+}
+
+func requestCookies(cookies []page.Cookie) []*http.Cookie {
+	result := make([]*http.Cookie, 0, len(cookies))
+	for _, cookie := range cookies {
+		current := &http.Cookie{
+			Name:     cookie.Name,
+			Value:    cookie.Value,
+			Domain:   cookie.Domain,
+			Path:     cookie.Path,
+			HttpOnly: cookie.HTTPOnly,
+			Secure:   cookie.Secure,
+		}
+		if cookie.Expires > 0 {
+			current.Expires = time.Unix(int64(cookie.Expires), 0)
+		}
+		result = append(result, current)
+	}
+	return result
 }
 
 func detectContentType(header string, path string) page.ContentType {

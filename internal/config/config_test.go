@@ -16,8 +16,8 @@ func TestLoadDefaults(t *testing.T) {
 	if got.Address != ":8083" {
 		t.Errorf("Load().Address = %q, want :8083", got.Address)
 	}
-	if !got.RodEnabled {
-		t.Error("Load().RodEnabled = false, want true")
+	if !got.ChromedpEnabled {
+		t.Error("Load().ChromedpEnabled = false, want true")
 	}
 	if got.PatchrightCommand != "bun" {
 		t.Errorf("Load().PatchrightCommand = %q, want bun", got.PatchrightCommand)

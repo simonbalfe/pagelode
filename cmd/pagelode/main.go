@@ -15,24 +15,28 @@ import (
 	"time"
 
 	"github.com/simonbalfe/pagelode/internal/api"
+	"github.com/simonbalfe/pagelode/internal/capsolver"
+	"github.com/simonbalfe/pagelode/internal/chromefetch"
 	"github.com/simonbalfe/pagelode/internal/config"
+	"github.com/simonbalfe/pagelode/internal/discovery"
 	"github.com/simonbalfe/pagelode/internal/httpfetch"
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/orchestrator"
 	"github.com/simonbalfe/pagelode/internal/patchright"
-	"github.com/simonbalfe/pagelode/internal/rodfetch"
 )
 
 const version = "0.1.0"
 
 type application struct {
-	extractor      *orchestrator.Service
-	extractLimiter *limit.Limiter
-	browserLimiter *limit.Limiter
-	routes         *memory.Routes
-	rod            *rodfetch.Engine
-	patchright     *patchright.Client
+	extractor         *orchestrator.Service
+	discoverer        *discovery.Service
+	extractLimiter    *limit.Limiter
+	browserLimiter    *limit.Limiter
+	routes            *memory.Routes
+	chromedp          *chromefetch.Engine
+	capSolverChromedp *chromefetch.Engine
+	patchright        *patchright.Client
 }
 
 func main() {
@@ -72,6 +76,15 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 		}
 		return app.serve(configuration, stdout)
 	}
+	if args[0] == "profile" {
+		return profileCommand(configuration, args[1:], stdout, stderr)
+	}
+	if args[0] == "discover" {
+		return app.discover(configuration, args[1:], stdout, stderr)
+	}
+	if args[0] == "extract" {
+		args = args[1:]
+	}
 	return app.extract(configuration, args, stdout, stderr)
 }
 
@@ -80,28 +93,54 @@ func newApplication(configuration config.Config) (*application, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure Patchright: %w", err)
 	}
-	rod, err := rodfetch.New(configuration.ProxyURL)
+	chromedp, err := chromefetch.New(configuration.ProxyURL)
 	if err != nil {
-		return nil, fmt.Errorf("configure Rod: %w", err)
+		return nil, fmt.Errorf("configure Chromedp: %w", err)
 	}
 	routes := memory.NewRoutes(configuration.RouteTTL, configuration.ProtectedDomains)
 	browserLimiter := limit.New(configuration.BrowserConcurrency, configuration.MaxWaiting)
 	extractLimiter := limit.New(configuration.MaxConcurrency, configuration.MaxWaiting)
+	httpClient := httpfetch.New(configuration.ProxyURL)
+	capSolverProxyURL := configuration.CapSolverProxyURL
+	if configuration.CapSolverAPIKey != "" && capSolverProxyURL != "" {
+		resolveContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		capSolverProxyURL, err = capsolver.ResolveProxy(resolveContext, capSolverProxyURL)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("configure CapSolver: %w", err)
+		}
+	}
+	capSolverHTTPClient := httpfetch.New(capSolverProxyURL)
+	capSolverChromedp, err := chromefetch.New(capSolverProxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("configure CapSolver browser: %w", err)
+	}
+	capSolverClient, err := capsolver.New(configuration.CapSolverAPIKey, configuration.CapSolverURL, capSolverProxyURL, capSolverHTTPClient, capSolverChromedp)
+	if err != nil {
+		return nil, fmt.Errorf("configure CapSolver: %w", err)
+	}
+	var capSolverFetcher orchestrator.Fetcher
+	if capSolverClient != nil {
+		capSolverFetcher = capSolverClient
+	}
 	extractor := orchestrator.New(
-		httpfetch.New(configuration.ProxyURL),
-		rod,
+		httpClient,
+		chromedp,
 		patchrightClient,
+		capSolverFetcher,
 		routes,
 		browserLimiter,
-		configuration.RodEnabled,
+		configuration.ChromedpEnabled,
 	)
 	return &application{
-		extractor:      extractor,
-		extractLimiter: extractLimiter,
-		browserLimiter: browserLimiter,
-		routes:         routes,
-		rod:            rod,
-		patchright:     patchrightClient,
+		discoverer:        discovery.New(chromedp, patchrightClient, routes, browserLimiter, configuration.ChromedpEnabled).WithProfiles(configuration.ProfilesDirectory),
+		extractor:         extractor,
+		extractLimiter:    extractLimiter,
+		browserLimiter:    browserLimiter,
+		routes:            routes,
+		chromedp:          chromedp,
+		capSolverChromedp: capSolverChromedp,
+		patchright:        patchrightClient,
 	}, nil
 }
 
@@ -146,7 +185,7 @@ func (a *application) extract(configuration config.Config, args []string, stdout
 
 func (a *application) serve(configuration config.Config, output io.Writer) error {
 	logger := slog.New(slog.NewJSONHandler(output, nil))
-	apiServer := api.New(a.extractor, a.extractLimiter, a.browserLimiter, a.routes, configuration.RequestTimeout, logger)
+	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.browserLimiter, a.routes, configuration.RequestTimeout, logger)
 	server := &http.Server{
 		Addr:              configuration.Address,
 		Handler:           apiServer.Handler(),
@@ -167,7 +206,7 @@ func (a *application) serve(configuration config.Config, output io.Writer) error
 		}
 	}()
 
-	logger.Info("pagelode listening", "address", configuration.Address, "rod", configuration.RodEnabled, "protected_domains", configuration.ProtectedDomains)
+	logger.Info("pagelode listening", "address", configuration.Address, "chromedp", configuration.ChromedpEnabled, "protected_domains", configuration.ProtectedDomains)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("serve: %w", err)
 	}
@@ -175,7 +214,7 @@ func (a *application) serve(configuration config.Config, output io.Writer) error
 }
 
 func (a *application) Close() error {
-	return errors.Join(a.rod.Close(), a.patchright.Close())
+	return errors.Join(a.chromedp.Close(), a.capSolverChromedp.Close(), a.patchright.Close())
 }
 
 func attemptDetail(attempts []orchestrator.Attempt) string {
@@ -186,11 +225,15 @@ func attemptDetail(attempts []orchestrator.Attempt) string {
 }
 
 func writeUsage(output io.Writer) {
-	fmt.Fprintln(output, `PageLode turns web pages into clean Markdown.
+	fmt.Fprintln(output, `PageLode extracts Markdown and discovers page data endpoints.
 
 Usage:
   pagelode <URL>
   pagelode --json <URL>
+  pagelode extract <URL>
+  pagelode discover [--profile <name>] [--verbose] [--wait-ms 1500] <URL>
+  pagelode discover --har <capture.har>
+  pagelode profile login <name> <URL>
   pagelode serve
   pagelode version
 

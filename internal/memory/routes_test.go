@@ -17,9 +17,9 @@ func TestRoutes(t *testing.T) {
 	if got, ok := routes.Preferred("www.crunchbase.com"); !ok || got != page.ProviderPatchright {
 		t.Fatalf("Preferred(protected) = %q, %v; want patchright, true", got, ok)
 	}
-	routes.Record("example.com", page.ProviderRod)
-	if got, ok := routes.Preferred("example.com"); !ok || got != page.ProviderRod {
-		t.Fatalf("Preferred(learned) = %q, %v; want rod, true", got, ok)
+	routes.Record("example.com", page.ProviderChromedp)
+	if got, ok := routes.Preferred("example.com"); !ok || got != page.ProviderChromedp {
+		t.Fatalf("Preferred(learned) = %q, %v; want chromedp, true", got, ok)
 	}
 
 	now = now.Add(2 * time.Minute)

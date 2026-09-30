@@ -22,7 +22,7 @@ caller
      -> host policy + learned route
      -> browser-profiled HTTP
         -> accept -----------------------> extraction (Go)
-        -> JavaScript shell -> Rod ------> extraction (Go)
+        -> JavaScript shell -> chromedp ------> extraction (Go)
         -> block -----------> Patchright -> extraction (Go)
      -> Markdown, links, attempts
 
@@ -46,7 +46,7 @@ Patchright adapter (TypeScript)
 
 - Port the structural anti-bot checks from the current OpenExtract design.
 - Add Spider-style weighted JavaScript-render detection.
-- Route confirmed blocks directly to Patchright instead of wasting a Rod attempt.
+- Route confirmed blocks directly to Patchright instead of wasting a chromedp attempt.
 - Carry the HTTP user agent and cookies into browser fallbacks.
 - Learn successful browser routes per hostname with an expiring in-memory cache.
 
@@ -59,7 +59,7 @@ Patchright adapter (TypeScript)
 
 ### 4. Browser hardening
 
-- Reuse Rod and Patchright browser processes.
+- Reuse chromedp and Patchright browser processes.
 - Add proxy/fingerprint coherence and persistent named sessions where needed.
 - Port optional Turnstile token-provider support behind the browser contract.
 - Add browser recycling, request interception, and per-domain wait profiles.
@@ -74,7 +74,7 @@ Patchright adapter (TypeScript)
 ## Initial acceptance gates
 
 - No JavaScript shell may be reported as `outcome=ok` in the fixture suite.
-- Confirmed challenge responses must skip Rod.
+- Confirmed challenge responses must skip chromedp.
 - Patchright must receive coherent UA, cookies, locale, timezone, and proxy settings.
 - Every attempt must have a bounded timeout and a recorded classification reason.
 - The service must reject saturated queues before starting more browser work.

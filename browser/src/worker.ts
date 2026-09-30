@@ -6,6 +6,8 @@ import { createInterface } from "node:readline";
 import { chromium, type BrowserContext, type Page } from "patchright";
 import { ZodError } from "zod";
 import { renderRequestSchema, type RenderData, type RenderEnvelope, type RenderRequest } from "./contract";
+import { captureTraffic } from "./capture";
+import { restoreSession, saveSession } from "./profile";
 
 let contextPromise: Promise<BrowserContext> | undefined;
 let activeProxyURL: string | undefined;
@@ -41,7 +43,15 @@ async function browserContext(input: RenderRequest): Promise<BrowserContext> {
     await mkdir(directory, { recursive: true });
     const options = launchOptions(input);
     debug("browser_launch", { channel: options.channel ?? "bundled", headless: options.headless, profile: directory, proxy: input.proxy_url !== undefined });
-    contextPromise = chromium.launchPersistentContext(directory, options).catch((error: unknown) => {
+    contextPromise = chromium.launchPersistentContext(directory, options).then(async (context) => {
+      try {
+        if (process.env.PAGELODE_PROFILE_SESSION === "true") await restoreSession(context, directory);
+        return context;
+      } catch (error: unknown) {
+        await context.close();
+        throw error;
+      }
+    }).catch((error: unknown) => {
       contextPromise = undefined;
       activeProxyURL = undefined;
       throw error;
@@ -137,7 +147,11 @@ async function settleChallenge(page: Page): Promise<void> {
 async function render(input: RenderRequest): Promise<RenderData> {
   const context = await browserContext(input);
   const page = await context.newPage();
+  const captureTimeout = input.capture === undefined ? undefined : setTimeout(() => {
+    void page.close().catch(() => debug("capture_timeout_close_failed"));
+  }, input.timeout_ms);
   try {
+    const capture = input.capture === undefined ? undefined : captureTraffic(page);
     let statusCode = 0;
     page.on("response", (response) => {
       if (response.request().resourceType() === "document" && response.frame() === page.mainFrame()) statusCode = response.status();
@@ -146,7 +160,8 @@ async function render(input: RenderRequest): Promise<RenderData> {
     const response = await page.goto(input.url, { timeout: input.timeout_ms, waitUntil: input.wait_until });
     debug("navigation_complete", { status: response?.status() ?? 0, title: await page.title(), url: page.url() });
     if (input.settle_challenge) await settleChallenge(page);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(input.capture?.wait_ms ?? 500);
+    if (process.env.PAGELODE_PROFILE_SESSION === "true") await saveSession(context, profileDirectory());
     const cookies = await context.cookies();
     return {
       status_code: statusCode || response?.status() || 0,
@@ -164,8 +179,10 @@ async function render(input: RenderRequest): Promise<RenderData> {
         secure: cookie.secure,
         same_site: cookie.sameSite,
       })),
+      ...(capture === undefined ? {} : { traffic: await capture.finish() }),
     };
   } finally {
+    if (captureTimeout !== undefined) clearTimeout(captureTimeout);
     await page.close();
   }
 }
@@ -194,15 +211,44 @@ async function handle(line: string): Promise<void> {
   }
 }
 
-const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
-const active = new Set<Promise<void>>();
-
-for await (const line of input) {
-  if (line.trim() === "") continue;
-  const job = handle(line).finally(() => active.delete(job));
-  active.add(job);
+async function login(target: string): Promise<void> {
+  const request = renderRequestSchema.parse({ id: "login", url: target, proxy_url: process.env.PAGELODE_PROXY_URL });
+  const context = await browserContext(request);
+  const closed = new Promise<void>((resolve) => context.once("close", () => resolve()));
+  const page = context.pages()[0] ?? await context.newPage();
+  const terminal = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  const entered = new Promise<"entered" | "ended">((resolve) => {
+    terminal.once("line", () => resolve("entered"));
+    terminal.once("close", () => resolve("ended"));
+  });
+  try {
+    await page.goto(request.url, { waitUntil: "domcontentloaded" });
+    const event = await Promise.race([entered, closed.then(() => "closed")]);
+    if (event !== "entered") throw new Error("press Enter after signing in to save the profile before closing the browser");
+    await saveSession(context, profileDirectory());
+  } finally {
+    terminal.close();
+    await context.close();
+  }
 }
 
-await Promise.allSettled(active);
-await writes;
-if (contextPromise !== undefined) await (await contextPromise).close();
+async function serve(): Promise<void> {
+  const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  const active = new Set<Promise<void>>();
+  for await (const line of input) {
+    if (line.trim() === "") continue;
+    const job = handle(line).finally(() => active.delete(job));
+    active.add(job);
+  }
+  await Promise.allSettled(active);
+  await writes;
+  if (contextPromise !== undefined) await (await contextPromise).close();
+}
+
+if (process.argv[2] === "--login") {
+  const target = process.argv[3];
+  if (target === undefined) throw new Error("login URL is required");
+  await login(target);
+} else {
+  await serve();
+}

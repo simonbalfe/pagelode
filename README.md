@@ -1,6 +1,6 @@
 # PageLode
 
-PageLode turns web pages into clean Markdown.
+PageLode extracts clean Markdown and discovers the data endpoints behind web pages.
 
 Give it a URL and it returns the useful content, page title, internal links, and a record of how the page was loaded. It begins with a fast direct request and only opens a browser when the page actually needs one.
 
@@ -9,10 +9,11 @@ Give it a URL and it returns the useful content, page title, internal links, and
 Many web pages can be downloaded directly. Others need JavaScript, and some place a browser check in front of their content. Using a full browser for every request is slow and expensive, so PageLode uses a simple waterfall:
 
 1. Load the page with a browser-like HTTP client.
-2. If JavaScript is required, render it with Rod and Chromium.
+2. If JavaScript is required, render it with Chromedp and Chromium.
 3. If the page appears blocked, retry it with Patchright.
-4. Remove navigation, advertising, and other clutter.
-5. Return readable Markdown and useful metadata.
+4. If Cloudflare still blocks the page and CapSolver is configured, obtain a valid browser session and retry through the same proxy.
+5. Remove navigation, advertising, and other clutter.
+6. Return readable Markdown and useful metadata.
 
 PageLode keeps the main service in Go. A small TypeScript worker exists only for Patchright, whose browser tooling is built for the JavaScript ecosystem.
 
@@ -42,8 +43,6 @@ For the complete result, including the loader attempts:
 
 The API starts at `http://localhost:8083`. Send it a page:
 
-Send it a page:
-
 ```sh
 curl -sS http://localhost:8083/extract \
   -H 'content-type: application/json' \
@@ -58,6 +57,23 @@ The response contains:
 - `provider`: the loader that succeeded
 - `attempts`: what PageLode tried and why it escalated
 
+## Discover page data endpoints
+
+```sh
+./bin/pagelode discover https://example.com/listings
+./bin/pagelode discover --har capture.har
+```
+
+Or use the API:
+
+```sh
+curl -sS http://localhost:8083/discover \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://example.com/listings","waitMs":1500}'
+```
+
+Discovery captures the page's network traffic and returns endpoint groups, request and response field types, authentication signals, pagination candidates, and optional sanitized evidence with `--verbose`. [Discovery documentation](docs/discovery.md) explains the response and capture limits.
+
 ## Docker
 
 ```sh
@@ -70,13 +86,16 @@ The container starts PageLode in service mode.
 
 PageLode currently supports HTML and text pages. It detects common block pages and JavaScript-only shells, limits response sizes and concurrency, and remembers the best loader for recently visited domains.
 
-It does not guarantee access to protected websites. Some sites require suitable proxies, authenticated sessions, or permission from the site owner. Use PageLode responsibly and follow applicable terms, robots policies, and laws.
+It does not guarantee access to protected websites. The optional CapSolver fallback requires an API key and a sticky authenticated proxy. Some sites also require authenticated sessions or permission from the site owner. Use PageLode responsibly and follow applicable terms, robots policies, and laws.
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Endpoint discovery](docs/discovery.md)
 - [Configuration](docs/configuration.md)
+- [Cloudflare fallback status](docs/cloudflare-status.md)
 - [OpenExtract migration plan](docs/migration.md)
+- [Plan beyond Markdown extraction](docs/generalization-plan.md)
 
 ## Development
 
@@ -90,3 +109,12 @@ make smoke
 ## License
 
 MIT
+
+### Authenticated discovery
+
+```sh
+pagelode profile login account https://example.com/login
+pagelode discover --profile account example.com
+```
+
+Sign in in the opened Patchright browser and press Enter in the terminal to save the profile and close it. Go reuses it for later discovery. Add `--verbose` for request evidence and matching scores. See [discovery documentation](docs/discovery.md) for API usage, profile storage, and endpoint matching rules.

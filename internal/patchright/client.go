@@ -21,9 +21,10 @@ const maxResponseBytes = 12 << 20
 var errClosed = errors.New("patchright: client is closed")
 
 type Client struct {
-	command  string
-	args     []string
-	proxyURL string
+	command     string
+	args        []string
+	proxyURL    string
+	environment []string
 
 	mu      sync.Mutex
 	process *workerProcess
@@ -57,6 +58,30 @@ func New(command string, args []string, proxyURL string) (*Client, error) {
 }
 
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
+	return c.render(ctx, targetURL, session, nil)
+}
+
+func (c *Client) Capture(ctx context.Context, targetURL string, session page.Session, options page.CaptureOptions) (page.Document, error) {
+	if options.ProfileDirectory == "" {
+		return c.render(ctx, targetURL, session, &options)
+	}
+	client, err := New(c.command, c.args, c.proxyURL)
+	if err != nil {
+		return page.Document{}, err
+	}
+	client.environment = []string{"PAGELODE_PATCHRIGHT_PROFILE=" + options.ProfileDirectory, "PAGELODE_PATCHRIGHT_HEADLESS=true", "PAGELODE_PROFILE_SESSION=true"}
+	document, captureErr := client.render(ctx, targetURL, session, &options)
+	closeErr := client.Close()
+	if captureErr != nil {
+		return page.Document{}, captureErr
+	}
+	if closeErr != nil {
+		return page.Document{}, closeErr
+	}
+	return document, nil
+}
+
+func (c *Client) render(ctx context.Context, targetURL string, session page.Session, capture *page.CaptureOptions) (page.Document, error) {
 	id := strconv.FormatUint(c.nextID.Add(1), 10)
 	result := make(chan workerResult, 1)
 
@@ -75,10 +100,21 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		URL:             targetURL,
 		TimeoutMS:       45_000,
 		WaitUntil:       "domcontentloaded",
-		UserAgent:       session.UserAgent,
 		Cookies:         session.Cookies,
 		ProxyURL:        c.proxyURL,
 		SettleChallenge: true,
+		Capture:         capture,
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline).Milliseconds()
+		if remaining < 1000 {
+			delete(c.pending, id)
+			c.mu.Unlock()
+			return page.Document{}, context.DeadlineExceeded
+		}
+		if remaining < int64(request.TimeoutMS) {
+			request.TimeoutMS = int(remaining)
+		}
 	}
 	if err := c.process.encoder.Encode(request); err != nil {
 		delete(c.pending, id)
@@ -140,6 +176,7 @@ func (c *Client) startLocked() error {
 		return nil
 	}
 	command := exec.Command(c.command, c.args...)
+	command.Env = append(os.Environ(), c.environment...)
 	input, err := command.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("patchright: create worker input: %w", err)
@@ -255,18 +292,19 @@ func document(envelope renderEnvelope, session page.Session) (page.Document, err
 		HTML:       envelope.Data.HTML,
 		Type:       page.ContentHTML,
 		Session:    session,
+		Traffic:    envelope.Data.Traffic,
 	}, nil
 }
 
 type renderRequest struct {
-	ID              string        `json:"id"`
-	URL             string        `json:"url"`
-	TimeoutMS       int           `json:"timeout_ms"`
-	WaitUntil       string        `json:"wait_until"`
-	UserAgent       string        `json:"user_agent,omitempty"`
-	Cookies         []page.Cookie `json:"cookies,omitempty"`
-	ProxyURL        string        `json:"proxy_url,omitempty"`
-	SettleChallenge bool          `json:"settle_challenge"`
+	ID              string               `json:"id"`
+	URL             string               `json:"url"`
+	TimeoutMS       int                  `json:"timeout_ms"`
+	WaitUntil       string               `json:"wait_until"`
+	Cookies         []page.Cookie        `json:"cookies,omitempty"`
+	ProxyURL        string               `json:"proxy_url,omitempty"`
+	SettleChallenge bool                 `json:"settle_challenge"`
+	Capture         *page.CaptureOptions `json:"capture,omitempty"`
 }
 
 type renderEnvelope struct {
@@ -283,6 +321,7 @@ type renderData struct {
 	HTML       string        `json:"html"`
 	UserAgent  string        `json:"user_agent"`
 	Cookies    []page.Cookie `json:"cookies"`
+	Traffic    *page.Capture `json:"traffic,omitempty"`
 }
 
 type renderError struct {

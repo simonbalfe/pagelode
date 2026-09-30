@@ -21,16 +21,16 @@ func (s *stubFetcher) Fetch(context.Context, string, page.Session) (page.Documen
 	return s.document, s.err
 }
 
-func TestBlockedHTTPSkipsRod(t *testing.T) {
+func TestBlockedHTTPSkipsChromedp(t *testing.T) {
 	t.Parallel()
 
 	httpFetcher := &stubFetcher{document: page.Document{
 		Provider: page.ProviderTLS, StatusCode: 403, FinalURL: "https://example.com", Type: page.ContentHTML,
 		HTML: `<html><title>Just a moment</title><body><form id="challenge-form" action="?__cf_chl_f_tk=x"></form></body></html>`,
 	}}
-	rodFetcher := &stubFetcher{}
+	chromedpFetcher := &stubFetcher{}
 	patchrightFetcher := &stubFetcher{document: usableDocument(page.ProviderPatchright)}
-	service := testService(httpFetcher, rodFetcher, patchrightFetcher, nil)
+	service := testService(httpFetcher, chromedpFetcher, patchrightFetcher, nil, nil)
 
 	result, err := service.Extract(context.Background(), "https://example.com")
 	if err != nil {
@@ -39,28 +39,28 @@ func TestBlockedHTTPSkipsRod(t *testing.T) {
 	if result.Provider != page.ProviderPatchright {
 		t.Errorf("Extract() provider = %q, want patchright", result.Provider)
 	}
-	if rodFetcher.calls != 0 {
-		t.Errorf("Rod calls = %d, want 0", rodFetcher.calls)
+	if chromedpFetcher.calls != 0 {
+		t.Errorf("Chromedp calls = %d, want 0", chromedpFetcher.calls)
 	}
 }
 
-func TestJavaScriptShellUsesRod(t *testing.T) {
+func TestJavaScriptShellUsesChromedp(t *testing.T) {
 	t.Parallel()
 
 	httpFetcher := &stubFetcher{document: page.Document{
 		Provider: page.ProviderTLS, StatusCode: 200, FinalURL: "https://example.com", Type: page.ContentHTML,
 		HTML: `<html><body><div id="root"></div><script src="/1.js"></script><script src="/2.js"></script><script src="/3.js"></script><script src="/4.js"></script></body></html>`,
 	}}
-	rodFetcher := &stubFetcher{document: usableDocument(page.ProviderRod)}
+	chromedpFetcher := &stubFetcher{document: usableDocument(page.ProviderChromedp)}
 	patchrightFetcher := &stubFetcher{document: usableDocument(page.ProviderPatchright)}
-	service := testService(httpFetcher, rodFetcher, patchrightFetcher, nil)
+	service := testService(httpFetcher, chromedpFetcher, patchrightFetcher, nil, nil)
 
 	result, err := service.Extract(context.Background(), "https://example.com")
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
-	if result.Provider != page.ProviderRod {
-		t.Errorf("Extract() provider = %q, want rod", result.Provider)
+	if result.Provider != page.ProviderChromedp {
+		t.Errorf("Extract() provider = %q, want chromedp", result.Provider)
 	}
 	if patchrightFetcher.calls != 0 {
 		t.Errorf("Patchright calls = %d, want 0", patchrightFetcher.calls)
@@ -71,9 +71,9 @@ func TestProtectedDomainStartsWithPatchright(t *testing.T) {
 	t.Parallel()
 
 	httpFetcher := &stubFetcher{document: usableDocument(page.ProviderTLS)}
-	rodFetcher := &stubFetcher{document: usableDocument(page.ProviderRod)}
+	chromedpFetcher := &stubFetcher{document: usableDocument(page.ProviderChromedp)}
 	patchrightFetcher := &stubFetcher{document: usableDocument(page.ProviderPatchright)}
-	service := testService(httpFetcher, rodFetcher, patchrightFetcher, []string{"crunchbase.com"})
+	service := testService(httpFetcher, chromedpFetcher, patchrightFetcher, nil, []string{"crunchbase.com"})
 
 	result, err := service.Extract(context.Background(), "https://www.crunchbase.com/organization/example")
 	if err != nil {
@@ -82,16 +82,43 @@ func TestProtectedDomainStartsWithPatchright(t *testing.T) {
 	if result.Provider != page.ProviderPatchright {
 		t.Errorf("Extract() provider = %q, want patchright", result.Provider)
 	}
-	if httpFetcher.calls != 0 || rodFetcher.calls != 0 {
-		t.Errorf("lower-tier calls = http:%d rod:%d, want zero", httpFetcher.calls, rodFetcher.calls)
+	if httpFetcher.calls != 0 || chromedpFetcher.calls != 0 {
+		t.Errorf("lower-tier calls = http:%d chromedp:%d, want zero", httpFetcher.calls, chromedpFetcher.calls)
 	}
 }
 
-func testService(httpFetcher Fetcher, rodFetcher Fetcher, patchrightFetcher Fetcher, protected []string) *Service {
+func TestBlockedPatchrightEscalatesToCapSolver(t *testing.T) {
+	t.Parallel()
+
+	httpFetcher := &stubFetcher{document: usableDocument(page.ProviderTLS)}
+	patchrightFetcher := &stubFetcher{document: page.Document{
+		Provider: page.ProviderPatchright, StatusCode: 403, FinalURL: "https://example.com", Type: page.ContentHTML,
+		HTML: `<html><title>Just a moment</title><body><form id="challenge-form"></form></body></html>`,
+	}}
+	capSolverFetcher := &stubFetcher{document: usableDocument(page.ProviderCapSolver)}
+	service := testService(httpFetcher, nil, patchrightFetcher, capSolverFetcher, []string{"example.com"})
+
+	result, err := service.Extract(context.Background(), "https://example.com")
+	if err != nil {
+		t.Fatalf("Extract() error = %v", err)
+	}
+	if result.Provider != page.ProviderCapSolver {
+		t.Errorf("provider = %q, want capsolver", result.Provider)
+	}
+	if httpFetcher.calls != 0 {
+		t.Errorf("HTTP calls = %d, want 0", httpFetcher.calls)
+	}
+	if patchrightFetcher.calls != 1 || capSolverFetcher.calls != 1 {
+		t.Errorf("calls = patchright:%d capsolver:%d, want 1 each", patchrightFetcher.calls, capSolverFetcher.calls)
+	}
+}
+
+func testService(httpFetcher Fetcher, chromedpFetcher Fetcher, patchrightFetcher Fetcher, capSolverFetcher Fetcher, protected []string) *Service {
 	return New(
 		httpFetcher,
-		rodFetcher,
+		chromedpFetcher,
 		patchrightFetcher,
+		capSolverFetcher,
 		memory.NewRoutes(time.Hour, protected),
 		limit.New(2, 2),
 		true,

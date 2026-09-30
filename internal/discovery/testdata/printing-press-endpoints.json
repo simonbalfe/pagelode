@@ -1,0 +1,6423 @@
+{
+  "cases": [
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 5,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -5,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -4,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -3,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://google-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 5,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/html",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "text/css",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/javascript",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": -1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "image/png",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/octet-stream",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/api/users",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": ""
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 1,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://notgoogle-analytics.com/v1/app.js",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/problem+json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/v1/app.js",
+      "host": "notgoogle-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.google-analytics.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.doubleclick.net/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.doubleclick.net",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.sentry.io/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.sentry.io",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.facebook.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.facebook.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.googlesyndication.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.googlesyndication.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.googletagmanager.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.googletagmanager.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.fonts.googleapis.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.fonts.googleapis.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.gstatic.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.gstatic.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.bat.bing.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.bat.bing.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.criteo.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.criteo.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.demdex.net/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.demdex.net",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.onetrust.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.onetrust.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.cookielaw.org/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.cookielaw.org",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.amazon-adsystem.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.amazon-adsystem.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.adsymptotic.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.adsymptotic.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.improving.duckduckgo.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.improving.duckduckgo.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.lngtd.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.lngtd.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.kargo.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.kargo.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.segment.io/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.segment.io",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.api.segment.io/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.api.segment.io",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.mixpanel.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.mixpanel.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.amplitude.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.amplitude.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.hotjar.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.hotjar.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.newrelic.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.newrelic.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.fullstory.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.fullstory.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.intercom.io/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.intercom.io",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.branch.io/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.branch.io",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.stats.g.doubleclick.net/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.stats.g.doubleclick.net",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.adservice.google.com/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.adservice.google.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://sub.connect.facebook.net/collect",
+        "request_body": "",
+        "response_body": "{}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/collect",
+      "host": "sub.connect.facebook.net",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/users/123",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users/{id}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/users/456",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users/{id}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/users/999999999999999999999999999999",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users/{id}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/orders/550e8400-e29b-41d4-a716-446655440000",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/orders/{uuid}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/orders/123e4567-e89b-12d3-a456-426614174000",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/orders/{uuid}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/orders/550e8400-e29b-01d4-a716-446655440000",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/orders/550e8400-e29b-01d4-a716-446655440000",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/blob/{hash}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/blob/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/blob/{hash}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/blob/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/blob/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/api/users?expand=true",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/api/users?expand=false",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 3,
+      "path": "/api/users",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": " get ",
+        "url": "https://API.example.com:8443/users/%31%32%33",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users/{id}",
+      "host": "api.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://other.example.com/users/123",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 2,
+      "path": "/users/{id}",
+      "host": "other.example.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "POST",
+        "url": "https://api.example.com/session",
+        "request_body": "",
+        "response_body": "{\"ok\":true}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/session",
+      "host": "api.example.com",
+      "method": "POST"
+    },
+    {
+      "entry": {
+        "method": "POST",
+        "url": "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+        "request_body": "",
+        "response_body": "{\"videoDetails\":{\"videoId\":\"abc123\"}}",
+        "response_status": 0,
+        "response_content_type": "application/json",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/youtubei/v1/player",
+      "host": "www.youtube.com",
+      "method": "POST"
+    },
+    {
+      "entry": {
+        "method": "POST",
+        "url": "https://region1.analytics.google.com/g/collect",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 0,
+        "response_content_type": "",
+        "request_headers": null,
+        "classification": "",
+        "is_noise": false
+      },
+      "score": 0,
+      "path": "/g/collect",
+      "host": "region1.analytics.google.com",
+      "method": "POST"
+    },
+    {
+      "entry": {
+        "method": "POST",
+        "url": "https://uj5wyc0l7x-dsn.algolia.net/1/indexes/Item_dev/query?x-algolia-api-key=fixture-key&x-algolia-application-id=UJ5WYC0L7X",
+        "request_body": "{\"query\": \"kubernetes\", \"page\": 0, \"hitsPerPage\": 3}",
+        "response_body": "{\"hits\": [{\"objectID\": \"21711748\", \"title\": \"Troubleshooting K8s\", \"url\": \"https://example.com\", \"author\": \"test\", \"points\": 240, \"num_comments\": 53, \"created_at\": \"2019-12-05T12:22:28Z\", \"created_at_i\": 1575548548}, {\"objectID\": \"21711749\", \"title\": \"K8s Best Practices\", \"url\": \"https://example2.com\", \"author\": \"test2\", \"points\": 180, \"num_comments\": 30, \"created_at\": \"2020-01-10T08:00:00Z\", \"created_at_i\": 1578643200}], \"nbHits\": 4804, \"page\": 0, \"nbPages\": 334, \"hitsPerPage\": 3, \"processingTimeMS\": 16, \"query\": \"kubernetes\"}",
+        "response_status": 200,
+        "response_content_type": "application/json",
+        "request_headers": {
+          "Content-Type": "application/json"
+        },
+        "classification": "api",
+        "is_noise": false
+      },
+      "score": 4,
+      "path": "/{id}/indexes/Item_dev/query",
+      "host": "uj5wyc0l7x-dsn.algolia.net",
+      "method": "POST"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://www.google-analytics.com/collect?v=1&tid=UA-12345",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 200,
+        "response_content_type": "image/gif",
+        "request_headers": {},
+        "classification": "noise",
+        "is_noise": true
+      },
+      "score": -5,
+      "path": "/collect",
+      "host": "www.google-analytics.com",
+      "method": "GET"
+    },
+    {
+      "entry": {
+        "method": "GET",
+        "url": "https://hn.algolia.com/assets/app-abc123.js",
+        "request_body": "",
+        "response_body": "",
+        "response_status": 200,
+        "response_content_type": "application/javascript",
+        "request_headers": {},
+        "classification": "noise",
+        "is_noise": true
+      },
+      "score": -3,
+      "path": "/assets/app-abc123.js",
+      "host": "hn.algolia.com",
+      "method": "GET"
+    }
+  ],
+  "groups": [
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/users",
+      "calls": 13
+    },
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/api/users",
+      "calls": 22
+    },
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/v1/app.js",
+      "calls": 13
+    },
+    {
+      "host": "google-analytics.com",
+      "method": "GET",
+      "path": "/users",
+      "calls": 1
+    },
+    {
+      "host": "google-analytics.com",
+      "method": "GET",
+      "path": "/api/users",
+      "calls": 3
+    },
+    {
+      "host": "google-analytics.com",
+      "method": "GET",
+      "path": "/v1/app.js",
+      "calls": 1
+    },
+    {
+      "host": "notgoogle-analytics.com",
+      "method": "GET",
+      "path": "/users",
+      "calls": 13
+    },
+    {
+      "host": "notgoogle-analytics.com",
+      "method": "GET",
+      "path": "/api/users",
+      "calls": 20
+    },
+    {
+      "host": "notgoogle-analytics.com",
+      "method": "GET",
+      "path": "/v1/app.js",
+      "calls": 13
+    },
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/users/{id}",
+      "calls": 4
+    },
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/orders/{uuid}",
+      "calls": 2
+    },
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/orders/550e8400-e29b-01d4-a716-446655440000",
+      "calls": 1
+    },
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/blob/{hash}",
+      "calls": 2
+    },
+    {
+      "host": "api.example.com",
+      "method": "GET",
+      "path": "/blob/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "calls": 1
+    },
+    {
+      "host": "other.example.com",
+      "method": "GET",
+      "path": "/users/{id}",
+      "calls": 1
+    },
+    {
+      "host": "api.example.com",
+      "method": "POST",
+      "path": "/session",
+      "calls": 1
+    },
+    {
+      "host": "www.youtube.com",
+      "method": "POST",
+      "path": "/youtubei/v1/player",
+      "calls": 1
+    },
+    {
+      "host": "uj5wyc0l7x-dsn.algolia.net",
+      "method": "POST",
+      "path": "/{id}/indexes/Item_dev/query",
+      "calls": 1
+    }
+  ]
+}

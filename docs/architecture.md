@@ -22,14 +22,17 @@ flowchart LR
     Route --> Orchestrator[Waterfall orchestrator]
 
     Orchestrator --> TLS[tls-client]
-    Orchestrator --> Rod[Rod + Chromium]
+    Orchestrator --> Chromedp[Chromedp + Chromium]
     Orchestrator --> Bridge[Go Patchright client]
     Bridge <-->|NDJSON over stdio| Worker[TypeScript worker]
     Worker --> Patchright[Patchright + Chromium]
+    Orchestrator --> Solver[CapSolver API]
+    Solver --> SolvedBrowser[Solved session + Chromedp]
 
     TLS --> Classifier[Response classifier]
-    Rod --> Classifier
+    Chromedp --> Classifier
     Patchright --> Classifier
+    SolvedBrowser --> Classifier
     Classifier --> Extractor[Go content extraction]
     Extractor --> Result[Markdown + links + evidence]
     Result --> Caller
@@ -47,34 +50,39 @@ flowchart TD
     Capacity -- No --> Busy[429 response]
     Capacity -- Yes --> Preferred{Learned browser route?}
 
-    Preferred -- Rod --> TryRod[Try Rod]
+    Preferred -- Chromedp --> TryChromedp[Try Chromedp]
     Preferred -- Patchright --> TryPatchright[Try Patchright]
     Preferred -- No --> TryTLS[Try profiled HTTP]
 
     TryTLS --> ClassifyTLS{Classify response}
     ClassifyTLS -- Usable --> Extract[Extract in Go]
     ClassifyTLS -- Dead --> Dead[Return dead outcome]
-    ClassifyTLS -- JavaScript shell --> TryRod
+    ClassifyTLS -- JavaScript shell --> TryChromedp
     ClassifyTLS -- Blocked or retryable --> TryPatchright
 
-    TryRod --> ClassifyRod{Classify response}
-    ClassifyRod -- Usable --> RememberRod[Remember Rod route]
-    ClassifyRod -- Dead --> Dead
-    ClassifyRod -- Still blocked or unusable --> TryPatchright
+    TryChromedp --> ClassifyChromedp{Classify response}
+    ClassifyChromedp -- Usable --> RememberChromedp[Remember Chromedp route]
+    ClassifyChromedp -- Dead --> Dead
+    ClassifyChromedp -- Still blocked or unusable --> TryPatchright
 
     TryPatchright --> ClassifyPatchright{Classify response}
     ClassifyPatchright -- Usable --> RememberPatchright[Remember Patchright route]
     ClassifyPatchright -- Dead --> Dead
-    ClassifyPatchright -- Unusable --> Failed[Return failed outcome]
+    ClassifyPatchright -- Unusable --> SolverReady{CapSolver configured?}
+    SolverReady -- No --> Failed[Return failed outcome]
+    SolverReady -- Yes --> TryCapSolver[Solve Cloudflare session]
+    TryCapSolver --> ClassifySolved{Classify solved response}
+    ClassifySolved -- Usable --> Extract
+    ClassifySolved -- Unusable --> Failed
 
-    RememberRod --> Extract
+    RememberChromedp --> Extract
     RememberPatchright --> Extract
     Extract --> Success[Return Markdown, links, provider, and attempts]
 ```
 
 Every loader produces the same internal `page.Document` shape. That keeps classification and extraction independent from transport details.
 
-## The three loaders
+## The four loaders
 
 ### Profiled HTTP
 
@@ -82,17 +90,23 @@ The first attempt uses `bogdanfinn/tls-client` with a current Chrome TLS profile
 
 The loader returns the status code, final URL, detected content type, response body, effective user agent, and portable cookies for possible browser escalation. Responses are capped at 12 MiB.
 
-### Rod
+### Chromedp
 
-Rod handles ordinary JavaScript rendering. PageLode lazily launches one reusable Chromium process and creates a fresh tab for each request. Cookies and the user agent from the HTTP attempt are carried into the tab when available.
+Chromedp handles ordinary JavaScript rendering. PageLode lazily launches one reusable Chromium process and creates a fresh tab for each request. Cookies and the user agent from the HTTP attempt are carried into the tab when available.
 
-Rod is used for application shells and pages whose useful content is created after JavaScript runs. It is not treated as the stealth path.
+Chromedp is used for application shells and pages whose useful content is created after JavaScript runs. It is not treated as the stealth path.
 
 ### Patchright
 
 Patchright handles confirmed challenge pages, protected domains, and failures that warrant the most expensive local loader. It runs behind a small TypeScript worker because Patchright's maintained API is in the JavaScript ecosystem.
 
-The worker lazily launches Chromium, creates an isolated browser context for each job, applies the proxy and session state, renders the page, makes a bounded attempt to settle visible challenges, and returns HTML plus updated cookies.
+The worker lazily launches a persistent Chromium context, creates a fresh page for each job, applies the proxy and session state, renders the page, makes a bounded attempt to settle visible challenges, and returns HTML plus updated cookies.
+
+### CapSolver
+
+CapSolver is an optional final escalation for Cloudflare challenges that remain after local Patchright. The Go client fetches the live challenge through a sticky proxy, creates an `AntiCloudflareTask`, polls within the extraction deadline, converts the returned clearance cookies and user agent into a portable session, and renders the target with Chromedp through the same proxy.
+
+It is disabled unless both `CAPSOLVER_API_KEY` and an authenticated solver proxy are available. API keys and proxy credentials are never included in attempt logs.
 
 ## Go-to-TypeScript boundary
 
@@ -126,7 +140,6 @@ The boundary deliberately exposes browser facts rather than extraction policy.
   "url": "https://example.com",
   "timeout_ms": 45000,
   "wait_until": "domcontentloaded",
-  "user_agent": "Mozilla/5.0 ...",
   "cookies": [],
   "proxy_url": "",
   "settle_challenge": true
@@ -159,7 +172,7 @@ Classification occurs after every attempt and returns one of five states:
 | State | Meaning | Typical next action |
 |---|---|---|
 | `accept` | The response contains usable content | Extract it |
-| `needs_render` | The response resembles a JavaScript shell | Try Rod |
+| `needs_render` | The response resembles a JavaScript shell | Try Chromedp |
 | `blocked` | The response contains strong challenge evidence | Try Patchright |
 | `retryable` | The response failed without proving it is permanently absent | Escalate |
 | `dead` | The target returned 404 or 410 | Stop |
@@ -209,7 +222,7 @@ flowchart LR
 
 ## Route memory
 
-When Rod or Patchright succeeds, PageLode remembers that provider for the hostname. A later request to the same host can begin at the known working browser layer instead of repeating cheaper attempts that are likely to fail.
+When Chromedp or Patchright succeeds, PageLode remembers that provider for the hostname. A later request to the same host can begin at the known working browser layer instead of repeating cheaper attempts that are likely to fail.
 
 Entries expire after `PAGELODE_ROUTE_TTL`. The store is process-local by design; there is no external database in the current architecture. Configured protected domains are pre-seeded to Patchright, and subdomains inherit their parent-domain rule.
 
@@ -224,7 +237,7 @@ flowchart LR
     Queue -->|queue full| Reject[HTTP 429]
     Work --> Fast[HTTP work]
     Work --> BL[Browser limiter]
-    BL -->|up to PAGELODE_BROWSER_CONCURRENCY| Browsers[Rod or Patchright]
+    BL -->|up to PAGELODE_BROWSER_CONCURRENCY| Browsers[Chromedp or Patchright]
 ```
 
 The extraction limiter bounds complete request lifetimes. A second limiter independently protects browser capacity. Both share the configured maximum waiting depth, and the API rejects overload instead of allowing unbounded memory growth.
@@ -239,8 +252,9 @@ Request contexts carry deadlines through the API, orchestrator, loaders, browser
 | `internal/api` | HTTP contract, validation, timeouts, health reporting |
 | `internal/orchestrator` | Waterfall, attempt evidence, escalation, final results |
 | `internal/httpfetch` | Profiled direct HTTP loader and session capture |
-| `internal/rodfetch` | Ordinary JavaScript rendering with Rod |
+| `internal/chromefetch` | Ordinary JavaScript rendering with Chromedp |
 | `internal/patchright` | Managed subprocess client and NDJSON multiplexing |
+| `internal/capsolver` | Managed Cloudflare task polling and solved-session handoff |
 | `internal/classify` | Block, render, retry, dead, and accept decisions |
 | `internal/extract` | Readability, DOM cleanup, Markdown, links, structured data |
 | `internal/memory` | Expiring hostname-to-provider routes |
@@ -262,18 +276,22 @@ The provided container builds a static Go binary, installs Bun and Chromium, ins
 flowchart TB
     Container[PageLode container]
     Container --> Go[PageLode Go process :8083]
-    Go --> RodBrowser[Reusable Rod Chromium]
+    Go --> ChromedpBrowser[Reusable Chromedp Chromium]
     Go --> Worker[On-demand Bun worker]
     Worker --> PatchBrowser[Reusable Patchright Chromium]
 ```
 
 This is the smallest deployment that preserves the maintained Patchright implementation while keeping orchestration in Go.
 
+## Endpoint discovery
+
+`POST /discover` runs browser capture and returns an endpoint breakdown. Capture starts before navigation and uses the existing browser limiter, proxies, protected-domain rules, and classifier. Go analyzes both chromedp and Patchright observations. The API and CLI also accept offline HAR captures. See [discovery.md](discovery.md) for the contract, module map, and limits.
+
 ## Current limitations
 
 - PDF extraction is not implemented.
 - Route memory is not shared between replicas.
-- Browser contexts are isolated, but named persistent sessions are not implemented.
+- Browser processes are reused; named persistent sessions are not implemented.
 - Challenge interaction is intentionally small and cannot solve every protection system.
 - Proxy credentials are supported but proxy quality and browser fingerprint coherence remain deployment concerns.
 - There is no authentication layer in front of the HTTP API yet.

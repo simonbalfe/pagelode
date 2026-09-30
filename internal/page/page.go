@@ -4,8 +4,9 @@ type Provider string
 
 const (
 	ProviderTLS        Provider = "tls"
-	ProviderRod        Provider = "rod"
+	ProviderChromedp   Provider = "chromedp"
 	ProviderPatchright Provider = "patchright"
+	ProviderCapSolver  Provider = "capsolver"
 )
 
 type ContentType string
@@ -42,4 +43,5 @@ type Document struct {
 	Text       string
 	Type       ContentType
 	Session    Session
+	Traffic    *Capture
 }

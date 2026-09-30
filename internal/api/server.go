@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/simonbalfe/pagelode/internal/discovery"
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/orchestrator"
@@ -21,6 +22,7 @@ const maximumRequestBytes = 16 << 10
 
 type Server struct {
 	extractor      *orchestrator.Service
+	discoverer     *discovery.Service
 	extractLimiter *limit.Limiter
 	browserLimiter *limit.Limiter
 	routes         *memory.Routes
@@ -28,9 +30,10 @@ type Server struct {
 	logger         *slog.Logger
 }
 
-func New(extractor *orchestrator.Service, extractLimiter *limit.Limiter, browserLimiter *limit.Limiter, routes *memory.Routes, timeout time.Duration, logger *slog.Logger) *Server {
+func New(extractor *orchestrator.Service, discoverer *discovery.Service, extractLimiter *limit.Limiter, browserLimiter *limit.Limiter, routes *memory.Routes, timeout time.Duration, logger *slog.Logger) *Server {
 	return &Server{
 		extractor:      extractor,
+		discoverer:     discoverer,
 		extractLimiter: extractLimiter,
 		browserLimiter: browserLimiter,
 		routes:         routes,
@@ -43,6 +46,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("POST /extract", s.extract)
+	mux.HandleFunc("POST /discover", s.discover)
 	return mux
 }
 
@@ -50,7 +54,7 @@ func (s *Server) health(response http.ResponseWriter, _ *http.Request) {
 	writeJSON(response, http.StatusOK, map[string]any{
 		"ok":            true,
 		"service":       "pagelode",
-		"engines":       []string{"tls", "rod", "patchright"},
+		"engines":       []string{"tls", "chromedp", "patchright", "capsolver"},
 		"learnedRoutes": s.routes.Size(),
 		"limits": map[string]any{
 			"extraction": s.extractLimiter.Snapshot(),
