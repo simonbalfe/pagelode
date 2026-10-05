@@ -75,7 +75,7 @@ Patchright adapter (TypeScript)
 
 - No JavaScript shell may be reported as `outcome=ok` in the fixture suite.
 - Confirmed challenge responses must skip chromedp.
-- Patchright must receive coherent UA, cookies, locale, timezone, and proxy settings.
+- Patchright must receive coherent UA, cookies, and proxy settings, and must keep the browser's native locale and timezone because Cloudflare detects emulated values.
 - Every attempt must have a bounded timeout and a recorded classification reason.
 - The service must reject saturated queues before starting more browser work.
 

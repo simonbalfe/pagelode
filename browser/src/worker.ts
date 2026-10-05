@@ -72,10 +72,9 @@ function proxySettings(raw: string | undefined): ProxySettings | undefined {
 }
 
 function launchOptions(input: RenderRequest): PersistentContextOptions {
+  // Locale and timezone emulation is detectable by Cloudflare; keep the real browser values.
   const result: PersistentContextOptions = {
     headless: booleanEnvironment("PAGELODE_PATCHRIGHT_HEADLESS", false),
-    locale: "en-GB",
-    timezoneId: "Europe/London",
     viewport: null,
   };
   const executablePath = process.env.PAGELODE_PATCHRIGHT_EXECUTABLE_PATH;

@@ -121,7 +121,7 @@ sequenceDiagram
     C->>C: Allocate correlation ID
     C->>W: One NDJSON request on stdin
     W->>B: Create isolated context
-    W->>B: Apply UA, cookies, proxy, locale, timezone
+    W->>B: Apply UA, cookies, proxy (locale and timezone stay native)
     W->>B: Navigate and settle
     B-->>W: HTML, URL, title, cookies, status
     W-->>C: One NDJSON response on stdout
