@@ -1,14 +1,13 @@
-# Cloudflare fallback status
+# Cloudflare status
 
-Status recorded on 12 September 2026.
+Status recorded on 5 October 2026.
 
-## Current implementation
-
-PageLode now has an optional CapSolver fallback after Patchright:
+## How PageLode handles a challenge
 
 ```mermaid
 flowchart LR
-    Target[Protected page] --> Patchright[Local Patchright]
+    Target[Protected page] --> HTTP[HTTP request]
+    HTTP -->|Challenge| Patchright[Patchright: real Chrome]
     Patchright -->|Still blocked| Bootstrap[Fetch challenge through sticky proxy]
     Bootstrap --> CapSolver[CapSolver AntiCloudflareTask]
     CapSolver --> Session[Clearance cookie + matching user agent]
@@ -16,47 +15,50 @@ flowchart LR
     Chromedp --> Classifier[Classify and extract]
 ```
 
-The integration is implemented in Go. It creates an `AntiCloudflareTask`, polls for completion within the request deadline, preserves the proxy identity, merges the returned cookies into the browser session, and records `capsolver` as an observable provider. API keys and proxy credentials are excluded from diagnostic output.
+Patchright is the primary path. CapSolver is an optional last resort, enabled only when `CAPSOLVER_API_KEY` and either `PAGELODE_CAPSOLVER_PROXY_URL` or `PAGELODE_PROXY_URL` are set.
 
-CapSolver is enabled only when both `CAPSOLVER_API_KEY` and either `PAGELODE_CAPSOLVER_PROXY_URL` or `PAGELODE_PROXY_URL` are available.
+## Requirements
 
-## What was verified
+Patchright passes Cloudflare's standard challenge page when:
 
-- CapSolver accepts the live Crunchbase challenge when an API-generated sticky Evomi Core Residential proxy is used.
-- A completed task returns one clearance cookie and a Chrome 150 user agent matching the challenge request.
-- Chromedp can authenticate to the residential proxy and receive the solved session.
-- One run reached a normal page titled `Crunchbase` and returned 341 characters, proving the end-to-end handoff can pass Cloudflare.
-- The full Go tests, race detector, vet, TypeScript type check, and worker tests pass.
-- The installed `pagelode` binary contains the new integration.
+1. Chrome runs with a visible window: `PAGELODE_PATCHRIGHT_HEADLESS=false`.
+2. Chrome keeps its native locale and timezone. PageLode no longer overrides them, because Cloudflare detects emulated values.
+3. The connection uses no proxy, or a sticky proxy session that keeps one IP for the whole run.
 
-## What is not yet reliable
+The proxy can come from any provider. Setup instructions are in [configuration](configuration.md#proxies).
 
-Repeated requests to the OpenAI company page still commonly finish on `Just a moment...` with a Cloudflare challenge. The earlier 341-character success was generic Crunchbase content, not a verified extraction of the OpenAI company profile.
+## Test results
 
-The current sequence uses Chromedp after CapSolver. It does not inject the solved session back into Patchright. This is the main experiment to try next because it keeps the stealth browser layer involved after solving.
+Target: `https://www.scrapingcourse.com/cloudflare-challenge`, a public Cloudflare test page. CapSolver disabled.
 
-Proxy behavior observed during testing:
+| Setup | Result |
+|---|---|
+| No proxy, visible Chrome | 8 of 8 passed in 1.5 to 3.4 seconds |
+| No proxy, headless Chrome | 0 of 3 passed |
+| Sticky mobile proxy, any country, visible Chrome | 2 of 2 passed in 7 to 10 seconds |
+| Sticky mobile proxy, UK exit, visible Chrome | 2 of 2 passed in 10 to 21 seconds |
+| Sticky mobile proxy, US exit, visible Chrome | 2 of 2 passed in about 9 seconds |
+| Proxy with a new IP for every connection | 0 of 1 passed |
 
-- A generic rotating proxy hostname was rejected by CapSolver as dynamic DNS.
-- Reusing manually assembled proxy credentials produced remote proxy-authentication failures even though those credentials worked locally.
-- Proxies generated through Evomi's public API were accepted by CapSolver, but their clearance success on Crunchbase was intermittent.
-- Evomi's managed scraper endpoint returned `401` with the currently available API key, so that account is not presently usable as a scraper fallback.
+Before the locale and timezone override was removed, Patchright failed every run, with or without a proxy.
 
-No successful OpenAI Crunchbase profile data should be claimed from the current tests.
+## CapSolver results
 
-## Next implementation steps
+CapSolver returned a `cf_clearance` cookie on every task, but Cloudflare accepted it on only 1 of 9 replays. Using the same sticky IP, the exact solved user agent, and a Chrome TLS fingerprint did not change that. The fallback is unreliable and should not be relied on when Patchright can pass.
 
-1. Add a dedicated Patchright client for the solver proxy and inject CapSolver's returned user agent and cookies into it.
-2. Give that worker a separate persistent profile directory so it cannot collide with the normal Patchright process.
-3. Restore an optional user-agent field at the private worker boundary and apply it when launching the solver-specific browser context.
-4. Retry with a newly generated sticky proxy when the solved response is still classified as blocked.
-5. Add a content assertion for the requested Crunchbase organization so a generic Crunchbase shell cannot count as success.
-6. Keep retries bounded to control CapSolver credits and proxy traffic.
+CapSolver rejects proxies it cannot authenticate before solving. It requires a sticky proxy with a username and password.
 
-## Safe test command
+## Known gaps
+
+- The Docker image runs headless, so containers do not pass the challenge yet. Running visible Chrome on a virtual display such as Xvfb is the likely fix.
+- Each server process keeps one proxy session until restart. Only CLI runs get a new session automatically.
+- Crunchbase has not been retested since the locale fix.
+
+## Test command
 
 ```sh
-PAGELODE_DEBUG=true pagelode --json https://www.crunchbase.com/organization/openai
+PAGELODE_DEBUG=true PAGELODE_PATCHRIGHT_HEADLESS=false \
+pagelode --json https://www.scrapingcourse.com/cloudflare-challenge
 ```
 
 Debug output contains provider, status, timing, cookie count, and browser major version without secret values.
