@@ -35,6 +35,72 @@ For the complete result, including the loader attempts:
 ./bin/pagelode --json example.com
 ```
 
+## CLI
+
+```text
+pagelode [--json] <URL>
+pagelode extract [--json] <URL>
+pagelode discover [--wait-ms 1500] [--profile <name>] [--verbose] <URL>
+pagelode discover --har <capture.har> [<URL>]
+pagelode emails [--max-pages 20] [--max-emails 100] [--max-duration 30s] [--render auto] [--profile <name>] [--verbose] <URL>
+pagelode profile login <name> <URL>
+pagelode serve
+pagelode version
+pagelode help
+```
+
+Put options before the URL. A bare domain such as `example.com` is accepted wherever a URL is. Every command reads its settings from environment variables; see [configuration](docs/configuration.md) for proxies, browser mode, CapSolver, and limits.
+
+### `pagelode <URL>` / `pagelode extract <URL>`
+
+Loads one page through the waterfall and prints clean Markdown.
+
+| Option | Default | Effect |
+|---|---|---|
+| `--json`, `-j` | off | Print the complete result: content, title, links, provider, and every loader attempt |
+
+### `pagelode discover`
+
+Captures a page's network traffic and prints a JSON report of its data endpoints.
+
+| Option | Default | Effect |
+|---|---|---|
+| `--wait-ms` | `1500` | Observe network activity after page load, 100–10000 ms |
+| `--profile` | none | Use a saved signed-in browser profile |
+| `--verbose` | off | Include request evidence, matching scores, and loading details |
+| `--har` | none | Analyze a HAR file instead of opening a browser. An optional URL names the page it came from |
+
+### `pagelode emails`
+
+Crawls a site and prints one published email address per line.
+
+| Option | Default | Effect |
+|---|---|---|
+| `--max-pages` | `20` | Pages to visit, 1–100 |
+| `--max-emails` | `100` | Stop after this many unique addresses, 1–1000 |
+| `--max-duration` | `30s` | Crawl time budget, 1s–2m |
+| `--render` | `auto` | `auto` uses a browser only when needed, `never` stays on HTTP, `always` renders every page |
+| `--profile` | none | Use a saved signed-in browser profile; every page loads in Patchright |
+| `--verbose` | off | Print the full JSON report: sources, page outcomes, and crawl details |
+
+### `pagelode profile login <name> <URL>`
+
+Opens a visible Patchright browser at the URL. Sign in, then press Enter in the terminal to save the profile under `<name>`. Use it later with `--profile <name>` on `discover` or `emails`. Profiles are stored in `PAGELODE_PROFILES_DIR`.
+
+```sh
+pagelode profile login account https://example.com/login
+pagelode discover --profile account example.com
+pagelode emails --profile account https://example.com/directory
+```
+
+### `pagelode serve`
+
+Starts the HTTP API on `PORT` (default `8083`).
+
+### Exit status
+
+`0` on success. `1` on any error, including a failed extraction or a discovery whose outcome is not `ok`. The JSON output is still printed before a failed `--json` extraction or discovery exits. `emails` exits `0` on a partial crawl and `1` only when every page failed.
+
 ## Run as a service
 
 ```sh
@@ -120,15 +186,6 @@ make smoke
 ## License
 
 MIT
-
-### Authenticated discovery
-
-```sh
-pagelode profile login account https://example.com/login
-pagelode discover --profile account example.com
-```
-
-Sign in in the opened Patchright browser and press Enter in the terminal to save the profile and close it. Go reuses it for later discovery. Add `--verbose` for request evidence and matching scores. See [discovery documentation](docs/discovery.md) for API usage, profile storage, and endpoint matching rules.
 
 ## Roadmap
 
