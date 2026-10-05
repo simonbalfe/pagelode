@@ -72,7 +72,6 @@ function proxySettings(raw: string | undefined): ProxySettings | undefined {
 }
 
 function launchOptions(input: RenderRequest): PersistentContextOptions {
-  // Locale and timezone emulation is detectable by Cloudflare; keep the real browser values.
   const result: PersistentContextOptions = {
     headless: booleanEnvironment("PAGELODE_PATCHRIGHT_HEADLESS", false),
     viewport: null,

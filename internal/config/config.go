@@ -116,9 +116,6 @@ func Load() (Config, error) {
 	}, nil
 }
 
-// freshProxySession replaces an Evomi-style `_session-`, `_hardsession-`, or
-// `_lockedsession-` ID in the proxy password so every run gets its own sticky IP.
-// Proxies without a session ID are returned unchanged.
 func freshProxySession(raw string) (string, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil {
