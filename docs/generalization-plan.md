@@ -1,5 +1,7 @@
 # PageLode beyond Markdown extraction
 
+The [feature roadmap](roadmap.md) tracks planned capabilities, priorities, proposed interfaces, and completion criteria informed by Spider, Firecrawl, and Crawl4AI. This document covers the implementation direction and discovery design.
+
 ## Product direction
 
 Make PageLode a general scraping service that can collect structured records from HTML, rendered pages, and the data APIs behind websites. A caller should be able to fetch a URL, discover where its data comes from, extract records, follow pagination, and resume a collection job. Markdown remains one output of that pipeline.
@@ -7,6 +9,10 @@ Make PageLode a general scraping service that can collect structured records fro
 Printing Press is a source of design ideas for PageLode's own implementation. The immediate priority is its automated endpoint analysis, exposed as a separate discovery input mode that returns a breakdown for each loaded page. Reusable collection recipes and incremental collection follow that capability.
 
 Keep `POST /extract` and its current response intact while new capabilities are added. Existing routing, classification, browser escalation, deadlines, proxy settings, and attempt evidence are the shared acquisition layer.
+
+## Email finding
+
+`pagelode emails` and `POST /emails` are implemented as a focused scraping workflow. They prioritize contact pages, inspect full HTML and captured JSON, return deduplicated addresses with source URLs, and support saved authenticated profiles. See [email finding](emails.md) for behavior and bounds.
 
 ## What to take from CLI Printing Press
 

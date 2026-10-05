@@ -19,6 +19,7 @@ import (
 	"github.com/simonbalfe/pagelode/internal/chromefetch"
 	"github.com/simonbalfe/pagelode/internal/config"
 	"github.com/simonbalfe/pagelode/internal/discovery"
+	"github.com/simonbalfe/pagelode/internal/emails"
 	"github.com/simonbalfe/pagelode/internal/httpfetch"
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
@@ -29,6 +30,7 @@ import (
 const version = "0.1.0"
 
 type application struct {
+	emailFinder       *emails.Service
 	extractor         *orchestrator.Service
 	discoverer        *discovery.Service
 	extractLimiter    *limit.Limiter
@@ -78,6 +80,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	}
 	if args[0] == "profile" {
 		return profileCommand(configuration, args[1:], stdout, stderr)
+	}
+	if args[0] == "emails" {
+		return app.emails(configuration, args[1:], stdout, stderr)
 	}
 	if args[0] == "discover" {
 		return app.discover(configuration, args[1:], stdout, stderr)
@@ -132,7 +137,9 @@ func newApplication(configuration config.Config) (*application, error) {
 		browserLimiter,
 		configuration.ChromedpEnabled,
 	)
+	emailLoader := emails.NewLoader(httpClient, chromedp, patchrightClient, capSolverFetcher, routes, browserLimiter, configuration.ChromedpEnabled)
 	return &application{
+		emailFinder:       emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency, configuration.ProfilesDirectory),
 		discoverer:        discovery.New(chromedp, patchrightClient, routes, browserLimiter, configuration.ChromedpEnabled).WithProfiles(configuration.ProfilesDirectory),
 		extractor:         extractor,
 		extractLimiter:    extractLimiter,
@@ -185,7 +192,7 @@ func (a *application) extract(configuration config.Config, args []string, stdout
 
 func (a *application) serve(configuration config.Config, output io.Writer) error {
 	logger := slog.New(slog.NewJSONHandler(output, nil))
-	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.browserLimiter, a.routes, configuration.RequestTimeout, logger)
+	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.browserLimiter, a.routes, configuration.RequestTimeout, logger).WithEmails(a.emailFinder)
 	server := &http.Server{
 		Addr:              configuration.Address,
 		Handler:           apiServer.Handler(),
@@ -225,7 +232,7 @@ func attemptDetail(attempts []orchestrator.Attempt) string {
 }
 
 func writeUsage(output io.Writer) {
-	fmt.Fprintln(output, `PageLode extracts Markdown and discovers page data endpoints.
+	fmt.Fprintln(output, `PageLode extracts Markdown, discovers page data endpoints, and finds emails.
 
 Usage:
   pagelode <URL>
@@ -233,6 +240,7 @@ Usage:
   pagelode extract <URL>
   pagelode discover [--profile <name>] [--verbose] [--wait-ms 1500] <URL>
   pagelode discover --har <capture.har>
+  pagelode emails [--max-pages 20] [--profile <name>] [--verbose] <URL>
   pagelode profile login <name> <URL>
   pagelode serve
   pagelode version

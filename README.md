@@ -1,6 +1,6 @@
 # PageLode
 
-PageLode extracts clean Markdown and discovers the data endpoints behind web pages.
+PageLode extracts clean Markdown, discovers the data endpoints behind web pages, and finds published email addresses.
 
 Give it a URL and it returns the useful content, page title, internal links, and a record of how the page was loaded. It begins with a fast direct request and only opens a browser when the page actually needs one.
 
@@ -74,6 +74,16 @@ curl -sS http://localhost:8083/discover \
 
 Discovery captures the page's network traffic and returns endpoint groups, request and response field types, authentication signals, pagination candidates, and optional sanitized evidence with `--verbose`. [Discovery documentation](docs/discovery.md) explains the response and capture limits.
 
+## Find email addresses
+
+```sh
+pagelode emails example.com
+pagelode emails --max-pages 10 --max-duration 15s example.com
+pagelode emails --profile account https://app.example.com
+```
+
+Or send `POST /emails` with `{"url":"example.com"}`. The CLI prints one deduplicated email address per line. Add `--verbose` for sources and crawl details. The crawler prioritizes contact and team pages and reads full HTML and captured JSON. See [email finding](docs/emails.md) for limits, rendering controls, authenticated searches, and the response format.
+
 ## Docker
 
 ```sh
@@ -92,6 +102,7 @@ It does not guarantee access to protected websites. The optional CapSolver fallb
 
 - [Architecture](docs/architecture.md)
 - [Endpoint discovery](docs/discovery.md)
+- [Email finding](docs/emails.md)
 - [Configuration](docs/configuration.md)
 - [Cloudflare fallback status](docs/cloudflare-status.md)
 - [OpenExtract migration plan](docs/migration.md)
@@ -118,3 +129,7 @@ pagelode discover --profile account example.com
 ```
 
 Sign in in the opened Patchright browser and press Enter in the terminal to save the profile and close it. Go reuses it for later discovery. Add `--verbose` for request evidence and matching scores. See [discovery documentation](docs/discovery.md) for API usage, profile storage, and endpoint matching rules.
+
+## Roadmap
+
+See the [feature roadmap](docs/roadmap.md) for planned interactive sessions, authenticated scans, crawling, structured records, endpoint collection, jobs, rendering controls, additional outputs, caching, monitoring, search, and integrations.

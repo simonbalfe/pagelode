@@ -251,6 +251,7 @@ Request contexts carry deadlines through the API, orchestrator, loaders, browser
 | `cmd/pagelode` | CLI parsing, process wiring, HTTP lifecycle, graceful shutdown |
 | `internal/api` | HTTP contract, validation, timeouts, health reporting |
 | `internal/orchestrator` | Waterfall, attempt evidence, escalation, final results |
+| `internal/emails` | Email-finding crawl, page loading policy, address extraction |
 | `internal/httpfetch` | Profiled direct HTTP loader and session capture |
 | `internal/chromefetch` | Ordinary JavaScript rendering with Chromedp |
 | `internal/patchright` | Managed subprocess client and NDJSON multiplexing |
@@ -286,6 +287,27 @@ This is the smallest deployment that preserves the maintained Patchright impleme
 ## Endpoint discovery
 
 `POST /discover` runs browser capture and returns an endpoint breakdown. Capture starts before navigation and uses the existing browser limiter, proxies, protected-domain rules, and classifier. Go analyzes both chromedp and Patchright observations. The API and CLI also accept offline HAR captures. See [discovery.md](discovery.md) for the contract, module map, and limits.
+
+## Email finding
+
+`pagelode emails` and `POST /emails` are a separate pathway from `/extract`. The email service crawls a site within page, address, and duration limits, prioritizing contact, team, and about pages plus sitemap entries. Each page goes through its own loader instead of the extraction orchestrator:
+
+```mermaid
+flowchart LR
+    Crawl[Email crawler] --> Loader[Email loader]
+    Loader -->|render auto or never| HTTP[tls-client]
+    Loader -->|render always| Chromedp[Chromedp capture]
+    Loader -->|saved profile| Patchright[Patchright capture]
+    HTTP -->|JS shell, blocked, or dynamic contact data| Chromedp
+    Chromedp -->|unusable| Patchright
+    Patchright -->|unusable, no profile| Solver[CapSolver]
+    HTTP --> Extract[Address extraction]
+    Chromedp --> Extract
+    Patchright --> Extract
+    Solver --> Extract
+```
+
+The loader shares the same HTTP client, browsers, CapSolver client, route memory, browser limiter, and proxy settings as extraction, so the Cloudflare and proxy behavior in [configuration](configuration.md#passing-cloudflare-challenges) applies here too. Hosts already known to need Patchright skip HTTP and Chromedp. `render: never` stops after HTTP. The loader reads full HTML and captured JSON responses rather than the Markdown output, because contact details often sit in headers, footers, and API responses. See [emails.md](emails.md) for the contract and limits.
 
 ## Current limitations
 

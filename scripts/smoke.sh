@@ -60,6 +60,19 @@ for fixture_host in 127.0.0.1 localhost; do
     exit 1
   fi
 done
+printf '%s\n' '<html><body><main><h1>Contact directory</h1></main><footer><a href="mailto:footer@example.org">Contact</a></footer></body></html>' > "$work_dir/emails.html"
+printf '%s\n' '{"people":[{"email":"dynamic@example.org"}],"token":"smoke-secret"}' > "$work_dir/emails.json"
+printf '%s\n' '<html><body><h1>Team</h1><script>fetch("/emails.json?token=smoke-secret").then(r=>r.json()).then(data=>{document.body.append(data.people[0].email)})</script></body></html>' > "$work_dir/email-shell.html"
+for fixture_host in 127.0.0.1 localhost; do
+  email_result="$(curl -fsS "http://127.0.0.1:$api_port/emails" -H 'content-type: application/json' -d "{\"url\":\"http://$fixture_host:$fixture_port/email-shell.html\",\"maxPages\":1}")"
+  printf '%s' "$email_result" | grep -q 'dynamic@example.org'
+  printf '%s' "$email_result" | grep -q 'network_json'
+  if printf '%s' "$email_result" | grep -q 'smoke-secret'; then
+    exit 1
+  fi
+done
+"$work_dir/pagelode" emails --max-pages 1 --render never "http://127.0.0.1:$fixture_port/emails.html" > "$work_dir/emails-cli.txt"
+grep -qx 'footer@example.org' "$work_dir/emails-cli.txt"
 "$work_dir/pagelode" discover --wait-ms 100 "http://127.0.0.1:$fixture_port/discover.html" > "$work_dir/discovery-cli.json"
 grep -q '"path": "/data.json"' "$work_dir/discovery-cli.json"
-printf '%s\n' 'PageLode smoke test passed: extraction and discovery with chromedp and Patchright'
+printf '%s\n' 'PageLode smoke test passed: extraction, discovery, and email finding with Chromedp and Patchright'

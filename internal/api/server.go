@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/simonbalfe/pagelode/internal/discovery"
+	"github.com/simonbalfe/pagelode/internal/emails"
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/orchestrator"
@@ -21,6 +22,7 @@ import (
 const maximumRequestBytes = 16 << 10
 
 type Server struct {
+	emailFinder    *emails.Service
 	extractor      *orchestrator.Service
 	discoverer     *discovery.Service
 	extractLimiter *limit.Limiter
@@ -47,6 +49,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("POST /extract", s.extract)
 	mux.HandleFunc("POST /discover", s.discover)
+	mux.HandleFunc("POST /emails", s.emails)
 	return mux
 }
 
