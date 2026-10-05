@@ -1,14 +1,18 @@
 package config
 
 import (
+	"crypto/rand"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var proxySessionPattern = regexp.MustCompile(`(_(?:hard|locked)?session-)[A-Za-z0-9]+`)
 
 type Config struct {
 	ProfilesDirectory  string
@@ -65,11 +69,19 @@ func Load() (Config, error) {
 		if err := validateURL(proxyURL, "http", "https", "socks4", "socks5"); err != nil {
 			return Config{}, fmt.Errorf("config: invalid PAGELODE_PROXY_URL: %w", err)
 		}
+		if proxyURL, err = freshProxySession(proxyURL); err != nil {
+			return Config{}, fmt.Errorf("config: PAGELODE_PROXY_URL session: %w", err)
+		}
 	}
-	capSolverProxyURL := configuredCapSolverProxyURL(proxyURL)
-	if capSolverProxyURL != "" {
+	capSolverProxyURL := os.Getenv("PAGELODE_CAPSOLVER_PROXY_URL")
+	if capSolverProxyURL == "" {
+		capSolverProxyURL = proxyURL
+	} else {
 		if err := validateURL(capSolverProxyURL, "http", "https", "socks4", "socks5"); err != nil {
 			return Config{}, fmt.Errorf("config: invalid PAGELODE_CAPSOLVER_PROXY_URL: %w", err)
+		}
+		if capSolverProxyURL, err = freshProxySession(capSolverProxyURL); err != nil {
+			return Config{}, fmt.Errorf("config: PAGELODE_CAPSOLVER_PROXY_URL session: %w", err)
 		}
 	}
 	capSolverURL := value("PAGELODE_CAPSOLVER_URL", "https://api.capsolver.com")
@@ -104,11 +116,31 @@ func Load() (Config, error) {
 	}, nil
 }
 
-func configuredCapSolverProxyURL(sharedProxyURL string) string {
-	if configured := os.Getenv("PAGELODE_CAPSOLVER_PROXY_URL"); configured != "" {
-		return configured
+// freshProxySession replaces an Evomi-style `_session-`, `_hardsession-`, or
+// `_lockedsession-` ID in the proxy password so every run gets its own sticky IP.
+// Proxies without a session ID are returned unchanged.
+func freshProxySession(raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", err
 	}
-	return sharedProxyURL
+	if parsed.User == nil {
+		return raw, nil
+	}
+	password, ok := parsed.User.Password()
+	if !ok || !proxySessionPattern.MatchString(password) {
+		return raw, nil
+	}
+	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+	id := make([]byte, 10)
+	if _, err := rand.Read(id); err != nil {
+		return "", err
+	}
+	for index, current := range id {
+		id[index] = alphabet[int(current)%len(alphabet)]
+	}
+	parsed.User = url.UserPassword(parsed.User.Username(), proxySessionPattern.ReplaceAllString(password, "${1}"+string(id)))
+	return parsed.String(), nil
 }
 
 func integer(name string, fallback int, minimum int) (int, error) {

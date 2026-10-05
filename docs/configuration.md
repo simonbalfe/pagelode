@@ -35,6 +35,12 @@ The shared proxy is applied to every loader. `PAGELODE_CAPSOLVER_PROXY_URL` can 
 
 CapSolver requires a sticky authenticated proxy because the challenge solution is bound to the network identity. PageLode passes the solved cookies and user agent to Chromedp and repeats the request through that exact proxy.
 
+When the proxy password contains an Evomi-style `_session-`, `_hardsession-`, or `_lockedsession-` ID, PageLode replaces that ID with a random one each time the process starts. Every CLI run therefore gets a fresh sticky IP, and all loaders in that run share it. A long-running server keeps one session until it restarts or the provider's session lifetime expires.
+
+```sh
+PAGELODE_PROXY_URL=http://username:password_session-anything1_lifetime-30@mp.evomi.com:3000
+```
+
 ## Protected domains
 
 Protected domains begin at Patchright instead of spending time on the HTTP and Chromedp layers.
