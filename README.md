@@ -40,7 +40,7 @@ For the complete result, including the loader attempts:
 ```text
 pagelode [--json] <URL>
 pagelode extract [--json] <URL>
-pagelode discover [--wait-ms 1500] [--profile <name>] [--verbose] <URL>
+pagelode discover [--wait-ms 1500] [--profile <name>] [--stealth] [--verbose] <URL>
 pagelode discover --har <capture.har> [<URL>]
 pagelode emails [--max-pages 20] [--max-emails 100] [--max-duration 30s] [--render auto] [--profile <name>] [--verbose] <URL>
 pagelode profile login <name> <URL>
@@ -67,6 +67,7 @@ Captures a page's network traffic and prints a JSON report of its data endpoints
 |---|---|---|
 | `--wait-ms` | `1500` | Observe network activity after page load, 100–10000 ms |
 | `--profile` | none | Use a saved signed-in browser profile |
+| `--stealth` | off | Skip Chromedp and load only with the Patchright stealth browser through `PAGELODE_PROXY_URL`. Fails when no proxy is configured |
 | `--verbose` | off | Include request evidence, matching scores, and loading details |
 | `--har` | none | Analyze a HAR file instead of opening a browser. An optional URL names the page it came from |
 

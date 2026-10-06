@@ -43,6 +43,8 @@ func (s *Server) discover(response http.ResponseWriter, request *http.Request) {
 			writeJSON(response, http.StatusTooManyRequests, map[string]string{"error": "PageLode queue is full"})
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			writeJSON(response, http.StatusRequestTimeout, map[string]string{"error": "discovery timed out"})
+		case errors.Is(err, discovery.ErrStealthProxy):
+			writeJSON(response, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		default:
 			writeJSON(response, http.StatusBadGateway, map[string]string{"error": "browser discovery failed"})
 		}

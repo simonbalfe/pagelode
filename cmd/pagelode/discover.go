@@ -19,6 +19,7 @@ func (a *application) discover(configuration config.Config, args []string, stdou
 	wait := flags.Int("wait-ms", 1500, "observe network activity after page load (100–10000 ms)")
 	profileName := flags.String("profile", "", "use a saved authenticated browser profile")
 	verbose := flags.Bool("verbose", false, "include request evidence, matching scores, and loading details")
+	stealth := flags.Bool("stealth", false, "load only with the Patchright stealth browser through PAGELODE_PROXY_URL, skipping Chromedp")
 	harPath := flags.String("har", "", "analyze a HAR file without opening a browser")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -26,7 +27,7 @@ func (a *application) discover(configuration config.Config, args []string, stdou
 		}
 		return err
 	}
-	request := discovery.Request{WaitMS: *wait, Verbose: *verbose, Profile: *profileName}
+	request := discovery.Request{WaitMS: *wait, Verbose: *verbose, Profile: *profileName, Stealth: *stealth}
 	if *harPath != "" {
 		if flags.NArg() > 1 {
 			return errors.New("provide at most one page URL with --har")

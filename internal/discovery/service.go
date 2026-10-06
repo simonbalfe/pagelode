@@ -27,7 +27,11 @@ type Service struct {
 	limiter           *limit.Limiter
 	chromeEnabled     bool
 	profilesDirectory string
+	proxyConfigured   bool
 }
+
+// ErrStealthProxy reports a stealth request on a server without PAGELODE_PROXY_URL.
+var ErrStealthProxy = errors.New("stealth discovery requires PAGELODE_PROXY_URL")
 
 func New(chrome, patchright Capturer, routes *memory.Routes, limiter *limit.Limiter, chromeEnabled bool) *Service {
 	return &Service{chrome: chrome, patchright: patchright, routes: routes, limiter: limiter, chromeEnabled: chromeEnabled}
@@ -38,7 +42,9 @@ type Request struct {
 	WaitMS  int    `json:"waitMs,omitempty"`
 	HAR     *HAR   `json:"har,omitempty"`
 	Profile string `json:"profile,omitempty"`
-	Verbose bool   `json:"verbose,omitempty"`
+	// Stealth loads the page only with Patchright through the configured proxy, skipping Chromedp.
+	Stealth bool `json:"stealth,omitempty"`
+	Verbose bool `json:"verbose,omitempty"`
 }
 
 func (r Request) Validate() (Request, error) {
@@ -56,6 +62,9 @@ func (r Request) Validate() (Request, error) {
 		}
 		if r.WaitMS != 0 {
 			return Request{}, errors.New("waitMs applies only to browser discovery")
+		}
+		if r.Stealth {
+			return Request{}, errors.New("stealth applies only to browser discovery")
 		}
 		return r, nil
 	}
@@ -87,6 +96,9 @@ func (s *Service) Discover(ctx context.Context, request Request) (Report, error)
 	if err != nil {
 		return Report{}, err
 	}
+	if request.Stealth && !s.proxyConfigured {
+		return Report{}, ErrStealthProxy
+	}
 	options := page.CaptureOptions{WaitMS: request.WaitMS}
 	if request.Profile != "" {
 		options.ProfileDirectory, err = profile.Directory(s.profilesDirectory, request.Profile, false)
@@ -96,7 +108,7 @@ func (s *Service) Discover(ctx context.Context, request Request) (Report, error)
 	}
 	preferred, _ := s.routes.Preferred(parsed.Hostname())
 	providers := []page.Provider{page.ProviderChromedp, page.ProviderPatchright}
-	if request.Profile != "" || preferred == page.ProviderPatchright || !s.chromeEnabled {
+	if request.Stealth || request.Profile != "" || preferred == page.ProviderPatchright || !s.chromeEnabled {
 		providers = []page.Provider{page.ProviderPatchright}
 	}
 	attempts := []orchestrator.Attempt{}
@@ -175,5 +187,11 @@ func captureError(err error) string {
 
 func (s *Service) WithProfiles(directory string) *Service {
 	s.profilesDirectory = directory
+	return s
+}
+
+// WithProxy records whether the browsers route through PAGELODE_PROXY_URL, which stealth requests require.
+func (s *Service) WithProxy(configured bool) *Service {
+	s.proxyConfigured = configured
 	return s
 }

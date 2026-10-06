@@ -140,7 +140,7 @@ func newApplication(configuration config.Config) (*application, error) {
 	emailLoader := emails.NewLoader(httpClient, chromedp, patchrightClient, capSolverFetcher, routes, browserLimiter, configuration.ChromedpEnabled)
 	return &application{
 		emailFinder:       emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency, configuration.ProfilesDirectory),
-		discoverer:        discovery.New(chromedp, patchrightClient, routes, browserLimiter, configuration.ChromedpEnabled).WithProfiles(configuration.ProfilesDirectory),
+		discoverer:        discovery.New(chromedp, patchrightClient, routes, browserLimiter, configuration.ChromedpEnabled).WithProfiles(configuration.ProfilesDirectory).WithProxy(configuration.ProxyURL != ""),
 		extractor:         extractor,
 		extractLimiter:    extractLimiter,
 		browserLimiter:    browserLimiter,
@@ -238,7 +238,7 @@ Usage:
   pagelode <URL>
   pagelode --json <URL>
   pagelode extract <URL>
-  pagelode discover [--profile <name>] [--verbose] [--wait-ms 1500] <URL>
+  pagelode discover [--profile <name>] [--stealth] [--verbose] [--wait-ms 1500] <URL>
   pagelode discover --har <capture.har>
   pagelode emails [--max-pages 20] [--profile <name>] [--verbose] <URL>
   pagelode profile login <name> <URL>

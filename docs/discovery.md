@@ -16,6 +16,7 @@ pagelode discover https://example.com/listings
 pagelode discover --wait-ms 3000 https://example.com/listings
 pagelode discover --har capture.har
 pagelode discover --verbose https://example.com/listings
+pagelode discover --stealth https://example.com/listings
 ```
 
 Discovery always prints JSON. The default report omits request evidence, evidence references, sequence details, and loading attempts. Use `--verbose` or API `"verbose": true` to include those details. Verbose reports still redact credentials. `--wait-ms` controls the observation period after navigation completes: default 1500 milliseconds, minimum 100, maximum 10000. The configured extraction timeout bounds the whole operation.
@@ -30,9 +31,9 @@ curl -sS http://localhost:8083/discover \
   -d '{"url":"https://example.com/listings","waitMs":1500}'
 ```
 
-For offline traffic, send `{"har":{"log":{"entries":[...]}}}`. `url` is optional with HAR input; `waitMs` applies to live discovery. Request bodies are limited to 4 MiB.
+For offline traffic, send `{"har":{"log":{"entries":[...]}}}`. `url` is optional with HAR input; `waitMs` and `stealth` apply to live discovery. Request bodies are limited to 4 MiB.
 
-Malformed input returns HTTP 400, a saturated queue returns 429, a request deadline returns 408, and a browser capture failure returns 502. A captured page that remains blocked returns a report with `outcome: "blocked"`; a missing page returns `outcome: "dead"`. Other completed analyses return `outcome: "ok"`, including pages where no API was observed.
+Malformed input returns HTTP 400, a saturated queue returns 429, a request deadline returns 408, a stealth request on a server without `PAGELODE_PROXY_URL` returns 503, and a browser capture failure returns 502. A captured page that remains blocked returns a report with `outcome: "blocked"`; a missing page returns `outcome: "dead"`. Other completed analyses return `outcome: "ok"`, including pages where no API was observed.
 
 ## Read the report
 
@@ -112,6 +113,8 @@ Storage defaults to `pagelode/profiles` under the operating system's user config
 ## Loading and limits
 
 Discovery starts with chromedp because even a usable HTML page can make useful data requests. Protected hostname rules or disabled chromedp route it directly to Patchright. A blocked or failed chromedp load escalates to Patchright. Both paths use the existing proxy configuration, classification, and browser limiter. Capturing a normal page does not teach extraction to skip its cheap HTTP attempt.
+
+Stealth discovery (`--stealth` or API `"stealth": true`) skips that waterfall: the page loads once, in Patchright, through `PAGELODE_PROXY_URL`. A server without that proxy rejects stealth requests instead of loading the page from its own address. Profile discovery already uses Patchright only and accepts `stealth` to require the proxy as well.
 
 Retained traffic is bounded to 200 entries, 256 KiB per body, and 2 MiB of bodies per load. Schemas inspect at most eight nested levels, twenty array samples, and 512 fields per schema. The report records dropped or truncated observations. Stream and binary protocol payloads are identified by their transport signals rather than decoded into record schemas. Discovery observes initial loading and the configured wait period; explicit clicks, scrolling, and endpoint replay are future additions.
 

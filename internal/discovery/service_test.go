@@ -83,7 +83,7 @@ func TestHARDiscovery(t *testing.T) {
 }
 
 func TestValidateDiscoveryRequest(t *testing.T) {
-	for _, request := range []Request{{URL: "file:///etc/passwd"}, {URL: "https://user:password@example.com"}, {URL: "https://example.com", WaitMS: -1}, {URL: "https://example.com", WaitMS: 10001}, {HAR: &HAR{}}, {URL: "example.com", Profile: "../account"}, {HAR: &HAR{Log: HARLog{Entries: []HAREntry{{}}}}, Profile: "account"}} {
+	for _, request := range []Request{{URL: "file:///etc/passwd"}, {URL: "https://user:password@example.com"}, {URL: "https://example.com", WaitMS: -1}, {URL: "https://example.com", WaitMS: 10001}, {HAR: &HAR{}}, {URL: "example.com", Profile: "../account"}, {HAR: &HAR{Log: HARLog{Entries: []HAREntry{{}}}}, Profile: "account"}, {HAR: &HAR{Log: HARLog{Entries: []HAREntry{{}}}}, Stealth: true}} {
 		if _, err := request.Validate(); err == nil {
 			t.Errorf("Validate(%+v) succeeded", request)
 		}
@@ -135,5 +135,23 @@ func TestDiscoveryProfileUsesPatchright(t *testing.T) {
 	_, err = service.Discover(context.Background(), Request{URL: "example.com", Profile: "missing"})
 	if err == nil || patch.calls != 1 {
 		t.Errorf("missing profile error=%v calls=%d", err, patch.calls)
+	}
+}
+
+func TestDiscoveryStealthSkipsChromedpAndRequiresProxy(t *testing.T) {
+	chrome := &captureStub{document: page.Document{Provider: page.ProviderChromedp, Traffic: &page.Capture{}}}
+	patch := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
+	service := New(chrome, patch, memory.NewRoutes(time.Hour, nil), limit.New(1, 1), true)
+	if _, err := service.Discover(context.Background(), Request{URL: "example.com", Stealth: true}); !errors.Is(err, ErrStealthProxy) {
+		t.Fatalf("without proxy error = %v, want ErrStealthProxy", err)
+	}
+	if chrome.calls != 0 || patch.calls != 0 {
+		t.Fatalf("without proxy calls = %d/%d, want 0/0", chrome.calls, patch.calls)
+	}
+	if _, err := service.WithProxy(true).Discover(context.Background(), Request{URL: "example.com", Stealth: true}); err != nil {
+		t.Fatal(err)
+	}
+	if chrome.calls != 0 || patch.calls != 1 {
+		t.Errorf("calls = %d/%d, want 0/1", chrome.calls, patch.calls)
 	}
 }
