@@ -15,6 +15,7 @@ Both use the same classifier (`internal/classify`) and route memory (`internal/m
 
 | Provider | Library | Cost | Role |
 |---|---|---|---|
+| `replay` | `bogdanfinn/tls-client` with a browser-harvested session: same proxy IP, cookies, and Chrome headers | Cheapest | Tried first when a browser render has recorded a clearance for the host; see [clearance replay](browser-service.md#clearance-replay) |
 | `tls` | `bogdanfinn/tls-client` with a Chrome TLS profile | Cheapest | Always tried first unless a route is remembered |
 | `chromedp` | `chromedp/chromedp` driving one reusable Chromium | Medium | JavaScript shells; skipped when `PAGELODE_CHROMEDP_ENABLED=false` |
 | `patchright` | Patchright in the browser service (`browser-service/`), called over HTTP by `internal/browser` | High | Challenge pages, protected domains, and every other failure |

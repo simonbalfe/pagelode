@@ -42,8 +42,8 @@ Each feature folder owns its routes, request schema, and logic. `app.ts` only co
 | `src/server.ts` | Entry point: config, wiring, `Bun.serve`, graceful shutdown |
 | `src/app.ts` | Hono app: error format, health, auth, body limit, feature routers under `/v1`, dashboard |
 | `src/config.ts` | `BROWSER_SERVICE_*` environment |
-| `src/render/` | `POST /v1/render`: `schema.ts`, `renderer.ts` (identity or profile, limiter, deadline), `page.ts` (one page render), `challenge.ts` (settling), `capture.ts` (network capture) |
-| `src/captcha/` | `datadome.ts` (detect the DataDome frame, wait for the device check, fall back to CapSolver), `capsolver.ts` (CapSolver task client) |
+| `src/render/` | `POST /v1/render`: `schema.ts`, `renderer.ts` (identity or profile, limiter, deadline), `page.ts` (one page render), `challenge.ts` (settling), `capture.ts` (network capture), `replay.ts` (headers and cookies for HTTP replay) |
+| `src/captcha/` | `datadome.ts` (DataDome device check, CapSolver fallback), `google.ts` (Google's `/sorry` reCAPTCHA through CapSolver), `capsolver.ts` (CapSolver task client) |
 | `src/sessions/` | `/v1/sessions` and the CDP relay: `schema.ts`, `sessions.ts` (lifecycle), `devtools.ts` (debug port, endpoint discovery, WebSocket relay) |
 | `src/identities/` | `/v1/identities`: `pool.ts` (warm identities, rotation) |
 | `src/profiles/` | `store.ts` (profile directories and saved cookies), `locks.ts` (one owner per profile) |
@@ -66,6 +66,7 @@ Every route except `GET /healthz` and the dashboard requires the token as `Autho
 | `WS /v1/sessions/:id/cdp` | Browser-level CDP, relayed to that session's Chrome |
 | `WS /v1/sessions/:id/devtools/page/:target` | Page-level CDP |
 | `GET /v1/identities` | Warm identities with IP, country, timezone, languages, usage |
+| `GET /v1/identities/:key/clearance?url=` | The identity's exact proxy URL, browser request headers, and cookies for that URL, for replay over HTTP |
 | `DELETE /v1/identities/:key` | Rotate an identity: new profile directory and new proxy session |
 
 Errors always look like `{"error":{"code","message"}}`.
@@ -90,12 +91,12 @@ Errors always look like `{"error":{"code","message"}}`.
 | `cookies` | `[]` | Up to 500, carried over from the Go HTTP attempt |
 | `proxy_url` | none | `http`, `https`, `socks4`, `socks5`; may contain `{session}` |
 | `settle_challenge` | `true` | Detect a challenge page, click its checkbox, wait for it to clear |
-| `solve_captcha` | `true` | Clear DataDome: wait for its device check, then solve its captcha with CapSolver when configured |
+| `solve_captcha` | `true` | Clear DataDome (wait for its device check, then CapSolver) and Google's `/sorry` reCAPTCHA (CapSolver) when configured |
 | `capture` | none | `{wait_ms}` adds captured network traffic to the response |
 | `profile` | none | Render inside a saved login profile |
 | `identity` | derived | Which warm browser identity to use (see below) |
 
-The response contains `status_code`, `final_url`, `title`, `html` (the DOM after JavaScript), `user_agent`, `cookies`, and `traffic` when captured.
+The response contains `status_code`, `final_url`, `title`, `html` (the DOM after JavaScript), `user_agent`, `cookies`, `replay`, and `traffic` when captured. `replay` holds the identity key, the exact proxy URL with `{session}` filled in, and Chrome's own request headers (`user-agent`, `accept`, `accept-language`, `sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`).
 
 - After navigation the service waits 500 ms, or `capture.wait_ms`, before reading the page.
 - Every render has a hard deadline of `timeout_ms` + 15 s. When it expires the identity's browser is discarded and relaunched on the next request, so a crashed Chrome cannot hang the queue.
@@ -147,6 +148,35 @@ flowchart TD
 - **WebRTC.** With a proxy, the profile sets `webrtc.ip_handling_policy` to `disable_non_proxied_udp`, so WebRTC cannot reveal the server's real IP.
 - **Pool.** Up to `BROWSER_SERVICE_MAX_IDENTITIES` browsers stay warm; the least recently used idle one is closed when a new identity is needed. Its profile stays on disk, so cookies such as `cf_clearance` survive.
 - **Rotation is policy.** The service exposes the mechanism; Go decides when to rotate, for example after a host blocks an identity twice.
+
+## Clearance replay
+
+A browser render earns a site's clearance once: cookies such as Cloudflare's `cf_clearance`, DataDome's `datadome`, or Google's session cookies. PageLode then reuses that clearance over its cheap tls-client loader for later requests to the same host.
+
+```mermaid
+flowchart LR
+    Request[extract URL] --> Known{clearance for host?}
+    Known -- yes --> Replay["replay: tls-client, same proxy IP, browser headers, cookies"]
+    Replay -- usable --> Done[result, provider replay]
+    Replay -- blocked --> Forget[forget clearance]
+    Known -- no --> Waterfall[normal waterfall]
+    Forget --> Waterfall
+    Waterfall -- browser success --> Record[remember clearance for PAGELODE_ROUTE_TTL]
+    Record --> Done
+```
+
+| Replayed | Source |
+|---|---|
+| Exit IP | The identity's exact proxy URL from `replay.proxy_url` |
+| Cookies | Every cookie in the identity's browser after the render |
+| User agent and client hints | Chrome's real request headers from the main document request |
+| Header order | Chrome's navigation order, including `sec-fetch-*` and `priority` |
+| TLS handshake | tls-client's newest Chrome profile (`Chrome_152`) |
+
+- PageLode keeps clearances in memory per host (`internal/memory/clearances.go`) for `PAGELODE_ROUTE_TTL` and tries replay before the waterfall.
+- A blocked replay forgets the clearance and runs the normal waterfall, which harvests a fresh one.
+- Replayed results report provider `replay`.
+- Other tools can read the same data from `GET /v1/identities/:key/clearance`.
 
 ## Fingerprint
 
@@ -246,6 +276,20 @@ Same container, fresh identities, Evomi mobile IPs in each site's country, one s
 - Plain HTTP through the same mobile IPs got the slider captcha (`rt:'c'`) on every site; the browser from a home IP also got the captcha.
 - CapSolver was never needed. The fallback is wired but not yet exercised end to end, and CapSolver only accepts Windows or Mac Chrome and Firefox user agents, so it is unlikely to work from the Linux container.
 
+### Google search with clearance replay
+
+PageLode with the container service, Evomi mobile proxies, `PAGELODE_CHROMEDP_ENABLED=false`.
+
+| Step | Path | Result | Time |
+|---|---|---|---|
+| First search | tls-client gets Google's JavaScript wall, then the browser renders (CapSolver solves `/sorry` when served) | Results | 7–17 s, up to 63 s with a slow solve |
+| Next 47 searches, one session | `replay` | 45 with results, 2 blocked and re-harvested by the browser | 1.1–1.9 s each |
+| Reproducibility run, rounds 1–3 (GB, GB, US), fresh identity and PageLode restart per round | 1 harvest + 15 replays per round | 46 of 48 searches returned results; every search after a successful harvest replayed | replays 1.1–1.9 s |
+
+- Plain tls-client always receives Google's JavaScript wall (`emsg=SG_REL`); `classify` now treats it as blocked.
+- US T-Mobile IPs (`172.56.*`) received `/sorry` on every query; GB, IE, and AU IPs often did not.
+- Result links are opaque `google.com/goto?url=` tokens. The `cite` element shows the host and a shortened path; the real URL needs one extra request per result.
+
 ## Known gaps
 
 | Site or area | Cause | Planned fix |
@@ -255,11 +299,16 @@ Same container, fresh identities, Evomi mobile IPs in each site's country, one s
 | DataDome captchas | Device checks pass; the slider captcha only appears for distrusted IPs or non-browser clients. CapSolver accepts only Windows or Mac user agents | Rotate the identity to a fresh IP first; exercise the CapSolver fallback on a Mac or Windows service |
 | Late verdicts | Some pages fill in content asynchronously after the snapshot | Add `wait_for: {selector, timeout_ms}` to renders |
 | Signatures in two places | The service's challenge check is a weaker copy of Go's `classify` patterns | One `signatures.json` read by both; return response headers and cookie names with every document so Go classifies on headers first, HTML second |
+| Render deadline with CapSolver | A render is limited to `timeout_ms` + 15 s, and PageLode caps `timeout_ms` at 45 s, so a slow captcha solve exceeds it and the browser is discarded | Add the CapSolver solving budget to the deadline when a solver is configured |
+| Browser closed at startup | A freshly launched identity occasionally died on its first page (`Target page, context or browser has been closed`) | Discard and retry once on a fresh browser within the same deadline |
+| Identity rotation can hang | During the reproducibility run a `DELETE /v1/identities/:key` never returned, stalling the run after round 3 | Bound `context.close()` with a timeout and kill the browser process if it does not exit |
+| One identity per PageLode proxy | PageLode sends no `identity`, so all its renders share one browser and IP, and Go never rotates | Let Go keep a pool of identities per country and rotate on repeated blocks |
 
 ## Next steps
 
-1. Signal-based challenge detection and a shared `signatures.json`, with response headers added to `page.Document` for both the HTTP tier and the service.
-2. `wait_for` on renders; make the 500 ms post-load wait configurable.
-3. Exercise the DataDome CapSolver fallback, and measure DataDome under concurrent load from one IP.
-4. Move Chromedp and CapSolver into the service once Patchright covers plain JavaScript rendering at similar cost.
-5. Update the production deployment (`hetzner-infra/apps/pagelode/compose.yaml`), which still runs the old single container.
+1. Fix the render deadline with CapSolver, the startup retry, and bounded rotation; repeat the 10-round Google reproducibility run.
+2. Signal-based challenge detection and a shared `signatures.json`, with response headers added to `page.Document` for both the HTTP tier and the service.
+3. `wait_for` on renders; make the 500 ms post-load wait configurable.
+4. A Google search endpoint: identity pool per country, result parsing, `/goto` link resolution.
+5. Move Chromedp and CapSolver into the service once Patchright covers plain JavaScript rendering at similar cost.
+6. Update the production deployment (`hetzner-infra/apps/pagelode/compose.yaml`), which still runs the old single container.
