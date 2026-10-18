@@ -9,7 +9,6 @@ import (
 
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/page"
-	"github.com/simonbalfe/pagelode/internal/profile"
 )
 
 type PageLoader interface {
@@ -17,20 +16,19 @@ type PageLoader interface {
 }
 
 type Service struct {
-	loader            PageLoader
-	limiter           *limit.Limiter
-	concurrency       int
-	profilesDirectory string
+	loader      PageLoader
+	limiter     *limit.Limiter
+	concurrency int
 }
 
-func New(loader PageLoader, limiter *limit.Limiter, concurrency int, profilesDirectory string) *Service {
+func New(loader PageLoader, limiter *limit.Limiter, concurrency int) *Service {
 	if concurrency < 1 {
 		concurrency = 1
 	}
 	if concurrency > 4 {
 		concurrency = 4
 	}
-	return &Service{loader: loader, limiter: limiter, concurrency: concurrency, profilesDirectory: profilesDirectory}
+	return &Service{loader: loader, limiter: limiter, concurrency: concurrency}
 }
 
 func (s *Service) Find(ctx context.Context, request Request) (Report, error) {
@@ -38,13 +36,7 @@ func (s *Service) Find(ctx context.Context, request Request) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	options := Options{Render: request.Render}
-	if request.Profile != "" {
-		options.ProfileDirectory, err = profile.Directory(s.profilesDirectory, request.Profile, false)
-		if err != nil {
-			return Report{}, err
-		}
-	}
+	options := Options{Render: request.Render, Profile: request.Profile}
 	started := time.Now()
 	deadline, cancel := context.WithTimeout(ctx, time.Duration(request.MaxDurationMS)*time.Millisecond)
 	defer cancel()

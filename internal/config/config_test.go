@@ -8,8 +8,7 @@ import (
 
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("PORT", "")
-	t.Setenv("PAGELODE_PATCHRIGHT_COMMAND", "")
-	t.Setenv("PAGELODE_PATCHRIGHT_WORKER", "")
+	t.Setenv("PAGELODE_BROWSER_URL", "")
 	t.Setenv("PAGELODE_BROWSER_CONCURRENCY", "")
 	t.Setenv("PAGELODE_MAX_CONCURRENCY", "")
 
@@ -23,11 +22,8 @@ func TestLoadDefaults(t *testing.T) {
 	if !got.ChromedpEnabled {
 		t.Error("Load().ChromedpEnabled = false, want true")
 	}
-	if got.PatchrightCommand != "bun" {
-		t.Errorf("Load().PatchrightCommand = %q, want bun", got.PatchrightCommand)
-	}
-	if got.PatchrightWorker != "browser/src/worker.ts" {
-		t.Errorf("Load().PatchrightWorker = %q, want browser/src/worker.ts", got.PatchrightWorker)
+	if got.BrowserURL != "http://127.0.0.1:8090" {
+		t.Errorf("Load().BrowserURL = %q, want http://127.0.0.1:8090", got.BrowserURL)
 	}
 }
 

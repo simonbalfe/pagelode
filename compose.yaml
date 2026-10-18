@@ -3,12 +3,31 @@ services:
     build: .
     environment:
       PORT: 8083
-      PAGELODE_PATCHRIGHT_COMMAND: bun
-      PAGELODE_PATCHRIGHT_WORKER: /app/browser/src/worker.ts
-      PAGELODE_PATCHRIGHT_HEADLESS: ${PAGELODE_PATCHRIGHT_HEADLESS:-true}
+      PAGELODE_BROWSER_URL: http://browser:8090
+      PAGELODE_BROWSER_TOKEN: ${BROWSER_SERVICE_TOKEN:?set BROWSER_SERVICE_TOKEN}
       PAGELODE_PROXY_URL: ${PAGELODE_PROXY_URL:-}
       PAGELODE_PROTECTED_DOMAINS: ${PAGELODE_PROTECTED_DOMAINS:-crunchbase.com}
       PAGELODE_CHROMEDP_ENABLED: ${PAGELODE_CHROMEDP_ENABLED:-true}
     ports:
       - "8083:8083"
+    depends_on:
+      - browser
     restart: unless-stopped
+
+  browser:
+    build: ./browser-service
+    environment:
+      BROWSER_SERVICE_TOKEN: ${BROWSER_SERVICE_TOKEN:?set BROWSER_SERVICE_TOKEN}
+      BROWSER_SERVICE_CONCURRENCY: ${BROWSER_SERVICE_CONCURRENCY:-4}
+      BROWSER_SERVICE_MAX_SESSIONS: ${BROWSER_SERVICE_MAX_SESSIONS:-4}
+      TZ: ${BROWSER_TZ:-Etc/UTC}
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - browser-data:/data
+    shm_size: 1gb
+    init: true
+    restart: unless-stopped
+
+volumes:
+  browser-data:

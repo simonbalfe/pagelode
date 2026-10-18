@@ -1,5 +1,5 @@
 import type { Page, Request, Response } from "patchright";
-import type { Exchange, Traffic } from "./contract";
+import type { Exchange, Traffic } from "./contract.ts";
 
 const maxRequests = 200;
 const maxBodyBytes = 256 << 10;

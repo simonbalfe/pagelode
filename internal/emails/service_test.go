@@ -14,7 +14,6 @@ import (
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/page"
-	"github.com/simonbalfe/pagelode/internal/profile"
 )
 
 type loadFunc func(context.Context, string, Options) (page.Document, error)
@@ -42,7 +41,7 @@ func TestCrawlPrioritizesContactsAndRetainsSources(t *testing.T) {
 	}))
 	defer server.Close()
 	loader := NewLoader(httpfetch.New(""), nil, nil, nil, memory.NewRoutes(time.Hour, nil), limit.New(1, 10), false)
-	service := New(loader, limit.New(1, 10), 1, t.TempDir())
+	service := New(loader, limit.New(1, 10), 1)
 	report, err := service.Find(context.Background(), Request{URL: server.URL, MaxPages: 3, Render: "never"})
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +68,7 @@ func TestLimitsAndCancellation(t *testing.T) {
 	loader := loadFunc(func(ctx context.Context, target string, _ Options) (page.Document, error) {
 		return page.Document{FinalURL: target, HTML: `<p>a@example.org b@example.org c@example.org</p><a href="/contact">Contact</a>`, StatusCode: 200}, nil
 	})
-	service := New(loader, limit.New(4, 10), 4, t.TempDir())
+	service := New(loader, limit.New(4, 10), 4)
 	report, err := service.Find(context.Background(), Request{URL: "example.org", MaxPages: 1, MaxEmails: 1})
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +91,7 @@ func TestDurationReturnsPartialResults(t *testing.T) {
 		<-ctx.Done()
 		return page.Document{}, ctx.Err()
 	})
-	service := New(loader, limit.New(4, 10), 1, t.TempDir())
+	service := New(loader, limit.New(4, 10), 1)
 	report, err := service.Find(context.Background(), Request{URL: "example.org", MaxDurationMS: 1000})
 	if err != nil {
 		t.Fatal(err)
@@ -103,18 +102,13 @@ func TestDurationReturnsPartialResults(t *testing.T) {
 }
 
 func TestProfileLoadsSeriallyAndSkipsPublicSitemap(t *testing.T) {
-	root := t.TempDir()
-	directory, err := profile.Directory(root, "account", true)
-	if err != nil {
-		t.Fatal(err)
-	}
 	var active atomic.Int32
 	loader := loadFunc(func(_ context.Context, target string, options Options) (page.Document, error) {
 		if active.Add(1) != 1 {
 			t.Error("profile loaded concurrently")
 		}
 		defer active.Add(-1)
-		if options.ProfileDirectory != directory {
+		if options.Profile != "account" {
 			t.Errorf("profile options: %#v", options)
 		}
 		if strings.Contains(target, "sitemap") {
@@ -126,7 +120,7 @@ func TestProfileLoadsSeriallyAndSkipsPublicSitemap(t *testing.T) {
 		}
 		return page.Document{FinalURL: target, HTML: body, StatusCode: 200}, nil
 	})
-	report, err := New(loader, limit.New(4, 10), 4, root).Find(context.Background(), Request{URL: "example.org", Profile: "account"})
+	report, err := New(loader, limit.New(4, 10), 4).Find(context.Background(), Request{URL: "example.org", Profile: "account"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +133,7 @@ func TestRejectOutsideRedirect(t *testing.T) {
 	loader := loadFunc(func(context.Context, string, Options) (page.Document, error) {
 		return page.Document{FinalURL: "https://outside.test/", HTML: `<p>outside@example.org</p>`, StatusCode: 200}, nil
 	})
-	report, err := New(loader, limit.New(1, 10), 1, t.TempDir()).Find(context.Background(), Request{URL: "example.org", MaxPages: 1})
+	report, err := New(loader, limit.New(1, 10), 1).Find(context.Background(), Request{URL: "example.org", MaxPages: 1})
 	if err != nil {
 		t.Fatal(err)
 	}

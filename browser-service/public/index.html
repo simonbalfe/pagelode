@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browser service</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="toolbar">
+    <span class="product">Browser service</span>
+    <span id="health" class="health">connecting</span>
+    <label class="token">
+      Token
+      <input id="token" type="password" autocomplete="off" spellcheck="false">
+    </label>
+  </header>
+
+  <main>
+    <section>
+      <h2>Sessions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Profile</th>
+            <th>Mode</th>
+            <th>Expires</th>
+            <th>CDP URL</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="sessions">
+          <tr><td colspan="6" class="empty">No open sessions</td></tr>
+        </tbody>
+      </table>
+
+      <form id="session-form" class="form">
+        <h3>Open session</h3>
+        <div class="fields">
+          <label>Profile<input name="profile" placeholder="optional"></label>
+          <label>Start URL<input name="start_url" type="url" placeholder="https://"></label>
+          <label>Proxy URL<input name="proxy_url" placeholder="http://user:pass@host:port"></label>
+          <label>TTL seconds<input name="ttl_seconds" type="number" min="30" max="86400" value="900"></label>
+        </div>
+        <div class="options">
+          <label class="check"><input name="create_profile" type="checkbox"> Create profile if missing</label>
+          <label class="check"><input name="headless" type="checkbox" checked> Headless</label>
+          <button type="submit">Open session</button>
+        </div>
+        <p id="session-error" class="error" hidden></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Render</h2>
+      <form id="render-form" class="form">
+        <div class="fields">
+          <label class="wide">URL<input name="url" type="url" required placeholder="https://example.com"></label>
+          <label>Profile<input name="profile" placeholder="optional"></label>
+          <label>Proxy URL<input name="proxy_url" placeholder="optional"></label>
+        </div>
+        <div class="options">
+          <label class="check"><input name="capture" type="checkbox"> Capture network traffic</label>
+          <label class="check"><input name="settle_challenge" type="checkbox" checked> Settle challenges</label>
+          <button type="submit">Render</button>
+        </div>
+        <p id="render-error" class="error" hidden></p>
+      </form>
+
+      <div id="render-result" hidden>
+        <dl class="facts">
+          <dt>Status</dt><dd id="result-status"></dd>
+          <dt>Final URL</dt><dd id="result-url"></dd>
+          <dt>Title</dt><dd id="result-title"></dd>
+          <dt>HTML</dt><dd id="result-size"></dd>
+          <dt>Cookies</dt><dd id="result-cookies"></dd>
+          <dt>Requests</dt><dd id="result-traffic"></dd>
+          <dt>Time</dt><dd id="result-time"></dd>
+        </dl>
+        <iframe id="result-preview" sandbox="" title="Rendered page preview"></iframe>
+        <details>
+          <summary>HTML source</summary>
+          <pre id="result-html"></pre>
+        </details>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

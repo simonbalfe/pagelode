@@ -17,12 +17,14 @@ import (
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/orchestrator"
+	"github.com/simonbalfe/pagelode/internal/sitemap"
 )
 
 const maximumRequestBytes = 16 << 10
 
 type Server struct {
 	emailFinder    *emails.Service
+	mapper         *sitemap.Service
 	extractor      *orchestrator.Service
 	discoverer     *discovery.Service
 	extractLimiter *limit.Limiter
@@ -50,6 +52,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /extract", s.extract)
 	mux.HandleFunc("POST /discover", s.discover)
 	mux.HandleFunc("POST /emails", s.emails)
+	mux.HandleFunc("POST /map", s.siteMap)
 	return mux
 }
 

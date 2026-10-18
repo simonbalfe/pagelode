@@ -1,4 +1,4 @@
-package patchright_test
+package browser_test
 
 import (
 	"context"
@@ -6,23 +6,30 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/simonbalfe/pagelode/internal/browser"
+	"github.com/simonbalfe/pagelode/internal/browser/browsertest"
 	"github.com/simonbalfe/pagelode/internal/discovery"
 	"github.com/simonbalfe/pagelode/internal/page"
-	"github.com/simonbalfe/pagelode/internal/patchright"
 )
 
-func TestWorkerCapture(t *testing.T) {
+func startClient(t *testing.T) *browser.Client {
+	t.Helper()
 	if os.Getenv("PAGELODE_BROWSER_TESTS") != "1" {
-		t.Skip("set PAGELODE_BROWSER_TESTS=1 to run Patchright integration")
+		t.Skip("set PAGELODE_BROWSER_TESTS=1 to run browser service integration")
 	}
-	t.Setenv("PAGELODE_PATCHRIGHT_HEADLESS", "true")
-	t.Setenv("PAGELODE_PATCHRIGHT_PROFILE", t.TempDir())
+	client, err := browser.New(browsertest.Start(t), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
+}
+
+func TestServiceCapture(t *testing.T) {
+	client := startClient(t)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -38,19 +45,6 @@ func TestWorkerCapture(t *testing.T) {
 	})
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	worker, err := filepath.Abs("../../browser/src/worker.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	client, err := patchright.New("bun", []string{worker}, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := client.Close(); err != nil {
-			t.Error(err)
-		}
-	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	document, err := client.Capture(ctx, server.URL, page.Session{}, page.CaptureOptions{WaitMS: 200})
@@ -76,11 +70,7 @@ func TestWorkerCapture(t *testing.T) {
 }
 
 func TestAuthenticatedProfilePersistsAndIsolatesStorage(t *testing.T) {
-	if os.Getenv("PAGELODE_BROWSER_TESTS") != "1" {
-		t.Skip("set PAGELODE_BROWSER_TESTS=1 to run Patchright integration")
-	}
-	t.Setenv("PAGELODE_PATCHRIGHT_HEADLESS", "true")
-	t.Setenv("PAGELODE_PATCHRIGHT_PROFILE", t.TempDir())
+	client := startClient(t)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -106,33 +96,15 @@ func TestAuthenticatedProfilePersistsAndIsolatesStorage(t *testing.T) {
 	})
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	worker, err := filepath.Abs("../../browser/src/worker.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	client, err := patchright.New("bun", []string{worker}, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := client.Close(); err != nil {
-			t.Error(err)
-		}
-	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	directory := t.TempDir()
-	login := exec.CommandContext(ctx, "bun", worker, "--login", server.URL+"/login")
-	login.Env = append(os.Environ(), "PAGELODE_PATCHRIGHT_PROFILE="+directory, "PAGELODE_PROFILE_SESSION=true")
-	login.Stdin = strings.NewReader("\n")
-	if output, err := login.CombinedOutput(); err != nil {
-		t.Fatalf("login worker: %v: %s", err, output)
-	}
+	login(ctx, t, client, "member", server.URL+"/login")
+	login(ctx, t, client, "other", server.URL+"/")
 	for _, test := range []struct {
-		directory     string
+		profile       string
 		authenticated bool
-	}{{directory, true}, {t.TempDir(), false}} {
-		document, err := client.Capture(ctx, server.URL, page.Session{}, page.CaptureOptions{WaitMS: 200, ProfileDirectory: test.directory})
+	}{{"member", true}, {"other", false}} {
+		document, err := client.Capture(ctx, server.URL, page.Session{}, page.CaptureOptions{WaitMS: 200, Profile: test.profile})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,11 +121,11 @@ func TestAuthenticatedProfilePersistsAndIsolatesStorage(t *testing.T) {
 				t.Fatal(err)
 			}
 			if payload.Authenticated != test.authenticated {
-				t.Errorf("authenticated=%t,want %t", payload.Authenticated, test.authenticated)
+				t.Errorf("profile %s: authenticated=%t, want %t", test.profile, payload.Authenticated, test.authenticated)
 			}
 		}
 		if !found {
-			t.Fatal("account request missing")
+			t.Fatalf("profile %s: account request missing", test.profile)
 		}
 		report, err := json.Marshal(discovery.Analyze(server.URL, document))
 		if err != nil {
@@ -162,5 +134,17 @@ func TestAuthenticatedProfilePersistsAndIsolatesStorage(t *testing.T) {
 		if strings.Contains(string(report), "private-profile") {
 			t.Error("report exposes profile credentials")
 		}
+	}
+}
+
+func login(ctx context.Context, t *testing.T, client *browser.Client, profile, startURL string) {
+	t.Helper()
+	headless := true
+	session, err := client.CreateSession(ctx, browser.SessionRequest{Profile: profile, CreateProfile: true, Headless: &headless, StartURL: startURL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.CloseSession(ctx, session.ID); err != nil {
+		t.Fatal(err)
 	}
 }

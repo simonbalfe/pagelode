@@ -33,7 +33,7 @@ func TestLoaderRouting(t *testing.T) {
 		{name: "JavaScript shell", body: `<div id="app"></div><script src="/app.js"></script>`, status: 200, want: "chrome"},
 		{name: "blocked", body: `<p>Access denied</p>`, status: 403, want: "patchright"},
 		{name: "protected", protected: true, want: "patchright"},
-		{name: "profile", profile: "/private/profile", want: "patchright"},
+		{name: "profile", profile: "account", want: "patchright"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var calls []string
@@ -44,8 +44,8 @@ func TestLoaderRouting(t *testing.T) {
 			browser := func(name string) captureFunc {
 				return func(_ context.Context, target string, _ page.Session, options page.CaptureOptions) (page.Document, error) {
 					calls = append(calls, name)
-					if options.ProfileDirectory != test.profile {
-						t.Errorf("profile %q", options.ProfileDirectory)
+					if options.Profile != test.profile {
+						t.Errorf("profile %q", options.Profile)
 					}
 					return page.Document{HTML: `<p>rendered@example.org</p>`, FinalURL: target, StatusCode: 200, Type: page.ContentHTML}, nil
 				}
@@ -55,7 +55,7 @@ func TestLoaderRouting(t *testing.T) {
 				protected = []string{"example.org"}
 			}
 			loader := NewLoader(http, browser("chrome"), browser("patchright"), nil, memory.NewRoutes(time.Hour, protected), limit.New(1, 10), true)
-			_, err := loader.Load(context.Background(), "https://example.org/", Options{Render: "auto", ProfileDirectory: test.profile})
+			_, err := loader.Load(context.Background(), "https://example.org/", Options{Render: "auto", Profile: test.profile})
 			if err != nil {
 				t.Fatal(err)
 			}

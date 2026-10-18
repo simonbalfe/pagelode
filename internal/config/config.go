@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,10 +14,9 @@ import (
 var proxySessionPattern = regexp.MustCompile(`(_(?:hard|locked)?session-)[A-Za-z0-9]+`)
 
 type Config struct {
-	ProfilesDirectory  string
 	Address            string
-	PatchrightCommand  string
-	PatchrightWorker   string
+	BrowserURL         string
+	BrowserToken       string
 	CapSolverAPIKey    string
 	CapSolverURL       string
 	CapSolverProxyURL  string
@@ -89,19 +87,14 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("config: invalid PAGELODE_CAPSOLVER_URL: %w", err)
 	}
 
-	profilesDirectory := os.Getenv("PAGELODE_PROFILES_DIR")
-	if profilesDirectory == "" {
-		directory, err := os.UserConfigDir()
-		if err != nil {
-			return Config{}, fmt.Errorf("config: profiles directory: %w", err)
-		}
-		profilesDirectory = filepath.Join(directory, "pagelode", "profiles")
+	browserURL := value("PAGELODE_BROWSER_URL", "http://127.0.0.1:8090")
+	if err := validateURL(browserURL, "http", "https"); err != nil {
+		return Config{}, fmt.Errorf("config: invalid PAGELODE_BROWSER_URL: %w", err)
 	}
 	return Config{
-		ProfilesDirectory:  profilesDirectory,
 		Address:            fmt.Sprintf(":%d", port),
-		PatchrightCommand:  value("PAGELODE_PATCHRIGHT_COMMAND", "bun"),
-		PatchrightWorker:   value("PAGELODE_PATCHRIGHT_WORKER", "browser/src/worker.ts"),
+		BrowserURL:         browserURL,
+		BrowserToken:       os.Getenv("PAGELODE_BROWSER_TOKEN"),
 		CapSolverAPIKey:    os.Getenv("CAPSOLVER_API_KEY"),
 		CapSolverURL:       capSolverURL,
 		CapSolverProxyURL:  capSolverProxyURL,

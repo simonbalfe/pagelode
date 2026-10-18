@@ -1,8 +1,8 @@
 package page
 
 type CaptureOptions struct {
-	WaitMS           int    `json:"wait_ms"`
-	ProfileDirectory string `json:"-"`
+	WaitMS  int    `json:"wait_ms"`
+	Profile string `json:"-"`
 }
 
 const (

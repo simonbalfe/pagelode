@@ -1,4 +1,4 @@
-.PHONY: build check run setup smoke
+.PHONY: build check run run-browser setup smoke
 
 build:
 	mkdir -p bin
@@ -8,16 +8,18 @@ check:
 	go test ./...
 	go vet ./...
 	go test -race ./...
-	cd browser && bun run check
-	cd browser && bun test
+	cd browser-service && bun run check
 
 run:
 	go run ./cmd/pagelode serve
 
+run-browser:
+	cd browser-service && bun run dev
+
 setup:
 	go mod download
-	cd browser && bun install --frozen-lockfile
-	cd browser && bunx patchright install chromium
+	cd browser-service && bun install --frozen-lockfile
+	cd browser-service && bunx patchright install chromium
 
 smoke:
 	./scripts/smoke.sh

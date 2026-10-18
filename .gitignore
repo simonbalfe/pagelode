@@ -1,4 +1,4 @@
 bin/
-browser/dist/
-browser/node_modules/
+browser-service/node_modules/
+data/
 

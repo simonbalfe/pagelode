@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/simonbalfe/pagelode/internal/api"
+	"github.com/simonbalfe/pagelode/internal/browser"
 	"github.com/simonbalfe/pagelode/internal/capsolver"
 	"github.com/simonbalfe/pagelode/internal/chromefetch"
 	"github.com/simonbalfe/pagelode/internal/config"
@@ -24,13 +25,14 @@ import (
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/orchestrator"
-	"github.com/simonbalfe/pagelode/internal/patchright"
+	"github.com/simonbalfe/pagelode/internal/sitemap"
 )
 
 const version = "0.1.0"
 
 type application struct {
 	emailFinder       *emails.Service
+	mapper            *sitemap.Service
 	extractor         *orchestrator.Service
 	discoverer        *discovery.Service
 	extractLimiter    *limit.Limiter
@@ -38,7 +40,6 @@ type application struct {
 	routes            *memory.Routes
 	chromedp          *chromefetch.Engine
 	capSolverChromedp *chromefetch.Engine
-	patchright        *patchright.Client
 }
 
 func main() {
@@ -62,6 +63,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
+	if args[0] == "emails-bulk" {
+		return emailsBulk(configuration, args[1:], stdout, stderr)
+	}
 	app, err := newApplication(configuration)
 	if err != nil {
 		return err
@@ -84,6 +88,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	if args[0] == "emails" {
 		return app.emails(configuration, args[1:], stdout, stderr)
 	}
+	if args[0] == "map" {
+		return app.siteMap(configuration, args[1:], stdout, stderr)
+	}
 	if args[0] == "discover" {
 		return app.discover(configuration, args[1:], stdout, stderr)
 	}
@@ -94,9 +101,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 }
 
 func newApplication(configuration config.Config) (*application, error) {
-	patchrightClient, err := patchright.New(configuration.PatchrightCommand, []string{configuration.PatchrightWorker}, configuration.ProxyURL)
+	browserClient, err := browser.New(configuration.BrowserURL, configuration.BrowserToken, configuration.ProxyURL)
 	if err != nil {
-		return nil, fmt.Errorf("configure Patchright: %w", err)
+		return nil, fmt.Errorf("configure browser service: %w", err)
 	}
 	chromedp, err := chromefetch.New(configuration.ProxyURL)
 	if err != nil {
@@ -131,23 +138,23 @@ func newApplication(configuration config.Config) (*application, error) {
 	extractor := orchestrator.New(
 		httpClient,
 		chromedp,
-		patchrightClient,
+		browserClient,
 		capSolverFetcher,
 		routes,
 		browserLimiter,
 		configuration.ChromedpEnabled,
 	)
-	emailLoader := emails.NewLoader(httpClient, chromedp, patchrightClient, capSolverFetcher, routes, browserLimiter, configuration.ChromedpEnabled)
+	emailLoader := emails.NewLoader(httpClient, chromedp, browserClient, capSolverFetcher, routes, browserLimiter, configuration.ChromedpEnabled)
 	return &application{
-		emailFinder:       emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency, configuration.ProfilesDirectory),
-		discoverer:        discovery.New(chromedp, patchrightClient, routes, browserLimiter, configuration.ChromedpEnabled).WithProfiles(configuration.ProfilesDirectory).WithProxy(configuration.ProxyURL != ""),
+		mapper:            sitemap.New(httpClient, extractLimiter),
+		emailFinder:       emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency),
+		discoverer:        discovery.New(chromedp, browserClient, routes, browserLimiter, configuration.ChromedpEnabled).WithProxy(configuration.ProxyURL != ""),
 		extractor:         extractor,
 		extractLimiter:    extractLimiter,
 		browserLimiter:    browserLimiter,
 		routes:            routes,
 		chromedp:          chromedp,
 		capSolverChromedp: capSolverChromedp,
-		patchright:        patchrightClient,
 	}, nil
 }
 
@@ -192,7 +199,7 @@ func (a *application) extract(configuration config.Config, args []string, stdout
 
 func (a *application) serve(configuration config.Config, output io.Writer) error {
 	logger := slog.New(slog.NewJSONHandler(output, nil))
-	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.browserLimiter, a.routes, configuration.RequestTimeout, logger).WithEmails(a.emailFinder)
+	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.browserLimiter, a.routes, configuration.RequestTimeout, logger).WithEmails(a.emailFinder).WithMap(a.mapper)
 	server := &http.Server{
 		Addr:              configuration.Address,
 		Handler:           apiServer.Handler(),
@@ -221,7 +228,7 @@ func (a *application) serve(configuration config.Config, output io.Writer) error
 }
 
 func (a *application) Close() error {
-	return errors.Join(a.chromedp.Close(), a.capSolverChromedp.Close(), a.patchright.Close())
+	return errors.Join(a.chromedp.Close(), a.capSolverChromedp.Close())
 }
 
 func attemptDetail(attempts []orchestrator.Attempt) string {
@@ -232,7 +239,7 @@ func attemptDetail(attempts []orchestrator.Attempt) string {
 }
 
 func writeUsage(output io.Writer) {
-	fmt.Fprintln(output, `PageLode extracts Markdown, discovers page data endpoints, and finds emails.
+	fmt.Fprintln(output, `PageLode extracts Markdown, maps sites, discovers page data endpoints, and finds emails.
 
 Usage:
   pagelode <URL>
@@ -241,6 +248,8 @@ Usage:
   pagelode discover [--profile <name>] [--stealth] [--verbose] [--wait-ms 1500] <URL>
   pagelode discover --har <capture.har>
   pagelode emails [--max-pages 20] [--profile <name>] [--verbose] <URL>
+  pagelode map [--limit 500] [--include /blog/*] [--exclude /admin/*] [--subdomains] [--json] <URL>
+  pagelode emails-bulk [--db data/emails.sqlite] [--workers 32] [--max-pages 8] [--render never] <file|->
   pagelode profile login <name> <URL>
   pagelode serve
   pagelode version

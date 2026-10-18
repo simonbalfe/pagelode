@@ -1,14 +1,15 @@
 {
-  "name": "pagelode-browser",
+  "name": "pagelode-browser-service",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/worker.ts",
-    "start": "bun src/worker.ts",
-    "check": "bunx tsc --noEmit",
-    "test": "bun test"
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/bun": "1.0.1",
+    "hono": "4.13.13",
     "patchright": "1.63.0",
     "zod": "4.6.2"
   },

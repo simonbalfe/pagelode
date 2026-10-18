@@ -3,12 +3,15 @@ set -eu
 
 fixture_port="${PAGELODE_SMOKE_FIXTURE_PORT:-38084}"
 api_port="${PAGELODE_SMOKE_API_PORT:-38083}"
+browser_port="${PAGELODE_SMOKE_BROWSER_PORT:-38090}"
+browser_token="smoke-browser-token"
 work_dir="$(mktemp -d)"
 api_pid=""
+browser_pid=""
 fixture_pid=""
 
 cleanup() {
-	for pid in "$api_pid" "$fixture_pid"; do
+	for pid in "$api_pid" "$browser_pid" "$fixture_pid"; do
     if [ -n "$pid" ]; then
       kill "$pid" 2>/dev/null || true
       wait "$pid" 2>/dev/null || true
@@ -26,19 +29,26 @@ printf '%s\n' '<html><head><title>Discovery fixture</title></head><body><h1>List
 python3 -m http.server "$fixture_port" --bind 127.0.0.1 --directory "$work_dir" >"$work_dir/fixture.log" 2>&1 &
 fixture_pid="$!"
 
-go build -o "$work_dir/pagelode" ./cmd/pagelode
-PORT="$api_port" PAGELODE_PATCHRIGHT_HEADLESS=true PAGELODE_PATCHRIGHT_PROFILE="$work_dir/profile" PAGELODE_PATCHRIGHT_WORKER="browser/src/worker.ts" PAGELODE_PROTECTED_DOMAINS="localhost" PAGELODE_CHROMEDP_ENABLED=true "$work_dir/pagelode" serve >"$work_dir/api.log" 2>&1 &
-api_pid="$!"
+wait_healthy() {
+  attempt=0
+  until curl -fsS "$1/healthz" >/dev/null 2>&1; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 80 ]; then
+      sed -n '1,200p' "$2"
+      exit 1
+    fi
+    sleep 0.25
+  done
+}
 
-attempt=0
-until curl -fsS "http://127.0.0.1:$api_port/healthz" >/dev/null 2>&1; do
-  attempt=$((attempt + 1))
-	if [ "$attempt" -ge 80 ]; then
-		sed -n '1,200p' "$work_dir/api.log"
-		exit 1
-  fi
-  sleep 0.25
-done
+BROWSER_SERVICE_PORT="$browser_port" BROWSER_SERVICE_TOKEN="$browser_token" BROWSER_SERVICE_HEADLESS=true BROWSER_SERVICE_CHANNEL= BROWSER_SERVICE_DATA_DIR="$work_dir/identities" BROWSER_SERVICE_PROFILES_DIR="$work_dir/profiles" bun browser-service/src/server.ts >"$work_dir/browser.log" 2>&1 &
+browser_pid="$!"
+wait_healthy "http://127.0.0.1:$browser_port" "$work_dir/browser.log"
+
+go build -o "$work_dir/pagelode" ./cmd/pagelode
+PORT="$api_port" PAGELODE_BROWSER_URL="http://127.0.0.1:$browser_port" PAGELODE_BROWSER_TOKEN="$browser_token" PAGELODE_PROTECTED_DOMAINS="localhost" PAGELODE_CHROMEDP_ENABLED=true "$work_dir/pagelode" serve >"$work_dir/api.log" 2>&1 &
+api_pid="$!"
+wait_healthy "http://127.0.0.1:$api_port" "$work_dir/api.log"
 
 tls_result="$(curl -fsS "http://127.0.0.1:$api_port/extract" -H 'content-type: application/json' -d "{\"url\":\"http://127.0.0.1:$fixture_port/index.html\"}")"
 chromedp_result="$(curl -fsS "http://127.0.0.1:$api_port/extract" -H 'content-type: application/json' -d "{\"url\":\"http://127.0.0.1:$fixture_port/shell.html\"}")"

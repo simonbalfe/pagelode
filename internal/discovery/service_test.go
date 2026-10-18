@@ -12,7 +12,6 @@ import (
 	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/page"
-	"github.com/simonbalfe/pagelode/internal/profile"
 )
 
 type captureStub struct {
@@ -117,24 +116,15 @@ func TestDiscoveryVerbosity(t *testing.T) {
 }
 
 func TestDiscoveryProfileUsesPatchright(t *testing.T) {
-	root := t.TempDir()
-	directory, err := profile.Directory(root, "account", true)
-	if err != nil {
-		t.Fatal(err)
-	}
 	chrome := &captureStub{}
 	patch := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
-	service := New(chrome, patch, memory.NewRoutes(time.Hour, nil), limit.New(1, 1), true).WithProfiles(root)
-	_, err = service.Discover(context.Background(), Request{URL: "example.com", Profile: "account"})
+	service := New(chrome, patch, memory.NewRoutes(time.Hour, nil), limit.New(1, 1), true)
+	_, err := service.Discover(context.Background(), Request{URL: "example.com", Profile: "account"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if chrome.calls != 0 || patch.calls != 1 || patch.options.ProfileDirectory != directory {
-		t.Errorf("calls=%d/%d profile=%q", chrome.calls, patch.calls, patch.options.ProfileDirectory)
-	}
-	_, err = service.Discover(context.Background(), Request{URL: "example.com", Profile: "missing"})
-	if err == nil || patch.calls != 1 {
-		t.Errorf("missing profile error=%v calls=%d", err, patch.calls)
+	if chrome.calls != 0 || patch.calls != 1 || patch.options.Profile != "account" {
+		t.Errorf("calls=%d/%d profile=%q", chrome.calls, patch.calls, patch.options.Profile)
 	}
 }
 

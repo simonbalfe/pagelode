@@ -1,0 +1,6 @@
+session.screen0.toolbar.placement: TopCenter
+session.screen0.toolbar.height: 32
+session.screen0.toolbar.widthPercent: 100
+session.screen0.toolbar.visible: true
+session.screen0.fullMaximization: false
+session.screen0.defaultDeco: NONE

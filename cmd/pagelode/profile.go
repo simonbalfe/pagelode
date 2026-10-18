@@ -1,16 +1,20 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
+	"time"
 
+	"github.com/simonbalfe/pagelode/internal/browser"
 	"github.com/simonbalfe/pagelode/internal/config"
 	"github.com/simonbalfe/pagelode/internal/discovery"
-	"github.com/simonbalfe/pagelode/internal/profile"
 )
+
+const profileRequestTimeout = 2 * time.Minute
 
 func profileCommand(configuration config.Config, args []string, stdout, stderr io.Writer) error {
 	if len(args) != 3 || args[0] != "login" {
@@ -20,18 +24,27 @@ func profileCommand(configuration config.Config, args []string, stdout, stderr i
 	if err != nil {
 		return err
 	}
-	directory, err := profile.Directory(configuration.ProfilesDirectory, request.Profile, true)
+	client, err := browser.New(configuration.BrowserURL, configuration.BrowserToken, configuration.ProxyURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("configure browser service: %w", err)
 	}
-	command := exec.Command(configuration.PatchrightCommand, configuration.PatchrightWorker, "--login", request.URL)
-	command.Env = append(os.Environ(), "PAGELODE_PATCHRIGHT_PROFILE="+directory, "PAGELODE_PATCHRIGHT_HEADLESS=false", "PAGELODE_PROFILE_SESSION=true")
-	command.Stdout = stdout
-	command.Stderr = stderr
-	command.Stdin = os.Stdin
-	fmt.Fprintln(stdout, "Sign in in the browser, then press Enter here to save the profile and close the browser.")
-	if err := command.Run(); err != nil {
+	headless := false
+	createContext, cancelCreate := context.WithTimeout(context.Background(), profileRequestTimeout)
+	session, err := client.CreateSession(createContext, browser.SessionRequest{Profile: request.Profile, CreateProfile: true, Headless: &headless, StartURL: request.URL, TTL: time.Hour})
+	cancelCreate()
+	if err != nil {
 		return fmt.Errorf("profile login: %w", err)
+	}
+	fmt.Fprintf(stdout, "Browser session %s is open. CDP: %s\n", session.ID, session.CDPURL)
+	fmt.Fprintln(stdout, "Sign in in the browser window on the browser service host, then press Enter here to save the profile and close the browser.")
+	_, readErr := bufio.NewReader(os.Stdin).ReadString('\n')
+	closeContext, cancelClose := context.WithTimeout(context.Background(), profileRequestTimeout)
+	defer cancelClose()
+	if err := client.CloseSession(closeContext, session.ID); err != nil {
+		return fmt.Errorf("profile login: save profile: %w", err)
+	}
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return fmt.Errorf("profile login: read confirmation: %w", readErr)
 	}
 	fmt.Fprintf(stdout, "Profile %s saved. Use pagelode discover --profile %s %s\n", request.Profile, request.Profile, request.URL)
 	return nil

@@ -33,7 +33,7 @@ func NewLoader(http orchestrator.Fetcher, chrome, patchright Capturer, capsolver
 }
 
 func (l *Loader) Load(ctx context.Context, target string, options Options) (page.Document, error) {
-	if options.ProfileDirectory != "" {
+	if options.Profile != "" {
 		return l.browser(ctx, l.patchright, target, page.Session{}, options)
 	}
 	parsed, err := url.Parse(target)
@@ -102,7 +102,7 @@ func (l *Loader) browser(ctx context.Context, capturer Capturer, target string, 
 	var document page.Document
 	err := l.browserLimiter.Run(ctx, func() error {
 		var err error
-		document, err = capturer.Capture(ctx, target, session, page.CaptureOptions{WaitMS: 500, ProfileDirectory: options.ProfileDirectory})
+		document, err = capturer.Capture(ctx, target, session, page.CaptureOptions{WaitMS: 500, Profile: options.Profile})
 		return err
 	})
 	if err != nil {
@@ -111,7 +111,7 @@ func (l *Loader) browser(ctx context.Context, capturer Capturer, target string, 
 	if !usable(document) {
 		return document, errors.New("browser page unavailable")
 	}
-	if options.ProfileDirectory == "" {
+	if options.Profile == "" {
 		if parsed, err := url.Parse(target); err == nil {
 			l.routes.Record(parsed.Hostname(), document.Provider)
 		}

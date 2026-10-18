@@ -1,4 +1,4 @@
-FROM golang:1.25.5-bookworm AS build
+FROM golang:1.26.0-bookworm AS build
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -7,19 +7,11 @@ COPY cmd ./cmd
 COPY internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/pagelode ./cmd/pagelode
 
-FROM oven/bun:1.3.5-debian
+FROM debian:bookworm-slim
 
-WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates chromium && rm -rf /var/lib/apt/lists/*
-COPY browser/package.json browser/bun.lock browser/tsconfig.json ./browser/
-RUN cd browser && bun install --frozen-lockfile
-COPY browser/src ./browser/src
 COPY --from=build /out/pagelode /usr/local/bin/pagelode
-ENV PAGELODE_PATCHRIGHT_COMMAND=bun
-ENV PAGELODE_PATCHRIGHT_WORKER=/app/browser/src/worker.ts
-ENV PAGELODE_PATCHRIGHT_HEADLESS=true
-ENV PAGELODE_PATCHRIGHT_CHANNEL=
-ENV PAGELODE_PATCHRIGHT_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PAGELODE_BROWSER_URL=http://browser:8090
 EXPOSE 8083
 ENTRYPOINT ["pagelode"]
 CMD ["serve"]

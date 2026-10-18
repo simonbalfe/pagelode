@@ -21,13 +21,12 @@ type Capturer interface {
 }
 
 type Service struct {
-	chrome            Capturer
-	patchright        Capturer
-	routes            *memory.Routes
-	limiter           *limit.Limiter
-	chromeEnabled     bool
-	profilesDirectory string
-	proxyConfigured   bool
+	chrome          Capturer
+	patchright      Capturer
+	routes          *memory.Routes
+	limiter         *limit.Limiter
+	chromeEnabled   bool
+	proxyConfigured bool
 }
 
 // ErrStealthProxy reports a stealth request on a server without PAGELODE_PROXY_URL.
@@ -99,13 +98,7 @@ func (s *Service) Discover(ctx context.Context, request Request) (Report, error)
 	if request.Stealth && !s.proxyConfigured {
 		return Report{}, ErrStealthProxy
 	}
-	options := page.CaptureOptions{WaitMS: request.WaitMS}
-	if request.Profile != "" {
-		options.ProfileDirectory, err = profile.Directory(s.profilesDirectory, request.Profile, false)
-		if err != nil {
-			return Report{}, err
-		}
-	}
+	options := page.CaptureOptions{WaitMS: request.WaitMS, Profile: request.Profile}
 	preferred, _ := s.routes.Preferred(parsed.Hostname())
 	providers := []page.Provider{page.ProviderChromedp, page.ProviderPatchright}
 	if request.Stealth || request.Profile != "" || preferred == page.ProviderPatchright || !s.chromeEnabled {
@@ -183,11 +176,6 @@ func captureError(err error) string {
 		message = string(runes[:240])
 	}
 	return message
-}
-
-func (s *Service) WithProfiles(directory string) *Service {
-	s.profilesDirectory = directory
-	return s
 }
 
 // WithProxy records whether the browsers route through PAGELODE_PROXY_URL, which stealth requests require.

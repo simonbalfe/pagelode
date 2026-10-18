@@ -102,6 +102,6 @@ type Summary struct {
 }
 
 type Options struct {
-	ProfileDirectory string
-	Render           string
+	Profile string
+	Render  string
 }

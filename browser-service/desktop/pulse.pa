@@ -1,0 +1,6 @@
+load-module module-native-protocol-unix
+load-module module-null-sink sink_name=speakers sink_properties=device.description=Speakers
+load-module module-null-sink sink_name=mic sink_properties=device.description=Microphone
+load-module module-remap-source source_name=microphone master=mic.monitor source_properties=device.description=Microphone
+set-default-sink speakers
+set-default-source microphone
