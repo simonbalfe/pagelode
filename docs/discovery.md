@@ -126,8 +126,8 @@ Header values and raw request/response bodies are private capture inputs. Public
 |---|---|
 | `internal/page/capture.go` | Portable browser traffic values and capture limits |
 | `internal/chromefetch/capture.go` | CDP event collection and bounded body retrieval |
-| `browser-service/src/capture.ts` | Patchright network collection |
-| `browser-service/src/profiles.ts` | Profile directories, saved cookies, and per-profile locks |
+| `browser-service/src/render/capture.ts` | Patchright network collection |
+| `browser-service/src/profiles/` | Profile directories, saved cookies (`store.ts`), and per-profile locks (`locks.ts`) |
 | `internal/browser/client.go` | Render and capture requests to the browser service over HTTP |
 | `internal/discovery/service.go` | Input validation, loading, escalation, and shared limits |
 | `internal/discovery/classifier.go` | Ported Printing Press scoring and path matching |

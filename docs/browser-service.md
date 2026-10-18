@@ -33,6 +33,25 @@ The service returns browser facts (HTML, status, cookies, traffic). It never dec
 
 Open `http://127.0.0.1:8090/` for the dashboard: open and close sessions, copy CDP URLs, and run test renders with a preview.
 
+## Source layout
+
+Each feature folder owns its routes, request schema, and logic. `app.ts` only composes them.
+
+| Path | Owns |
+|---|---|
+| `src/server.ts` | Entry point: config, wiring, `Bun.serve`, graceful shutdown |
+| `src/app.ts` | Hono app: error format, health, auth, body limit, feature routers under `/v1`, dashboard |
+| `src/config.ts` | `BROWSER_SERVICE_*` environment |
+| `src/render/` | `POST /v1/render`: `schema.ts`, `renderer.ts` (identity or profile, limiter, deadline), `page.ts` (one page render), `challenge.ts` (settling), `capture.ts` (network capture) |
+| `src/captcha/` | `datadome.ts` (detect the DataDome frame, wait for the device check, fall back to CapSolver), `capsolver.ts` (CapSolver task client) |
+| `src/sessions/` | `/v1/sessions` and the CDP relay: `schema.ts`, `sessions.ts` (lifecycle), `devtools.ts` (debug port, endpoint discovery, WebSocket relay) |
+| `src/identities/` | `/v1/identities`: `pool.ts` (warm identities, rotation) |
+| `src/profiles/` | `store.ts` (profile directories and saved cookies), `locks.ts` (one owner per profile) |
+| `src/browser/` | `launch.ts` (the single Chrome launch path), `persona.ts` (geo lookup, languages, timezone, WebRTC preferences, proxy sessions) |
+| `src/shared/` | `errors.ts`, `schemas.ts` (shared field validators), `http.ts` (token check), `limiter.ts`, `log.ts` |
+| `public/` | Dashboard (static HTML, CSS, and JavaScript) |
+| `desktop/`, `docker-entrypoint.sh` | Virtual desktop for the container: fluxbox and PulseAudio configuration |
+
 ## API
 
 Every route except `GET /healthz` and the dashboard requires the token as `Authorization: Bearer <token>` or `?token=<token>`. A token is mandatory when the service listens on a non-loopback address.
@@ -71,6 +90,7 @@ Errors always look like `{"error":{"code","message"}}`.
 | `cookies` | `[]` | Up to 500, carried over from the Go HTTP attempt |
 | `proxy_url` | none | `http`, `https`, `socks4`, `socks5`; may contain `{session}` |
 | `settle_challenge` | `true` | Detect a challenge page, click its checkbox, wait for it to clear |
+| `solve_captcha` | `true` | Clear DataDome: wait for its device check, then solve its captcha with CapSolver when configured |
 | `capture` | none | `{wait_ms}` adds captured network traffic to the response |
 | `profile` | none | Render inside a saved login profile |
 | `identity` | derived | Which warm browser identity to use (see below) |
@@ -163,6 +183,8 @@ Some values are the same for every identity in one container: canvas and audio h
 | `BROWSER_SERVICE_DATA_DIR` | platform data dir | Identity profile directories |
 | `BROWSER_SERVICE_DEBUG` | `false` | JSON logs for launches, navigation, challenges, identities |
 | `TZ` | `Etc/UTC` (compose: `BROWSER_TZ`) | Timezone for identities without a proxy |
+| `CAPSOLVER_API_KEY` | empty | Enables the CapSolver fallback for DataDome captchas |
+| `CAPSOLVER_URL` | `https://api.capsolver.com` | CapSolver API base URL |
 
 PageLode reaches the service through `PAGELODE_BROWSER_URL` and `PAGELODE_BROWSER_TOKEN`.
 
@@ -199,9 +221,30 @@ Real sites (Wikipedia, MDN, BBC, GitHub and others): 1.1 pages/s at 1, 4.6 at 4,
 | Crunchbase | blocked | blocked | pass |
 | Indeed UK | 403 | blocked | pass |
 | Zillow | thin | 403 | pass |
-| G2 | 403 | 403 | 403 |
+| G2 | 403 | 403 | 403 from a home IP; pass through a mobile proxy (see below) |
 | Glassdoor | 403 | blocked | blocked |
 | JavaScript-rendered pages (3 tests) | partial | pass | pass |
+
+### DataDome through a mobile proxy
+
+Same container, fresh identities, Evomi mobile IPs in each site's country, one sequential pass. DataDome was confirmed on each site from its `x-datadome` header and `datadome` cookie.
+
+| Site | Proxy | Status | Title | Visible text | Time |
+|---|---|---|---|---|---|
+| leboncoin | FR | 200 | « velo » Toute la France - leboncoin | 10.0k chars | 6.7 s |
+| seloger | FR | 200 | Petites annonces immobilières | 8.1k | 2.8 s |
+| vinted | FR | 200 | Articles \| Vinted | 6.4k | 5.7 s |
+| tripadvisor | GB | 200 | THE 10 BEST Hotels in London 2026 | 30.8k | 15.1 s |
+| thefork | GB | 200 | TheFork – Book the best restaurants | 8.5k | 7.9 s |
+| idealista | ES | 200 | Casas y pisos en Madrid — idealista | 30.8k | 8.5 s |
+| allegro | PL | 200 | Rower - Niska cena na Allegro | 42.0k | 19.0 s |
+| yelp | US | 200 | TOP 10 BEST Pizza in San Francisco, CA | 17.6k | 26.8 s |
+| etsy | US | 200 | Ceramic mug - Etsy | 26.7k | 23.6 s |
+| g2 | US | 200 | Best CRM Software: User Reviews | 56.8k | 22.9 s |
+
+- Every DataDome site answered the first request with its device check (`rt:'i'`). Real headed Chrome on a mobile IP passed it without solving anything, and the identity kept the `datadome` cookie, so later pages loaded directly.
+- Plain HTTP through the same mobile IPs got the slider captcha (`rt:'c'`) on every site; the browser from a home IP also got the captcha.
+- CapSolver was never needed. The fallback is wired but not yet exercised end to end, and CapSolver only accepts Windows or Mac Chrome and Firefox user agents, so it is unlikely to work from the Linux container.
 
 ## Known gaps
 
@@ -209,7 +252,7 @@ Real sites (Wikipedia, MDN, BBC, GitHub and others): 1.1 pages/s at 1, 4.6 at 4,
 |---|---|---|
 | Glassdoor | A Cloudflare challenge with a custom title (`Security \| Glassdoor`, URL `__cf_chl_rt_tk=`). Challenge detection matches titles, so it returned the challenge page immediately | Detect challenges from the `cf-mitigated: challenge` header, `__cf_chl_` in the URL, and the challenge-platform script |
 | nowsecure.nl | No longer a challenge page; a Turnstile-like element triggered a false positive and 45 s of clicking | Same signal-based detection; drop it from the stealth suite |
-| G2 | DataDome block page (content only in scripts and a `captcha-delivery.com` frame); identical without a browser, so likely IP reputation | Detect DataDome and branch on its mode: wait for the device check, rotate or solve the captcha, rotate the IP on a ban; retest through a residential proxy |
+| DataDome captchas | Device checks pass; the slider captcha only appears for distrusted IPs or non-browser clients. CapSolver accepts only Windows or Mac user agents | Rotate the identity to a fresh IP first; exercise the CapSolver fallback on a Mac or Windows service |
 | Late verdicts | Some pages fill in content asynchronously after the snapshot | Add `wait_for: {selector, timeout_ms}` to renders |
 | Signatures in two places | The service's challenge check is a weaker copy of Go's `classify` patterns | One `signatures.json` read by both; return response headers and cookie names with every document so Go classifies on headers first, HTML second |
 
@@ -217,6 +260,6 @@ Real sites (Wikipedia, MDN, BBC, GitHub and others): 1.1 pages/s at 1, 4.6 at 4,
 
 1. Signal-based challenge detection and a shared `signatures.json`, with response headers added to `page.Document` for both the HTTP tier and the service.
 2. `wait_for` on renders; make the 500 ms post-load wait configurable.
-3. DataDome handling and a stealth run through a residential proxy.
+3. Exercise the DataDome CapSolver fallback, and measure DataDome under concurrent load from one IP.
 4. Move Chromedp and CapSolver into the service once Patchright covers plain JavaScript rendering at similar cost.
 5. Update the production deployment (`hetzner-infra/apps/pagelode/compose.yaml`), which still runs the old single container.

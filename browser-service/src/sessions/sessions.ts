@@ -1,19 +1,17 @@
 import { randomBytes } from "node:crypto";
-import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
-import { chromium, type BrowserContext } from "patchright";
-import { z } from "zod";
-import type { Config } from "./config.ts";
-import { ServiceError, type SessionRequest } from "./contract.ts";
-import { launchOptions, type Log } from "./launch.ts";
-import { personaLaunch, resolvePersona, withProxySession, writePreferences } from "./persona.ts";
-import { profileDirectory, restoreSession, saveSession, type ProfileLocks } from "./profiles.ts";
-
-const versionSchema = z.object({ webSocketDebuggerUrl: z.string() });
+import type { BrowserContext } from "patchright";
+import { launchBrowser } from "../browser/launch.ts";
+import { withProxySession } from "../browser/persona.ts";
+import type { Config } from "../config.ts";
+import type { ProfileLocks } from "../profiles/locks.ts";
+import { profileDirectory, restoreCookies, saveCookies } from "../profiles/store.ts";
+import { ServiceError } from "../shared/errors.ts";
+import type { Log } from "../shared/log.ts";
+import { browserDevtoolsPath, freeDebuggingPort } from "./devtools.ts";
+import type { SessionRequest } from "./schema.ts";
 
 export type Session = {
   readonly id: string;
@@ -24,7 +22,7 @@ export type Session = {
   readonly browserPath: string;
   readonly directory: string;
   readonly context: BrowserContext;
-  readonly timer: ReturnType<typeof setTimeout>;
+  readonly timer: Timer;
   closing?: Promise<void>;
 };
 
@@ -49,8 +47,10 @@ export class Sessions {
     return [...this.#sessions.values()];
   }
 
-  get(id: string): Session | undefined {
-    return this.#sessions.get(id);
+  get(id: string): Session {
+    const session = this.#sessions.get(id);
+    if (session === undefined) throw new ServiceError(404, "not_found", "session not found");
+    return session;
   }
 
   async create(request: SessionRequest): Promise<Session> {
@@ -64,8 +64,7 @@ export class Sessions {
   }
 
   async close(id: string): Promise<void> {
-    const session = this.#sessions.get(id);
-    if (session === undefined) throw new ServiceError(404, "not_found", "session not found");
+    const session = this.get(id);
     session.closing ??= this.#shutdown(session);
     await session.closing;
   }
@@ -75,7 +74,7 @@ export class Sessions {
   }
 
   async #open(request: SessionRequest): Promise<Session> {
-    const profile = request.profile;
+    const { profile } = request;
     if (profile !== undefined) this.#locks.holdForSession(profile);
     let directory: string | undefined;
     let context: BrowserContext | undefined;
@@ -84,39 +83,14 @@ export class Sessions {
         ? await mkdtemp(join(tmpdir(), "browser-session-"))
         : await profileDirectory(this.#config.profilesDirectory, profile, request.create_profile);
       const id = randomBytes(16).toString("hex");
-      const port = await freePort();
+      const port = await freeDebuggingPort();
       const headless = request.headless ?? this.#config.headless;
       const proxyURL = withProxySession(request.proxy_url, profile === undefined ? `session:${id}` : `profile:${profile}`);
-      const persona = await resolvePersona(proxyURL, this.#log);
-      await writePreferences(directory, persona, proxyURL !== undefined);
-      const launch = personaLaunch(persona);
-      context = await chromium.launchPersistentContext(directory, launchOptions(this.#config, {
-        headless,
-        proxyURL,
-        args: [`--remote-debugging-port=${port}`, ...launch.args],
-        env: launch.env,
-      }));
-      if (profile !== undefined) await restoreSession(context, directory);
-      const browserPath = await devtoolsBrowserPath(port);
-      if (request.start_url !== undefined) {
-        const page = context.pages()[0] ?? await context.newPage();
-        await page.goto(request.start_url, { waitUntil: "domcontentloaded", timeout: 45_000 });
-      }
-      const session: Session = {
-        id,
-        profile,
-        headless,
-        expiresAt: new Date(Date.now() + request.ttl_seconds * 1_000),
-        port,
-        browserPath,
-        directory,
-        context,
-        timer: setTimeout(() => void this.close(id).catch(() => this.#log("session_expire_failed", { id })), request.ttl_seconds * 1_000),
-      };
-      this.#sessions.set(id, session);
-      context.once("close", () => void this.#release(session));
-      this.#log("session_open", { id, profile, headless, port });
-      return session;
+      ({ context } = await launchBrowser(this.#config, this.#log, { directory, proxyURL, headless, args: [`--remote-debugging-port=${port}`] }));
+      if (profile !== undefined) await restoreCookies(context, directory);
+      const browserPath = await browserDevtoolsPath(port);
+      if (request.start_url !== undefined) await (context.pages()[0] ?? await context.newPage()).goto(request.start_url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+      return this.#register({ id, profile, headless, port, browserPath, directory, context }, request.ttl_seconds);
     } catch (error: unknown) {
       await context?.close().catch(() => this.#log("session_launch_cleanup_failed"));
       if (profile !== undefined) this.#locks.releaseSession(profile);
@@ -126,10 +100,22 @@ export class Sessions {
     }
   }
 
+  #register(opened: Omit<Session, "expiresAt" | "timer" | "closing">, ttlSeconds: number): Session {
+    const session: Session = {
+      ...opened,
+      expiresAt: new Date(Date.now() + ttlSeconds * 1_000),
+      timer: setTimeout(() => void this.close(opened.id).catch(() => this.#log("session_expire_failed", { id: opened.id })), ttlSeconds * 1_000),
+    };
+    this.#sessions.set(session.id, session);
+    session.context.once("close", () => void this.#release(session));
+    this.#log("session_open", { id: session.id, profile: session.profile, headless: session.headless, port: session.port });
+    return session;
+  }
+
   async #shutdown(session: Session): Promise<void> {
     let saveError: unknown;
     if (session.profile !== undefined) {
-      await saveSession(session.context, session.directory).catch((error: unknown) => {
+      await saveCookies(session.context, session.directory).catch((error: unknown) => {
         saveError = error;
       });
     }
@@ -148,24 +134,4 @@ export class Sessions {
     else await rm(session.directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
     this.#log("session_closed", { id: session.id });
   }
-}
-
-async function freePort(): Promise<number> {
-  const server = createServer();
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const address = server.address();
-  server.close();
-  await once(server, "close");
-  if (address === null || typeof address === "string") throw new Error("could not allocate a debugging port");
-  return address.port;
-}
-
-async function devtoolsBrowserPath(port: number): Promise<string> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const response = await fetch(`http://127.0.0.1:${port}/json/version`).catch(() => undefined);
-    if (response?.ok) return new URL(versionSchema.parse(await response.json()).webSocketDebuggerUrl).pathname;
-    await sleep(200);
-  }
-  throw new Error("browser debugging endpoint did not start");
 }

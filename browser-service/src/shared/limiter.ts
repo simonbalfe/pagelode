@@ -1,4 +1,4 @@
-import { ServiceError } from "./contract.ts";
+import { ServiceError } from "./errors.ts";
 
 export class Limiter {
   readonly #concurrency: number;

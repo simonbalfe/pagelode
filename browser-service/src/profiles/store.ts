@@ -2,7 +2,7 @@ import { chmod, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { BrowserContext } from "patchright";
 import { z } from "zod";
-import { ServiceError } from "./contract.ts";
+import { ServiceError } from "../shared/errors.ts";
 
 const sessionFile = "pagelode-session.json";
 
@@ -33,7 +33,7 @@ export async function profileDirectory(root: string, name: string, create: boole
   return directory;
 }
 
-export async function restoreSession(context: BrowserContext, directory: string): Promise<void> {
+export async function restoreCookies(context: BrowserContext, directory: string): Promise<void> {
   let data: string;
   try {
     data = await readFile(join(directory, sessionFile), "utf8");
@@ -46,35 +46,6 @@ export async function restoreSession(context: BrowserContext, directory: string)
   await context.addCookies(result.data.cookies);
 }
 
-export async function saveSession(context: BrowserContext, directory: string): Promise<void> {
+export async function saveCookies(context: BrowserContext, directory: string): Promise<void> {
   await writeFile(join(directory, sessionFile), JSON.stringify({ cookies: await context.cookies() }), { mode: 0o600 });
-}
-
-export class ProfileLocks {
-  readonly #renders = new Map<string, Promise<void>>();
-  readonly #sessions = new Set<string>();
-
-  async withRender<T>(name: string, task: () => Promise<T>): Promise<T> {
-    if (this.#sessions.has(name)) throw new ServiceError(409, "profile_in_use", `profile ${JSON.stringify(name)} is held by an open session`);
-    const previous = this.#renders.get(name) ?? Promise.resolve();
-    const { promise: done, resolve: release } = Promise.withResolvers<void>();
-    const tail = previous.then(() => done);
-    this.#renders.set(name, tail);
-    await previous;
-    try {
-      return await task();
-    } finally {
-      release();
-      if (this.#renders.get(name) === tail) this.#renders.delete(name);
-    }
-  }
-
-  holdForSession(name: string): void {
-    if (this.#sessions.has(name) || this.#renders.has(name)) throw new ServiceError(409, "profile_in_use", `profile ${JSON.stringify(name)} is in use`);
-    this.#sessions.add(name);
-  }
-
-  releaseSession(name: string): void {
-    this.#sessions.delete(name);
-  }
 }

@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { chromium, type BrowserContext } from "patchright";
-import type { Config } from "./config.ts";
-import { ServiceError, type IdentityView } from "./contract.ts";
-import { launchOptions, type Log } from "./launch.ts";
-import { personaLaunch, resolvePersona, withProxySession, writePreferences, type Persona } from "./persona.ts";
+import type { BrowserContext } from "patchright";
+import { launchBrowser, type LaunchedBrowser } from "../browser/launch.ts";
+import { withProxySession, type Persona } from "../browser/persona.ts";
+import type { Config } from "../config.ts";
+import { ServiceError } from "../shared/errors.ts";
+import type { Log } from "../shared/log.ts";
 
 type Identity = {
   readonly key: string;
@@ -22,8 +23,23 @@ type Identity = {
 
 export type Lease = {
   readonly context: Promise<BrowserContext>;
+  readonly proxyURL: string | undefined;
   release(): void;
   discard(): void;
+};
+
+export type IdentityView = {
+  key: string;
+  generation: number;
+  proxy: string;
+  ip?: string;
+  country?: string;
+  timezone?: string;
+  languages: ReadonlyArray<string>;
+  renders: number;
+  active: number;
+  created_at: string;
+  last_used_at: string;
 };
 
 export class Identities {
@@ -52,6 +68,7 @@ export class Identities {
     leased.renders += 1;
     return {
       context: leased.context,
+      proxyURL: leased.proxyURL,
       release: () => {
         leased.users -= 1;
         leased.lastUsed = Date.now();
@@ -107,8 +124,9 @@ export class Identities {
       directory,
       proxyURL,
       createdAt: new Date(),
-      context: this.#launch(key, directory, proxyURL, (persona) => {
+      context: this.#launch(key, directory, proxyURL).then(({ context, persona }) => {
         identity.persona = persona;
+        return context;
       }),
       persona: undefined,
       users: 0,
@@ -118,20 +136,17 @@ export class Identities {
     return identity;
   }
 
-  async #launch(key: string, directory: string, proxyURL: string | undefined, located: (persona: Persona) => void): Promise<BrowserContext> {
+  async #launch(key: string, directory: string, proxyURL: string | undefined): Promise<LaunchedBrowser> {
     const forget = (): void => {
       if (this.#identities.get(key)?.directory === directory) this.#identities.delete(key);
     };
     try {
       await mkdir(directory, { recursive: true });
-      const persona = await resolvePersona(proxyURL, this.#log);
-      located(persona);
-      await writePreferences(directory, persona, proxyURL !== undefined);
-      const { env, args } = personaLaunch(persona);
+      const launched = await launchBrowser(this.#config, this.#log, { directory, proxyURL, headless: this.#config.headless });
+      const { persona } = launched;
       this.#log("identity_launch", { key, country: persona.country, timezone: persona.timezone, languages: persona.languages, proxy: proxyURL !== undefined });
-      const context = await chromium.launchPersistentContext(directory, launchOptions(this.#config, { headless: this.#config.headless, proxyURL, args, env }));
-      context.once("close", forget);
-      return context;
+      launched.context.once("close", forget);
+      return launched;
     } catch (error: unknown) {
       forget();
       throw error;

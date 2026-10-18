@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import type { Log } from "./launch.ts";
+import type { Log } from "../shared/log.ts";
 
 export type Persona = {
   readonly ip?: string;

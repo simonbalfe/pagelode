@@ -2,28 +2,28 @@ import { websocket } from "@hono/bun";
 import { join } from "node:path";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
-import { Identities } from "./identities.ts";
-import { createLog } from "./launch.ts";
-import { Limiter } from "./limiter.ts";
-import { ProfileLocks } from "./profiles.ts";
-import { Renderer } from "./render.ts";
-import { Sessions } from "./sessions.ts";
+import { Identities } from "./identities/pool.ts";
+import { ProfileLocks } from "./profiles/locks.ts";
+import { Renderer } from "./render/renderer.ts";
+import { Sessions } from "./sessions/sessions.ts";
+import { Limiter } from "./shared/limiter.ts";
+import { createLog } from "./shared/log.ts";
 
 const config = loadConfig(Bun.env);
 const log = createLog(config.debug);
 const limiter = new Limiter(config.concurrency, config.maxWaiting);
 const locks = new ProfileLocks();
 const identities = new Identities(config, log);
-const renderer = new Renderer(config, limiter, locks, identities, log);
 const sessions = new Sessions(config, locks, log);
 const state = { shuttingDown: false };
+
 const app = createApp({
   token: config.token,
   publicDirectory: join(import.meta.dir, "..", "public"),
-  renderer,
+  renderer: new Renderer(config, limiter, locks, identities, log),
   sessions,
   identities,
-  load: limiter,
+  limiter,
   state,
   log,
 });
