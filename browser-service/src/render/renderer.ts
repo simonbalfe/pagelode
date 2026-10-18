@@ -50,7 +50,9 @@ export class Renderer {
     }, limitMs);
     try {
       const environment = { signal, log: this.#log, proxyURL: lease.proxyURL, capsolver: this.#config.capsolver };
-      return await Promise.race([lease.context.then((context) => renderPage(context, input, environment)), deadline.promise]);
+      const result = await Promise.race([lease.context.then((context) => renderPage(context, input, environment)), deadline.promise]);
+      lease.recordHeaders(result.replay.headers);
+      return { ...result, replay: { ...result.replay, identity: key, ...(lease.proxyURL === undefined ? {} : { proxy_url: lease.proxyURL }) } };
     } finally {
       clearTimeout(timer);
       lease.release();
@@ -66,7 +68,7 @@ export class Renderer {
         await restoreCookies(context, directory);
         const result = await renderPage(context, input, { signal, log: this.#log, proxyURL, capsolver: this.#config.capsolver });
         await saveCookies(context, directory);
-        return result;
+        return { ...result, replay: { ...result.replay, ...(proxyURL === undefined ? {} : { proxy_url: proxyURL }) } };
       } finally {
         await context.close();
       }

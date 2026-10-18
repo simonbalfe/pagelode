@@ -120,6 +120,7 @@ func testService(httpFetcher Fetcher, chromedpFetcher Fetcher, patchrightFetcher
 		patchrightFetcher,
 		capSolverFetcher,
 		memory.NewRoutes(time.Hour, protected),
+		memory.NewClearances(time.Hour),
 		limit.New(2, 2),
 		true,
 	)

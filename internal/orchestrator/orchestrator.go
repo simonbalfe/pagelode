@@ -49,17 +49,19 @@ type Service struct {
 	patchright      Fetcher
 	capsolver       Fetcher
 	routes          *memory.Routes
+	clearances      *memory.Clearances
 	browserLimiter  *limit.Limiter
 	chromedpEnabled bool
 }
 
-func New(httpFetcher Fetcher, chromedpFetcher Fetcher, patchrightFetcher Fetcher, capSolverFetcher Fetcher, routes *memory.Routes, browserLimiter *limit.Limiter, chromedpEnabled bool) *Service {
+func New(httpFetcher Fetcher, chromedpFetcher Fetcher, patchrightFetcher Fetcher, capSolverFetcher Fetcher, routes *memory.Routes, clearances *memory.Clearances, browserLimiter *limit.Limiter, chromedpEnabled bool) *Service {
 	return &Service{
 		http:            httpFetcher,
 		chromedp:        chromedpFetcher,
 		patchright:      patchrightFetcher,
 		capsolver:       capSolverFetcher,
 		routes:          routes,
+		clearances:      clearances,
 		browserLimiter:  browserLimiter,
 		chromedpEnabled: chromedpEnabled,
 	}
@@ -72,6 +74,9 @@ func (s *Service) Extract(ctx context.Context, input string) (Result, error) {
 	}
 	state := runState{target: target.String(), host: target.Hostname(), tried: make(map[page.Provider]bool)}
 
+	if result, done := s.tryReplay(ctx, &state); done {
+		return result, nil
+	}
 	if preferred, ok := s.routes.Preferred(state.host); ok {
 		if result, done := s.tryPreferred(ctx, &state, preferred); done {
 			return result, nil
@@ -114,6 +119,25 @@ func (s *Service) Extract(ctx context.Context, input string) (Result, error) {
 	}
 }
 
+func (s *Service) tryReplay(ctx context.Context, state *runState) (Result, bool) {
+	session, ok := s.clearances.Get(state.host)
+	if !ok {
+		return Result{}, false
+	}
+	document, classification, ok := s.attempt(ctx, state, page.ProviderReplay, s.http, session)
+	if ok {
+		document.Provider = page.ProviderReplay
+		if result, done := s.resolveDocument(state, document, classification); done {
+			return result, true
+		}
+		if classification.Kind == classify.Dead {
+			return failedResult(*state, document, "dead"), true
+		}
+	}
+	s.clearances.Forget(state.host)
+	return Result{}, false
+}
+
 func (s *Service) tryPreferred(ctx context.Context, state *runState, provider page.Provider) (Result, bool) {
 	var fetcher Fetcher
 	switch provider {
@@ -141,6 +165,7 @@ func (s *Service) tryPreferred(ctx context.Context, state *runState, provider pa
 	}
 	if result, done := s.resolveDocument(state, document, classification); done {
 		s.routes.Record(state.host, provider)
+		s.clearances.Record(state.host, document.Session)
 		return result, true
 	}
 	if classification.Kind == classify.Dead {
@@ -169,6 +194,7 @@ func (s *Service) tryPatchright(ctx context.Context, state *runState, session pa
 	}
 	if result, done := s.resolveDocument(state, document, classification); done {
 		s.routes.Record(state.host, page.ProviderPatchright)
+		s.clearances.Record(state.host, document.Session)
 		return result, nil
 	}
 	if classification.Kind == classify.Dead {

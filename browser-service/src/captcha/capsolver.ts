@@ -11,10 +11,11 @@ const responseSchema = z.object({
   errorDescription: z.string().nullish(),
   taskId: z.string().optional(),
   status: z.string().optional(),
-  solution: z.object({ cookie: z.string().optional() }).optional(),
+  solution: z.object({ cookie: z.string().optional(), gRecaptchaResponse: z.string().optional() }).optional(),
 });
 
 type CapSolverResponse = z.infer<typeof responseSchema>;
+type Solution = NonNullable<CapSolverResponse["solution"]>;
 
 export type DataDomeTask = {
   readonly captchaUrl: string;
@@ -22,19 +23,44 @@ export type DataDomeTask = {
   readonly proxyURL: string;
 };
 
+export type RecaptchaV2Task = {
+  readonly websiteURL: string;
+  readonly websiteKey: string;
+  readonly dataS: string | undefined;
+  readonly proxyURL: string | undefined;
+};
+
 export async function solveDataDome(settings: CapSolverSettings, task: DataDomeTask, signal: AbortSignal): Promise<string> {
-  const created = await call(settings, "/createTask", {
-    task: { type: "DatadomeSliderTask", captchaUrl: task.captchaUrl, userAgent: task.userAgent, proxy: capsolverProxy(task.proxyURL) },
+  const solution = await runTask(settings, {
+    type: "DatadomeSliderTask",
+    captchaUrl: task.captchaUrl,
+    userAgent: task.userAgent,
+    proxy: capsolverProxy(task.proxyURL),
   }, signal);
+  if (solution.cookie === undefined) throw new Error("capsolver returned no DataDome cookie");
+  return solution.cookie;
+}
+
+export async function solveRecaptchaV2(settings: CapSolverSettings, task: RecaptchaV2Task, signal: AbortSignal): Promise<string> {
+  const solution = await runTask(settings, {
+    type: task.proxyURL === undefined ? "ReCaptchaV2TaskProxyLess" : "ReCaptchaV2Task",
+    websiteURL: task.websiteURL,
+    websiteKey: task.websiteKey,
+    ...(task.dataS === undefined ? {} : { recaptchaDataSValue: task.dataS }),
+    ...(task.proxyURL === undefined ? {} : { proxy: capsolverProxy(task.proxyURL) }),
+  }, signal);
+  if (solution.gRecaptchaResponse === undefined) throw new Error("capsolver returned no reCAPTCHA token");
+  return solution.gRecaptchaResponse;
+}
+
+async function runTask(settings: CapSolverSettings, task: Record<string, unknown>, signal: AbortSignal): Promise<Solution> {
+  const created = await call(settings, "/createTask", { task }, signal);
   if (created.taskId === undefined) throw new Error("capsolver did not return a task id");
   for (let poll = 0; poll < maxPolls; poll += 1) {
     await sleep(pollIntervalMs, undefined, { signal });
     const result = await call(settings, "/getTaskResult", { taskId: created.taskId }, signal);
-    if (result.status === "ready") {
-      if (result.solution?.cookie === undefined) throw new Error("capsolver returned no DataDome cookie");
-      return result.solution.cookie;
-    }
-    if (result.status === "failed") throw new Error("capsolver failed to solve the DataDome challenge");
+    if (result.status === "ready") return result.solution ?? {};
+    if (result.status === "failed") throw new Error(`capsolver failed to solve ${String(task.type)}`);
   }
   throw new Error("capsolver did not finish in time");
 }

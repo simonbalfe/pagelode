@@ -169,6 +169,8 @@ func document(response renderResponse, session page.Session) page.Document {
 		session.UserAgent = response.UserAgent
 	}
 	session.Cookies = response.Cookies
+	session.ProxyURL = response.Replay.ProxyURL
+	session.Headers = response.Replay.Headers
 	return page.Document{
 		Provider:   page.ProviderPatchright,
 		StatusCode: response.StatusCode,
@@ -204,6 +206,12 @@ type renderResponse struct {
 	UserAgent  string        `json:"user_agent"`
 	Cookies    []page.Cookie `json:"cookies"`
 	Traffic    *page.Capture `json:"traffic,omitempty"`
+	Replay     replay        `json:"replay"`
+}
+
+type replay struct {
+	ProxyURL string            `json:"proxy_url"`
+	Headers  map[string]string `json:"headers"`
 }
 
 type sessionRequest struct {

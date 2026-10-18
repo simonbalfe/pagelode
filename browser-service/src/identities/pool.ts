@@ -5,8 +5,10 @@ import type { BrowserContext } from "patchright";
 import { launchBrowser, type LaunchedBrowser } from "../browser/launch.ts";
 import { withProxySession, type Persona } from "../browser/persona.ts";
 import type { Config } from "../config.ts";
+import { portableCookies } from "../render/replay.ts";
 import { ServiceError } from "../shared/errors.ts";
 import type { Log } from "../shared/log.ts";
+import type { Cookie } from "../shared/schemas.ts";
 
 type Identity = {
   readonly key: string;
@@ -16,6 +18,7 @@ type Identity = {
   readonly createdAt: Date;
   readonly context: Promise<BrowserContext>;
   persona: Persona | undefined;
+  headers: Record<string, string>;
   users: number;
   renders: number;
   lastUsed: number;
@@ -25,6 +28,7 @@ export type Lease = {
   readonly context: Promise<BrowserContext>;
   readonly proxyURL: string | undefined;
   release(): void;
+  recordHeaders(headers: Record<string, string>): void;
   discard(): void;
 };
 
@@ -40,6 +44,14 @@ export type IdentityView = {
   active: number;
   created_at: string;
   last_used_at: string;
+};
+
+export type Clearance = {
+  identity: string;
+  generation: number;
+  proxy_url?: string;
+  headers: Record<string, string>;
+  cookies: ReadonlyArray<Cookie>;
 };
 
 export class Identities {
@@ -73,6 +85,9 @@ export class Identities {
         leased.users -= 1;
         leased.lastUsed = Date.now();
       },
+      recordHeaders: (headers) => {
+        if (Object.keys(headers).length > 0) leased.headers = headers;
+      },
       discard: () => {
         if (this.#identities.get(key) === leased) this.#identities.delete(key);
         this.#log("identity_discarded", { key });
@@ -95,6 +110,18 @@ export class Identities {
       created_at: identity.createdAt.toISOString(),
       last_used_at: new Date(identity.lastUsed).toISOString(),
     }));
+  }
+
+  async clearance(key: string, url: string): Promise<Clearance> {
+    const identity = this.#identities.get(key);
+    if (identity === undefined) throw new ServiceError(404, "not_found", `identity ${JSON.stringify(key)} is not warm`);
+    return {
+      identity: key,
+      generation: identity.generation,
+      ...(identity.proxyURL === undefined ? {} : { proxy_url: identity.proxyURL }),
+      headers: identity.headers,
+      cookies: await portableCookies(await identity.context, url),
+    };
   }
 
   async rotate(key: string): Promise<void> {
@@ -129,6 +156,7 @@ export class Identities {
         return context;
       }),
       persona: undefined,
+      headers: {},
       users: 0,
       renders: 0,
       lastUsed: Date.now(),

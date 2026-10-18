@@ -1,9 +1,11 @@
-import type { BrowserContext, Page } from "patchright";
+import type { BrowserContext, Page, Request } from "patchright";
 import { clearDataDome } from "../captcha/datadome.ts";
+import { clearGoogleSorry } from "../captcha/google.ts";
 import type { CapSolverSettings } from "../config.ts";
 import type { Log } from "../shared/log.ts";
 import { captureTraffic } from "./capture.ts";
 import { settleChallenge } from "./challenge.ts";
+import { portableCookies, replayHeaders } from "./replay.ts";
 import type { RenderRequest, RenderResult } from "./schema.ts";
 
 const settleDelayMs = 500;
@@ -26,14 +28,20 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
   try {
     const capture = input.capture === undefined ? undefined : captureTraffic(page);
     let documentStatus = 0;
+    let documentRequest: Request | undefined;
     page.on("response", (response) => {
-      if (response.request().resourceType() === "document" && response.frame() === page.mainFrame()) documentStatus = response.status();
+      if (response.request().resourceType() !== "document" || response.frame() !== page.mainFrame()) return;
+      documentStatus = response.status();
+      documentRequest = response.request();
     });
     if (input.cookies.length > 0) await addCookies(page, input);
     const response = await page.goto(input.url, { timeout: input.timeout_ms, waitUntil: input.wait_until });
     log("navigation_complete", { status: response?.status() ?? 0, title: await page.title(), url: page.url() });
     if (input.settle_challenge) await settleChallenge(page, log);
-    if (input.solve_captcha) await clearDataDome(page, environment);
+    if (input.solve_captcha) {
+      await clearDataDome(page, environment);
+      await clearGoogleSorry(page, environment);
+    }
     await page.waitForTimeout(input.capture?.wait_ms ?? settleDelayMs);
     return {
       status_code: documentStatus || response?.status() || 0,
@@ -41,16 +49,8 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
       title: await page.title(),
       html: await page.content(),
       user_agent: await page.evaluate(() => navigator.userAgent),
-      cookies: (await context.cookies()).map((cookie) => ({
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path,
-        expires: cookie.expires,
-        http_only: cookie.httpOnly,
-        secure: cookie.secure,
-        same_site: cookie.sameSite,
-      })),
+      cookies: await portableCookies(context),
+      replay: { headers: documentRequest === undefined ? {} : replayHeaders(await documentRequest.allHeaders()) },
       ...(capture === undefined ? {} : { traffic: await capture.finish() }),
     };
   } finally {

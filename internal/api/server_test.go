@@ -34,7 +34,7 @@ func TestExtract(t *testing.T) {
 
 	routes := memory.NewRoutes(time.Hour, nil)
 	browserLimiter := limit.New(1, 1)
-	extractor := orchestrator.New(apiFetcher{}, nil, nil, nil, routes, browserLimiter, false)
+	extractor := orchestrator.New(apiFetcher{}, nil, nil, nil, routes, memory.NewClearances(time.Hour), browserLimiter, false)
 	server := New(extractor, nil, limit.New(2, 2), browserLimiter, routes, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	request := httptest.NewRequest(http.MethodPost, "/extract", bytes.NewBufferString(`{"url":"https://example.com"}`))

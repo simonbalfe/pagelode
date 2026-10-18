@@ -7,6 +7,7 @@ const (
 	ProviderChromedp   Provider = "chromedp"
 	ProviderPatchright Provider = "patchright"
 	ProviderCapSolver  Provider = "capsolver"
+	ProviderReplay     Provider = "replay"
 )
 
 type ContentType string
@@ -30,8 +31,14 @@ type Cookie struct {
 }
 
 type Session struct {
-	UserAgent string   `json:"user_agent,omitempty"`
-	Cookies   []Cookie `json:"cookies,omitempty"`
+	UserAgent string            `json:"user_agent,omitempty"`
+	Cookies   []Cookie          `json:"cookies,omitempty"`
+	ProxyURL  string            `json:"-"`
+	Headers   map[string]string `json:"-"`
+}
+
+func (s Session) Replayable() bool {
+	return s.ProxyURL != "" && len(s.Headers) > 0 && len(s.Cookies) > 0
 }
 
 type Document struct {

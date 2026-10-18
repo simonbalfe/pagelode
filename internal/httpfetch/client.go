@@ -30,13 +30,21 @@ func New(proxyURL string) *Client {
 
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
 	jar := tlsclient.NewCookieJar()
+	profile := profiles.Chrome_150
+	if session.Replayable() {
+		profile = profiles.Chrome_152
+	}
 	options := []tlsclient.HttpClientOption{
 		tlsclient.WithTimeoutSeconds(30),
-		tlsclient.WithClientProfile(profiles.Chrome_150),
+		tlsclient.WithClientProfile(profile),
 		tlsclient.WithCookieJar(jar),
 	}
-	if c.proxyURL != "" {
-		options = append(options, tlsclient.WithProxyUrl(c.proxyURL))
+	proxyURL := c.proxyURL
+	if session.ProxyURL != "" {
+		proxyURL = session.ProxyURL
+	}
+	if proxyURL != "" {
+		options = append(options, tlsclient.WithProxyUrl(proxyURL))
 	}
 	client, err := tlsclient.NewHttpClient(tlsclient.NewNoopLogger(), options...)
 	if err != nil {
@@ -59,22 +67,7 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 	if session.UserAgent != "" {
 		effectiveUserAgent = session.UserAgent
 	}
-	request.Header = http.Header{
-		"accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7"},
-		"accept-language":           {"en-GB,en;q=0.9"},
-		"cache-control":             {"no-cache"},
-		"pragma":                    {"no-cache"},
-		"upgrade-insecure-requests": {"1"},
-		"user-agent":                {effectiveUserAgent},
-		http.HeaderOrderKey: {
-			"accept",
-			"accept-language",
-			"cache-control",
-			"pragma",
-			"upgrade-insecure-requests",
-			"user-agent",
-		},
-	}
+	request.Header = requestHeaders(effectiveUserAgent, session)
 
 	response, err := client.Do(request)
 	if err != nil {
@@ -118,6 +111,44 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		document.Text = strings.TrimSpace(string(body))
 	}
 	return document, nil
+}
+
+func requestHeaders(userAgent string, session page.Session) http.Header {
+	if !session.Replayable() {
+		return http.Header{
+			"accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7"},
+			"accept-language":           {"en-GB,en;q=0.9"},
+			"cache-control":             {"no-cache"},
+			"pragma":                    {"no-cache"},
+			"upgrade-insecure-requests": {"1"},
+			"user-agent":                {userAgent},
+			http.HeaderOrderKey:         {"accept", "accept-language", "cache-control", "pragma", "upgrade-insecure-requests", "user-agent"},
+		}
+	}
+	browser := func(name, fallback string) []string {
+		if value := session.Headers[name]; value != "" {
+			return []string{value}
+		}
+		return []string{fallback}
+	}
+	return http.Header{
+		"sec-ch-ua":                 browser("sec-ch-ua", ""),
+		"sec-ch-ua-mobile":          browser("sec-ch-ua-mobile", "?0"),
+		"sec-ch-ua-platform":        browser("sec-ch-ua-platform", ""),
+		"upgrade-insecure-requests": {"1"},
+		"user-agent":                {userAgent},
+		"accept":                    browser("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"),
+		"sec-fetch-site":            {"none"},
+		"sec-fetch-mode":            {"navigate"},
+		"sec-fetch-user":            {"?1"},
+		"sec-fetch-dest":            {"document"},
+		"accept-language":           browser("accept-language", "en-US,en;q=0.9"),
+		"priority":                  {"u=0, i"},
+		http.HeaderOrderKey: {
+			"sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform", "upgrade-insecure-requests", "user-agent", "accept",
+			"sec-fetch-site", "sec-fetch-mode", "sec-fetch-user", "sec-fetch-dest", "accept-encoding", "accept-language", "priority",
+		},
+	}
 }
 
 func requestCookies(cookies []page.Cookie) []*http.Cookie {

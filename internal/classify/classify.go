@@ -39,6 +39,7 @@ var (
 		{label: "PerimeterX challenge", value: regexp.MustCompile(`(?i)window\._pxAppId\s*=|captcha\.px-cdn\.net`)},
 		{label: "DataDome challenge", value: regexp.MustCompile(`(?i)captcha-delivery\.com`)},
 		{label: "Imperva challenge", value: regexp.MustCompile(`(?i)_Incapsula_Resource|Incapsula\s+incident\s+ID`)},
+		{label: "Google JavaScript wall", value: regexp.MustCompile(`(?i)[?&](?:amp;)?emsg=SG_REL`)},
 		{label: "Sucuri firewall", value: regexp.MustCompile(`(?i)Sucuri\s+WebSite\s+Firewall`)},
 	}
 	shortBlockPatterns = []pattern{

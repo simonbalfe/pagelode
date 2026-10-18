@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cookieSchema, httpUrlSchema, identityKeySchema, optionalField, profileNameSchema, proxyUrlSchema, type Cookie } from "../shared/schemas.ts";
+import type { Replay } from "./replay.ts";
 
 export const renderRequestSchema = z.object({
   url: httpUrlSchema,
@@ -47,5 +48,6 @@ export type RenderResult = {
   html: string;
   user_agent: string;
   cookies: ReadonlyArray<Cookie>;
+  replay: Replay;
   traffic?: Traffic;
 };

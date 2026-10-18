@@ -141,6 +141,7 @@ func newApplication(configuration config.Config) (*application, error) {
 		browserClient,
 		capSolverFetcher,
 		routes,
+		memory.NewClearances(configuration.RouteTTL),
 		browserLimiter,
 		configuration.ChromedpEnabled,
 	)
