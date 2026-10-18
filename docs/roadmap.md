@@ -7,6 +7,7 @@ Expand PageLode into a general scraping service with the workflow: authenticate,
 Implemented today:
 
 - Markdown extraction through `POST /extract` and the CLI.
+- Site mapping through `POST /map` and `pagelode map`: robots.txt and sitemap indexes, page links, host and path scoping, and canonical deduplication over HTTP.
 - Per-page network discovery through `POST /discover`, including HAR analysis.
 - Printing Press endpoint classification and grouping.
 - Named authenticated Patchright profiles, including session-cookie persistence.
@@ -20,7 +21,8 @@ All features below are planned. Proposed routes and commands are not available y
 | Priority | Feature | Proposed interface | Outcome |
 |---|---|---|---|
 | Highest | Interactive authenticated browser sessions | `/sessions`, `pagelode session` | An agent can inspect and interact with a logged-in application |
-| Highest | Site mapping and bounded crawling | `/map`, `/crawl` | Discover page URLs and traverse selected parts of a site |
+| Implemented (map) | Site mapping | `/map`, `pagelode map` | Discover page URLs from sitemaps and links |
+| Highest | Bounded crawling | `/crawl` | Retrieve the mapped pages with depth, rate, and robots bounds |
 | Highest | Authenticated endpoint scans | `/scan`, `pagelode scan` | One endpoint inventory across pages and browser interactions |
 | Highest | Structured record extraction | `/scrape`, `pagelode scrape` | Return records with named, validated fields |
 | Highest | Collection from discovered APIs | `/collect`, `pagelode collect` | Execute a reusable endpoint recipe and follow pagination |
@@ -44,6 +46,8 @@ Use the same operations for automatic scans. Bound hosts, pages, depth, duration
 ## Site mapping and crawling
 
 Mapping discovers page URLs; network discovery identifies API calls. Keep those outputs distinct. Seed maps from sitemaps, sitemap indexes, and page links. Support host/subdomain scope, include/exclude path patterns, query handling, canonicalization, and URL deduplication.
+
+**Mapping status: implemented** (`pagelode map`, `POST /map`; see the README). Remaining for mapping: browser-rendered link discovery, gzip sitemaps, and robots disallow rules.
 
 Crawling retrieves the mapped or discovered pages with bounded depth and page counts. Add per-host concurrency, rate limits, robots policy, retry delays, and throttling backoff. Report skipped and failed URLs alongside completed pages.
 

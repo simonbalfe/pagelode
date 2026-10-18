@@ -10,7 +10,7 @@ rate on the same corpus.
 - Keep managed providers outside the service.
 - Make cheap HTTP the common path without returning JavaScript shells or block pages.
 - Separate “needs rendering” from “blocked”; these require different browsers.
-- Keep Patchright behind a small correlated NDJSON subprocess interface.
+- Keep Patchright behind a small HTTP browser service with no routing or extraction policy.
 - Reuse browser processes and bound all concurrency, queues, bodies, and output.
 - Record enough attempt evidence to tune routing without logging secrets.
 

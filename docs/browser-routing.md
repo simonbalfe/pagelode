@@ -17,7 +17,7 @@ Both use the same classifier (`internal/classify`) and route memory (`internal/m
 |---|---|---|---|
 | `tls` | `bogdanfinn/tls-client` with a Chrome TLS profile | Cheapest | Always tried first unless a route is remembered |
 | `chromedp` | `chromedp/chromedp` driving one reusable Chromium | Medium | JavaScript shells; skipped when `PAGELODE_CHROMEDP_ENABLED=false` |
-| `patchright` | Patchright in the TypeScript worker (`browser/`) | High | Challenge pages, protected domains, and every other failure |
+| `patchright` | Patchright in the browser service (`browser-service/`), called over HTTP by `internal/browser` | High | Challenge pages, protected domains, and every other failure |
 | `capsolver` | CapSolver API, then Chromedp with the solved session | Highest | Optional last resort; needs `CAPSOLVER_API_KEY` and a sticky authenticated proxy |
 
 The cookies and user agent from the HTTP attempt are passed to each browser fallback.

@@ -23,9 +23,9 @@ flowchart LR
 
     Orchestrator --> TLS[tls-client]
     Orchestrator --> Chromedp[Chromedp + Chromium]
-    Orchestrator --> Bridge[Go Patchright client]
-    Bridge <-->|NDJSON over stdio| Worker[TypeScript worker]
-    Worker --> Patchright[Patchright + Chromium]
+    Orchestrator --> Bridge[Go browser client]
+    Bridge <-->|HTTP JSON| Service[Bun browser service]
+    Service --> Patchright[Patchright + Chrome]
     Orchestrator --> Solver[CapSolver API]
     Solver --> SolvedBrowser[Solved session + Chromedp]
 
@@ -38,7 +38,7 @@ flowchart LR
     Result --> Caller
 ```
 
-The Go process owns every product decision. The TypeScript worker can render a URL and return browser state, but it cannot choose targets, select routes, extract content, or decide whether a result is acceptable. The same application graph serves one-shot CLI requests and the long-running HTTP API.
+The Go process owns every product decision. The browser service can render a URL and return browser state, but it cannot choose targets, select routes, extract content, or decide whether a result is acceptable. The same application graph serves one-shot CLI requests and the long-running HTTP API.
 
 ## Request lifecycle
 
@@ -98,9 +98,9 @@ Chromedp is used for application shells and pages whose useful content is create
 
 ### Patchright
 
-Patchright handles confirmed challenge pages, protected domains, and failures that warrant the most expensive local loader. It runs behind a small TypeScript worker because Patchright's maintained API is in the JavaScript ecosystem.
+Patchright handles confirmed challenge pages, protected domains, and failures that warrant the most expensive local loader. It runs in a separate Bun + Hono browser service (`browser-service/`) because Patchright's maintained API is in the JavaScript ecosystem. Results keep the provider name `patchright`.
 
-The worker lazily launches a persistent Chromium context, creates a fresh page for each job, applies the proxy and session state, renders the page, makes a bounded attempt to settle visible challenges, and returns HTML plus updated cookies.
+For an ordinary render, the service leases a warm browser identity: a persistent Chrome context keyed by identity or proxy, launched with the timezone and languages of the proxy's exit IP. It opens a fresh page, applies the cookies, renders the page, makes a bounded attempt to settle visible challenges, and returns HTML plus updated cookies. A render with a named profile launches that profile's own persistent context instead. See [browser service](browser-service.md).
 
 ### CapSolver
 
@@ -108,62 +108,40 @@ CapSolver is an optional final escalation for Cloudflare challenges that remain 
 
 It is disabled unless both `CAPSOLVER_API_KEY` and an authenticated solver proxy are available. API keys and proxy credentials are never included in attempt logs.
 
-## Go-to-TypeScript boundary
+## Browser service boundary
 
 ```mermaid
 sequenceDiagram
     participant O as Go orchestrator
-    participant C as Go Patchright client
-    participant W as TypeScript worker
+    participant C as Go browser client
+    participant S as Browser service
     participant B as Patchright browser
 
     O->>C: Fetch URL with session
-    C->>C: Allocate correlation ID
-    C->>W: One NDJSON request on stdin
-    W->>B: Create isolated context
-    W->>B: Apply UA, cookies, proxy (locale and timezone stay native)
-    W->>B: Navigate and settle
-    B-->>W: HTML, URL, title, cookies, status
-    W-->>C: One NDJSON response on stdout
+    C->>S: POST /v1/render (JSON, bearer token)
+    S->>B: Lease identity, open page
+    S->>B: Apply cookies and proxy
+    S->>B: Navigate and settle
+    B-->>S: HTML, URL, title, cookies, status
+    S-->>C: JSON render result
     C-->>O: page.Document
 ```
 
-Requests and responses are newline-delimited JSON. A correlation ID allows multiple requests to be in flight through one long-lived worker process. Writes are serialized, while render jobs may run concurrently within the configured browser limit.
+`internal/browser` is the Go client. It calls these routes:
 
-The boundary deliberately exposes browser facts rather than extraction policy.
+| Go method | Route | Use |
+|---|---|---|
+| `Fetch` | `POST /v1/render` | Render a page for extraction |
+| `Capture` | `POST /v1/render` with `capture` and optional `profile` | Render and record network traffic for discovery and email finding |
+| `CreateSession` | `POST /v1/sessions` | Open a browser session with a CDP URL (`profile login`) |
+| `CloseSession` | `DELETE /v1/sessions/{id}` | Close a session and save its profile |
 
-### Request shape
+- Requests carry `PAGELODE_BROWSER_TOKEN` as a bearer token and `PAGELODE_PROXY_URL` as `proxy_url` when they are set.
+- The render timeout comes from the request deadline, capped at 45 seconds.
+- Errors use `{"error":{"code","message"}}`. A `429 saturated` response counts as browser limiter saturation in Go.
+- Responses larger than 32 MiB are rejected.
 
-```json
-{
-  "id": "42",
-  "url": "https://example.com",
-  "timeout_ms": 45000,
-  "wait_until": "domcontentloaded",
-  "cookies": [],
-  "proxy_url": "",
-  "settle_challenge": true
-}
-```
-
-### Response shape
-
-```json
-{
-  "id": "42",
-  "ok": true,
-  "data": {
-    "status_code": 200,
-    "final_url": "https://example.com/",
-    "title": "Example Domain",
-    "html": "<!doctype html>...",
-    "user_agent": "Mozilla/5.0 ...",
-    "cookies": []
-  }
-}
-```
-
-If the worker exits, the Go client fails all pending calls and starts a new worker on the next request. Cancellation removes the abandoned correlation ID so a late response cannot block the reader.
+The boundary deliberately exposes browser facts rather than extraction policy. The full API, sessions, identities, and container are documented in [browser service](browser-service.md).
 
 ## Classification
 
@@ -240,9 +218,9 @@ flowchart LR
     BL -->|up to PAGELODE_BROWSER_CONCURRENCY| Browsers[Chromedp or Patchright]
 ```
 
-The extraction limiter bounds complete request lifetimes. A second limiter independently protects browser capacity. Both share the configured maximum waiting depth, and the API rejects overload instead of allowing unbounded memory growth.
+The extraction limiter bounds complete request lifetimes. A second limiter independently protects browser capacity. Both share the configured maximum waiting depth, and the API rejects overload instead of allowing unbounded memory growth. The browser service applies its own limit (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`).
 
-Request contexts carry deadlines through the API, orchestrator, loaders, browser queue, and worker response wait.
+Request contexts carry deadlines through the API, orchestrator, loaders, browser queue, and browser service request.
 
 ## Package map
 
@@ -254,14 +232,15 @@ Request contexts carry deadlines through the API, orchestrator, loaders, browser
 | `internal/emails` | Email-finding crawl, page loading policy, address extraction |
 | `internal/httpfetch` | Profiled direct HTTP loader and session capture |
 | `internal/chromefetch` | Ordinary JavaScript rendering with Chromedp |
-| `internal/patchright` | Managed subprocess client and NDJSON multiplexing |
+| `internal/browser` | HTTP client for the browser service: render, capture, and sessions |
 | `internal/capsolver` | Managed Cloudflare task polling and solved-session handoff |
 | `internal/classify` | Block, render, retry, dead, and accept decisions |
 | `internal/extract` | Readability, DOM cleanup, Markdown, links, structured data |
 | `internal/memory` | Expiring hostname-to-provider routes |
 | `internal/limit` | Bounded concurrency and queueing |
 | `internal/page` | Loader-neutral document and session values |
-| `browser/src` | Patchright worker and runtime contract validation |
+| `internal/browser/browsertest` | Starts the real browser service with `bun` for gated integration tests |
+| `browser-service/src` | Bun + Hono browser service: Patchright renders, identities, sessions, profiles, request validation |
 
 ## Failure behaviour
 
@@ -271,18 +250,28 @@ This separation makes an extraction failure observable without pretending that b
 
 ## Deployment model
 
-The provided container builds a static Go binary, installs Bun and Chromium, installs Patchright's Chromium build, and runs both language layers in one service container. The TypeScript worker remains a child process of PageLode rather than a separately deployed network service. The image defaults to `pagelode serve`; supplying a URL instead runs a one-shot extraction.
+The provided `compose.yaml` runs two containers:
+
+| Service | Image | Contents |
+|---|---|---|
+| `pagelode` | root `Dockerfile` | Static Go binary and Debian Chromium for Chromedp; no Node or Bun. Listens on `8083` |
+| `browser` | `browser-service/Dockerfile` | `oven/bun` with Google Chrome running headed on an Xvfb display, plus fluxbox, PulseAudio, Mesa, and fonts. Listens on `127.0.0.1:8090` |
+
+PageLode reaches the browser service at `http://browser:8090`. Both containers share `BROWSER_SERVICE_TOKEN`. Browser identities and profiles persist in the `browser-data` volume at `/data`, and `BROWSER_TZ` sets the browser container's `TZ`. The PageLode image defaults to `pagelode serve`; supplying a URL instead runs a one-shot extraction.
 
 ```mermaid
 flowchart TB
-    Container[PageLode container]
-    Container --> Go[PageLode Go process :8083]
-    Go --> ChromedpBrowser[Reusable Chromedp Chromium]
-    Go --> Worker[On-demand Bun worker]
-    Worker --> PatchBrowser[Reusable Patchright Chromium]
+    subgraph PL[pagelode container]
+        Go[PageLode Go process :8083] --> ChromedpBrowser[Reusable Chromedp Chromium]
+    end
+    subgraph BR[browser container]
+        Service[Bun browser service :8090] --> Chrome[Headed Google Chrome on Xvfb]
+    end
+    Go -->|HTTP + bearer token| Service
+    BR --> Volume[(browser-data volume /data)]
 ```
 
-This is the smallest deployment that preserves the maintained Patchright implementation while keeping orchestration in Go.
+Orchestration stays in Go; the browser service only renders, and the headed Chrome desktop lives in its own image.
 
 ## Endpoint discovery
 
@@ -313,9 +302,9 @@ The loader shares the same HTTP client, browsers, CapSolver client, route memory
 
 - PDF extraction is not implemented.
 - Route memory is not shared between replicas.
-- Browser processes are reused; named persistent sessions are not implemented.
+- Browser processes are reused through the browser service's warm identity pool. Interactive browser sessions exist only as raw CDP sessions on the browser service.
 - Challenge interaction is intentionally small and cannot solve every protection system.
-- Proxy credentials are supported but proxy quality and browser fingerprint coherence remain deployment concerns.
-- There is no authentication layer in front of the HTTP API yet.
+- Proxy credentials are supported. The browser service matches timezone and languages to the proxy exit IP, but proxy quality and browser fingerprint coherence remain deployment concerns.
+- There is no authentication layer in front of the PageLode HTTP API yet. The browser service accepts a bearer token.
 
 The planned path from the existing OpenExtract service is documented in [migration.md](migration.md).

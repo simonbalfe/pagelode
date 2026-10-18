@@ -21,8 +21,8 @@ Patchright is the primary path. CapSolver is an optional last resort, enabled on
 
 Patchright passes Cloudflare's standard challenge page when:
 
-1. Chrome runs with a visible window: `PAGELODE_PATCHRIGHT_HEADLESS=false`.
-2. Chrome keeps its native locale and timezone. PageLode no longer overrides them, because Cloudflare detects emulated values.
+1. Chrome runs with a visible window: `BROWSER_SERVICE_HEADLESS=false` (the browser service default).
+2. Locale and timezone are not emulated, because Cloudflare detects emulated values. Without a proxy, Chrome keeps the machine's values. With an HTTP or HTTPS proxy, the browser service launches Chrome with the timezone and languages of the proxy's exit IP.
 3. The connection uses no proxy, or a sticky proxy session that keeps one IP for the whole run.
 
 The proxy can come from any provider. Setup instructions are in [configuration](configuration.md#proxies).
@@ -50,15 +50,18 @@ CapSolver rejects proxies it cannot authenticate before solving. It requires a s
 
 ## Known gaps
 
-- The Docker image runs headless, so containers do not pass the challenge yet. Running visible Chrome on a virtual display such as Xvfb is the likely fix.
-- Each server process keeps one proxy session until restart. Only CLI runs get a new session automatically.
+- The browser service container now runs headed Google Chrome on an Xvfb virtual display. Container results are in [browser service](browser-service.md), not in the table above.
+- With a `_session-<id>` proxy, each PageLode server process keeps one proxy session until restart. Only CLI runs get a new session automatically. A `{session}` placeholder gives each browser service identity its own session, and rotating the identity gets a new one; see [configuration](configuration.md#fresh-session-per-run).
 - Crunchbase has not been retested since the locale fix.
 
 ## Test command
 
 ```sh
-PAGELODE_DEBUG=true PAGELODE_PATCHRIGHT_HEADLESS=false \
-pagelode --json https://www.scrapingcourse.com/cloudflare-challenge
+BROWSER_SERVICE_DEBUG=true make run-browser
 ```
 
-Debug output contains provider, status, timing, cookie count, and browser major version without secret values.
+```sh
+PAGELODE_DEBUG=true pagelode --json https://www.scrapingcourse.com/cloudflare-challenge
+```
+
+`PAGELODE_DEBUG` output contains CapSolver provider, status, timing, cookie count, and browser major version without secret values. `BROWSER_SERVICE_DEBUG` logs browser service events such as navigation, challenge detection, and identity launches.

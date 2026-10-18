@@ -102,13 +102,13 @@ pagelode discover --profile creatorcrawl creatorcrawl.com
 pagelode discover --profile creatorcrawl --verbose creatorcrawl.com
 ```
 
-The login command opens a visible Patchright browser. Sign in manually, including any MFA, then press Enter in the terminal to save and close it. The profile saves cookies, including session cookies, local storage, and the browser's other persistent state. Session storage is tied to individual tabs and is not guaranteed to survive reopening. No credentials need to be passed to PageLode.
+The login command opens a visible browser session on the browser service host at the URL, with a one-hour limit, and prints its CDP URL. Sign in manually, including any MFA, then press Enter in the terminal; PageLode closes the session and the browser service saves the profile. The profile saves cookies, including session cookies, local storage, and the browser's other persistent state. Session storage is tied to individual tabs and is not guaranteed to survive reopening. No credentials need to be passed to PageLode.
 
-Go validates profile names, resolves storage, and commands the Patchright worker. Named discovery runs headless in a dedicated worker and closes it afterward so that state is flushed and the profile is released. It always uses Patchright, even when ordinary discovery would use chromedp. A missing profile fails with a login instruction rather than silently running unauthenticated. Each profile has its own browser directory; normal discovery does not select a named profile. The browser enforces exclusive profile use, so close login windows before discovering and avoid concurrent calls using the same profile.
+Go validates profile names and passes the name to the browser service, which owns profile storage. Named discovery launches the profile's browser on the service, using its `BROWSER_SERVICE_HEADLESS` setting, restores the saved cookies, and closes the browser afterward so that state is saved and the profile is released. It always uses Patchright, even when ordinary discovery would use chromedp. A missing profile fails (`profile_not_found`) with a login instruction rather than silently running unauthenticated. Each profile has its own browser directory; normal discovery does not select a named profile. The browser service runs one render at a time per profile and rejects a profile held by an open login session (`profile_in_use`), so finish logging in before discovering.
 
-API callers select an existing profile with `{"url":"https://creatorcrawl.com","profile":"creatorcrawl","verbose":false}`. Profiles belong to the machine running PageLode; the server must have the same profile directory available. Profiles apply to live discovery only, not HAR input.
+API callers select an existing profile with `{"url":"https://creatorcrawl.com","profile":"creatorcrawl","verbose":false}`. Profiles belong to the browser service; every PageLode instance pointed at the same `PAGELODE_BROWSER_URL` sees the same profiles. Profiles apply to live discovery only, not HAR input.
 
-Storage defaults to `pagelode/profiles` under the operating system's user configuration directory (on macOS, `~/Library/Application Support/pagelode/profiles`). Set `PAGELODE_PROFILES_DIR` to override it. Names accept 1–64 letters, numbers, underscores, or hyphens, starting with a letter or number. Profile directories are restricted to the owning user. Discovery reports never include raw cookies, storage values, or header values, including with verbosity enabled. If login expires, run the login command again for the same name.
+The browser service stores profiles under `BROWSER_SERVICE_PROFILES_DIR`. It defaults to `pagelode/profiles` under the operating system's user configuration directory (on macOS, `~/Library/Application Support/pagelode/profiles`); the container image uses `/data/profiles`. Names accept 1–64 letters, numbers, underscores, or hyphens, starting with a letter or number. Profile directories are restricted to the owning user. Discovery reports never include raw cookies, storage values, or header values, including with verbosity enabled. If login expires, run the login command again for the same name.
 
 ## Loading and limits
 
@@ -126,12 +126,13 @@ Header values and raw request/response bodies are private capture inputs. Public
 |---|---|
 | `internal/page/capture.go` | Portable browser traffic values and capture limits |
 | `internal/chromefetch/capture.go` | CDP event collection and bounded body retrieval |
-| `browser/src/capture.ts` | Patchright network collection |
-| `internal/patchright/client.go` | Capture requests and responses across the worker boundary |
+| `browser-service/src/capture.ts` | Patchright network collection |
+| `browser-service/src/profiles.ts` | Profile directories, saved cookies, and per-profile locks |
+| `internal/browser/client.go` | Render and capture requests to the browser service over HTTP |
 | `internal/discovery/service.go` | Input validation, loading, escalation, and shared limits |
 | `internal/discovery/classifier.go` | Ported Printing Press scoring and path matching |
 | `internal/discovery/view.go` | Report verbosity |
-| `internal/profile/store.go` | Named profile validation and storage |
+| `internal/profile/store.go` | Named profile name validation |
 | `cmd/pagelode/profile.go` | Interactive profile login |
 | `internal/discovery/analyze.go` | Endpoint grouping, public evidence, and coverage reporting |
 | `internal/discovery/schema.go` | Observed JSON/form/query shapes |
@@ -145,11 +146,11 @@ Header values and raw request/response bodies are private capture inputs. Public
 ```sh
 make check
 make smoke
-PAGELODE_BROWSER_TESTS=1 go test -race ./internal/chromefetch ./internal/patchright
+PAGELODE_BROWSER_TESTS=1 go test -race ./internal/chromefetch ./internal/browser ./internal/emails
 ```
 
-The browser tests require installed Chromium/Chrome and Bun with the browser dependencies installed. They load local REST/GraphQL fixtures and exercise concurrent chromedp loads and the real Patchright worker. Unit tests cover grouping, mixed response types, pagination, redaction, HAR decoding, input validation, and fallback routing.
+The browser tests require installed Chromium/Chrome, Bun, and the browser service dependencies (`bun install` and `bunx patchright install chromium` in `browser-service/`, or `make setup`). `internal/browser/browsertest` starts the real browser service with `bun`, headless on bundled Chromium. The tests load local REST/GraphQL fixtures and exercise concurrent chromedp loads and real Patchright renders through the service. Unit tests cover grouping, mixed response types, pagination, redaction, HAR decoding, input validation, and fallback routing.
 
 ## Planned interactive discovery
 
-Persistent agent-controlled browser sessions and bounded automatic scans are future features. They will let an agent inspect pages, navigate authenticated routes, click navigation controls, and gather one endpoint report across those interactions. See the [generalization plan](generalization-plan.md#future-feature-interactive-browser-sessions-and-automatic-scans) for the proposed commands and acceptance criteria. The current CLI does not implement `session` or `scan`.
+Persistent agent-controlled browser sessions and bounded automatic scans are future features. They will let an agent inspect pages, navigate authenticated routes, click navigation controls, and gather one endpoint report across those interactions. See the [generalization plan](generalization-plan.md#future-feature-interactive-browser-sessions-and-automatic-scans) for the proposed commands and acceptance criteria. The current CLI does not implement `session` or `scan`. The browser service already exposes raw CDP browser sessions (`POST /v1/sessions`), which `profile login` uses; see [browser service](browser-service.md).
