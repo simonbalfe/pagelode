@@ -168,6 +168,7 @@ It does not guarantee access to protected websites. The optional CapSolver fallb
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Browser routing](docs/browser-routing.md)
 - [Endpoint discovery](docs/discovery.md)
 - [Email finding](docs/emails.md)
 - [Configuration](docs/configuration.md)
