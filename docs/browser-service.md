@@ -290,6 +290,54 @@ PageLode with the container service, Evomi mobile proxies, `PAGELODE_CHROMEDP_EN
 - US T-Mobile IPs (`172.56.*`) received `/sorry` on every query; GB, IE, and AU IPs often did not.
 - Result links are opaque `google.com/goto?url=` tokens. The `cite` element shows the host and a shortened path; the real URL needs one extra request per result.
 
+### Google: which cookie the replay needs
+
+Three fresh harvests (IE, GB, GB) replayed with one change at a time, two rounds each, the full session as a control at the start and end of every round. The control returned results 12 of 12 times.
+
+| Variant | IE-1 | GB-0 | GB-2 (harvest hit `/sorry`) |
+|---|---|---|---|
+| Full session (control) | results | results | results |
+| No cookies | wall | wall | wall |
+| Drop `AEC` | results | results | results |
+| Drop `SEARCH_SAMESITE` | results | results | results |
+| Drop `__Secure-ENID` | wall | wall | wall |
+| Only `__Secure-ENID` | results | results | `/sorry` |
+| Only `AEC` | wall | wall | wall |
+| Same cookie names minted by a plain HTTP request | wall | wall | wall |
+| Plain headers (no browser headers) | results | results | results |
+| No `sec-ch-ua` client hints | results | results | results |
+| Older TLS profile (`Chrome_150`) | results | results | results |
+| Drop `GOOGLE_ABUSE_EXEMPTION` | – | – | `/sorry` |
+| Only `GOOGLE_ABUSE_EXEMPTION` | – | – | wall |
+
+- **`__Secure-ENID` is the clearance.** It lives about 395 days; `AEC` and `SEARCH_SAMESITE` are not needed.
+- **Only the browser-minted value works.** A plain HTTP request also receives `__Secure-ENID`, but that value still gets the wall. The browser's value is longer (about 370–410 characters), consistent with Google upgrading it once its page JavaScript runs.
+- **Headers and TLS profile did not matter** in this test.
+- **A harvest that solved `/sorry` also needs `GOOGLE_ABUSE_EXEMPTION`**, a short-lived cookie that must be sent together with `__Secure-ENID`.
+
+Replaying only `__Secure-ENID` from other networks, three searches each:
+
+| Session | Same IP | New IP, same country | New IP, other country | Home IP, no proxy |
+|---|---|---|---|---|
+| IE-1 (`80.233.63.57`) | results | results (`80.233.37.160`) | `/sorry` | `/sorry` |
+| GB-0 (`82.132.233.175`) | results | `/sorry` (`31.94.2.127`) | `/sorry` | `/sorry` |
+
+The token worked from another IP in the same `80.233.x.x` range but not from a different GB range. This suggests it is bound to a network or IP range rather than one address, but two sessions are not enough to be sure, and a `/sorry` on a new IP may mean that IP was already flagged. Replay from the harvesting IP until this is measured further.
+
+### Google: harvest and replay volume
+
+One laptop-sized container, `BROWSER_SERVICE_CONCURRENCY=10`, Evomi mobile IPs in GB, IE, and AU, one identity per IP.
+
+| Step | Result |
+|---|---|
+| Harvest 20 sessions, 8 at a time | 20 of 20 in 54 s (about 22 per minute); 3.5–41 s each, slower when `/sorry` was solved |
+| Replay all 20 in parallel for 3 minutes, one search every 3 s per cookie | 677 of 728 searches returned results (93%), **3.76 searches/s**, 1–1.2 s latency on GB and IE, about 2.2 s on AU |
+| Life of a cookie at that pace | 8 cookies never blocked; 10 blocked after 39–40 searches (about 2.5 minutes); 3 blocked early (after 0, 2, and 14) |
+| Results page size | 617 KB decompressed, about 188 KB gzip-compressed (local estimate) |
+
+- The block at about 40 searches is either a per-session count or a time window; this run cannot tell them apart because every cookie used the same pace.
+- At 188 KB per search, 300 searches/s is about 4.9 TB of proxy traffic per day, which makes bandwidth the main cost at Serper-like volume ([Serper](https://serper.dev/) sells 50–300 queries per second at $1.00–$0.30 per 1,000).
+
 ## Known gaps
 
 | Site or area | Cause | Planned fix |

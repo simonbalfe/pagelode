@@ -9,6 +9,7 @@ PageLode is the Go-first successor experiment for OpenExtract.
 - Route JavaScript shells to Chromedp and confirmed challenge pages directly to Patchright.
 - Preserve the OpenExtract `/extract` response contract while the migration is evaluated.
 - Do not add managed extraction providers; those remain caller-owned fallbacks.
+- For Google search, the replayable clearance is the browser-minted `__Secure-ENID` cookie (plus `GOOGLE_ABUSE_EXEMPTION` when `/sorry` was solved), replayed from the harvesting IP. Measurements and open questions: [browser service](docs/browser-service.md#google-which-cookie-the-replay-needs).
 
 ## Validation
 
