@@ -40,7 +40,7 @@ func TestCrawlPrioritizesContactsAndRetainsSources(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	loader := NewLoader(httpfetch.New(""), nil, nil, nil, memory.NewRoutes(time.Hour, nil), limit.New(1, 10), false)
+	loader := NewLoader(httpfetch.New(""), nil, nil, memory.NewRoutes(time.Hour, nil))
 	service := New(loader, limit.New(1, 10), 1)
 	report, err := service.Find(context.Background(), Request{URL: server.URL, MaxPages: 3, Render: "never"})
 	if err != nil {

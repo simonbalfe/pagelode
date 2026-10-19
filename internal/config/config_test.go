@@ -2,6 +2,7 @@ package config
 
 import (
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"testing"
 )
@@ -9,8 +10,9 @@ import (
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("PORT", "")
 	t.Setenv("PAGELODE_BROWSER_URL", "")
-	t.Setenv("PAGELODE_BROWSER_CONCURRENCY", "")
+	t.Setenv("PAGELODE_BROWSER_SETTLE_MS", "")
 	t.Setenv("PAGELODE_MAX_CONCURRENCY", "")
+	t.Setenv("PAGELODE_STATE_PATH", "")
 
 	got, err := Load()
 	if err != nil {
@@ -19,16 +21,24 @@ func TestLoadDefaults(t *testing.T) {
 	if got.Address != ":8083" {
 		t.Errorf("Load().Address = %q, want :8083", got.Address)
 	}
-	if !got.ChromedpEnabled {
-		t.Error("Load().ChromedpEnabled = false, want true")
-	}
 	if got.BrowserURL != "http://127.0.0.1:8090" {
 		t.Errorf("Load().BrowserURL = %q, want http://127.0.0.1:8090", got.BrowserURL)
 	}
+	if filepath.Base(got.StatePath) != "state.sqlite" || filepath.Base(filepath.Dir(got.StatePath)) != "pagelode" {
+		t.Errorf("Load().StatePath = %q, want <config dir>/pagelode/state.sqlite", got.StatePath)
+	}
 }
 
-func TestLoadRotatesProxySessionPerRun(t *testing.T) {
-	t.Setenv("PAGELODE_PROXY_URL", "http://user:secret_country-US_session-fixed1_lifetime-30@proxy.example:3000")
+func TestLoadRejectsSettleOutOfRange(t *testing.T) {
+	t.Setenv("PAGELODE_BROWSER_SETTLE_MS", "10001")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load(PAGELODE_BROWSER_SETTLE_MS=10001) error = nil, want range error")
+	}
+}
+
+func TestLoadKeepsProxyTemplateAndPinsCapSolverSession(t *testing.T) {
+	const template = "http://user:secret_country-US_session-fixed1_lifetime-30@proxy.example:3000"
+	t.Setenv("PAGELODE_PROXY_URL", template)
 	t.Setenv("PAGELODE_CAPSOLVER_PROXY_URL", "")
 	sessionPassword := regexp.MustCompile(`^secret_country-US_session-[a-z0-9]{10}_lifetime-30$`)
 
@@ -38,21 +48,38 @@ func TestLoadRotatesProxySessionPerRun(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
 		}
-		if got.CapSolverProxyURL != got.ProxyURL {
-			t.Fatalf("CapSolverProxyURL = %q, want shared %q so one run keeps one IP", got.CapSolverProxyURL, got.ProxyURL)
+		if got.ProxyURL != template {
+			t.Fatalf("ProxyURL = %q, want the template %q; browser identities choose its session", got.ProxyURL, template)
 		}
-		parsed, err := url.Parse(got.ProxyURL)
+		parsed, err := url.Parse(got.CapSolverProxyURL)
 		if err != nil {
-			t.Fatalf("parse rotated proxy: %v", err)
+			t.Fatalf("parse CapSolver proxy: %v", err)
 		}
 		password, _ := parsed.User.Password()
 		if parsed.Host != "proxy.example:3000" || parsed.User.Username() != "user" || !sessionPassword.MatchString(password) {
-			t.Fatalf("rotated proxy = %q", got.ProxyURL)
+			t.Fatalf("CapSolverProxyURL = %q", got.CapSolverProxyURL)
 		}
 		seen[password] = true
 	}
 	if len(seen) != 3 {
-		t.Fatalf("got %d distinct sessions across 3 runs, want 3", len(seen))
+		t.Fatalf("got %d distinct CapSolver sessions across 3 runs, want 3", len(seen))
+	}
+}
+
+func TestLoadAcceptsSessionPlaceholder(t *testing.T) {
+	const template = "http://user-{session}:secret@proxy.example:3000"
+	t.Setenv("PAGELODE_PROXY_URL", template)
+	t.Setenv("PAGELODE_CAPSOLVER_PROXY_URL", "")
+
+	got, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.ProxyURL != template {
+		t.Errorf("ProxyURL = %q, want %q", got.ProxyURL, template)
+	}
+	if !regexp.MustCompile(`^http://user-[a-z0-9]{10}:secret@proxy\.example:3000$`).MatchString(got.CapSolverProxyURL) {
+		t.Errorf("CapSolverProxyURL = %q, want a concrete session", got.CapSolverProxyURL)
 	}
 }
 
@@ -65,7 +92,7 @@ func TestLoadKeepsProxyWithoutSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if got.ProxyURL != proxy {
-		t.Fatalf("ProxyURL = %q, want unchanged %q", got.ProxyURL, proxy)
+	if got.ProxyURL != proxy || got.CapSolverProxyURL != proxy {
+		t.Fatalf("ProxyURL = %q, CapSolverProxyURL = %q, want both unchanged %q", got.ProxyURL, got.CapSolverProxyURL, proxy)
 	}
 }

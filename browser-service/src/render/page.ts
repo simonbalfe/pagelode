@@ -1,12 +1,11 @@
-import type { BrowserContext, Page, Request } from "patchright";
+import { errors, type BrowserContext, type Page, type Request } from "patchright";
 import type { Log } from "../shared/log.ts";
+import { trackActivity } from "./activity.ts";
 import { captureTraffic } from "./capture.ts";
-import { settleChallenge } from "./challenge.ts";
+import { challengeHinted, remainingChallenge, settleChallenge } from "./challenge.ts";
 import { settleDataDome } from "./datadome.ts";
 import { portableCookies, replayHeaders } from "./replay.ts";
 import type { RenderRequest, RenderResult } from "./schema.ts";
-
-const settleDelayMs = 500;
 
 export type RenderEnvironment = {
   readonly signal: AbortSignal;
@@ -21,35 +20,55 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
   };
   signal.addEventListener("abort", closePage, { once: true });
   const captureDeadline = input.capture === undefined ? undefined : setTimeout(closePage, input.timeout_ms);
+  const activity = trackActivity(page);
   try {
-    const capture = input.capture === undefined ? undefined : captureTraffic(page);
+    const capture = input.capture === undefined ? undefined : captureTraffic(page, input.capture);
     let documentStatus = 0;
+    let documentHeaders: Record<string, string> = {};
     let documentRequest: Request | undefined;
     page.on("response", (response) => {
       if (response.request().resourceType() !== "document" || response.frame() !== page.mainFrame()) return;
       documentStatus = response.status();
+      documentHeaders = response.headers();
       documentRequest = response.request();
     });
     if (input.cookies.length > 0) await addCookies(page, input);
     const response = await page.goto(input.url, { timeout: input.timeout_ms, waitUntil: input.wait_until });
-    log("navigation_complete", { status: response?.status() ?? 0, title: await page.title(), url: page.url() });
-    if (input.settle_challenge) await settleChallenge(page, log);
-    if (input.solve_captcha) await settleDataDome(page, log);
-    await page.waitForTimeout(input.capture?.wait_ms ?? settleDelayMs);
+    const hinted = await challengeHinted(page, documentStatus || response?.status() || 0, documentHeaders);
+    log("navigation_complete", { status: response?.status() ?? 0, url: page.url(), challenge_hint: hinted });
+    if (hinted && input.settle_challenge) await settleChallenge(page, () => documentHeaders, log);
+    if (hinted && input.solve_captcha) await settleDataDome(page, log);
+    const waitForMatched = input.wait_for === undefined ? undefined : await waitForSelector(page, input.wait_for);
+    await activity.quiet(input.capture?.wait_ms ?? input.settle_ms);
+    const challenge = hinted ? await remainingChallenge(page, documentHeaders) : undefined;
     return {
       status_code: documentStatus || response?.status() || 0,
       final_url: page.url(),
       title: await page.title(),
       html: await page.content(),
       user_agent: await page.evaluate(() => navigator.userAgent),
+      headers: documentHeaders,
       cookies: await portableCookies(context),
       replay: { headers: documentRequest === undefined ? {} : replayHeaders(await documentRequest.allHeaders()) },
+      ...(challenge === undefined ? {} : { challenge }),
+      ...(waitForMatched === undefined ? {} : { wait_for_matched: waitForMatched }),
       ...(capture === undefined ? {} : { traffic: await capture.finish() }),
     };
   } finally {
+    activity.stop();
     clearTimeout(captureDeadline);
     signal.removeEventListener("abort", closePage);
     await page.close();
+  }
+}
+
+async function waitForSelector(page: Page, waitFor: NonNullable<RenderRequest["wait_for"]>): Promise<boolean> {
+  try {
+    await page.waitForSelector(waitFor.selector, { state: "attached", timeout: waitFor.timeout_ms });
+    return true;
+  } catch (error: unknown) {
+    if (error instanceof errors.TimeoutError) return false;
+    throw error;
   }
 }
 

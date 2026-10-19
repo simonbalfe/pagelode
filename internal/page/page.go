@@ -4,7 +4,6 @@ type Provider string
 
 const (
 	ProviderTLS        Provider = "tls"
-	ProviderChromedp   Provider = "chromedp"
 	ProviderPatchright Provider = "patchright"
 	ProviderCapSolver  Provider = "capsolver"
 	ProviderReplay     Provider = "replay"
@@ -49,6 +48,23 @@ type Document struct {
 	HTML       string
 	Text       string
 	Type       ContentType
+	Headers    map[string]string
+	Challenge  *Challenge
 	Session    Session
 	Traffic    *Capture
+}
+
+type ChallengeVendor string
+
+const (
+	ChallengeCloudflare ChallengeVendor = "cloudflare"
+	ChallengeDataDome   ChallengeVendor = "datadome"
+	ChallengeRecaptcha  ChallengeVendor = "recaptcha"
+)
+
+type Challenge struct {
+	Vendor  ChallengeVendor `json:"vendor"`
+	URL     string          `json:"url,omitempty"`
+	SiteKey string          `json:"sitekey,omitempty"`
+	DataS   string          `json:"data_s,omitempty"`
 }

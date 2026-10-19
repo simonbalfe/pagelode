@@ -10,7 +10,6 @@ import (
 
 	"github.com/simonbalfe/pagelode/internal/classify"
 	"github.com/simonbalfe/pagelode/internal/limit"
-	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/orchestrator"
 	"github.com/simonbalfe/pagelode/internal/page"
 	"github.com/simonbalfe/pagelode/internal/profile"
@@ -21,19 +20,15 @@ type Capturer interface {
 }
 
 type Service struct {
-	chrome          Capturer
-	patchright      Capturer
-	routes          *memory.Routes
-	limiter         *limit.Limiter
-	chromeEnabled   bool
+	browser         Capturer
 	proxyConfigured bool
 }
 
 // ErrStealthProxy reports a stealth request on a server without PAGELODE_PROXY_URL.
 var ErrStealthProxy = errors.New("stealth discovery requires PAGELODE_PROXY_URL")
 
-func New(chrome, patchright Capturer, routes *memory.Routes, limiter *limit.Limiter, chromeEnabled bool) *Service {
-	return &Service{chrome: chrome, patchright: patchright, routes: routes, limiter: limiter, chromeEnabled: chromeEnabled}
+func New(browser Capturer) *Service {
+	return &Service{browser: browser}
 }
 
 type Request struct {
@@ -41,9 +36,8 @@ type Request struct {
 	WaitMS  int    `json:"waitMs,omitempty"`
 	HAR     *HAR   `json:"har,omitempty"`
 	Profile string `json:"profile,omitempty"`
-	// Stealth loads the page only with Patchright through the configured proxy, skipping Chromedp.
-	Stealth bool `json:"stealth,omitempty"`
-	Verbose bool `json:"verbose,omitempty"`
+	Stealth bool   `json:"stealth,omitempty"`
+	Verbose bool   `json:"verbose,omitempty"`
 }
 
 func (r Request) Validate() (Request, error) {
@@ -91,79 +85,40 @@ func (s *Service) Discover(ctx context.Context, request Request) (Report, error)
 	if request.HAR != nil {
 		return reportView(AnalyzeHAR(*request.HAR, request.URL), request.Verbose), nil
 	}
-	parsed, err := url.Parse(request.URL)
-	if err != nil {
-		return Report{}, err
-	}
 	if request.Stealth && !s.proxyConfigured {
 		return Report{}, ErrStealthProxy
 	}
-	options := page.CaptureOptions{WaitMS: request.WaitMS, Profile: request.Profile}
-	preferred, _ := s.routes.Preferred(parsed.Hostname())
-	providers := []page.Provider{page.ProviderChromedp, page.ProviderPatchright}
-	if request.Stealth || request.Profile != "" || preferred == page.ProviderPatchright || !s.chromeEnabled {
-		providers = []page.Provider{page.ProviderPatchright}
+	if s.browser == nil {
+		return Report{}, errors.New("discovery failed: no browser capture available")
 	}
-	attempts := []orchestrator.Attempt{}
-	var last page.Document
-	var session page.Session
-	for _, provider := range providers {
-		capturer := s.chrome
-		if provider == page.ProviderPatchright {
-			capturer = s.patchright
+	started := time.Now()
+	document, err := s.browser.Capture(ctx, request.URL, page.Session{}, page.CaptureOptions{WaitMS: request.WaitMS, Profile: request.Profile})
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, limit.ErrSaturated) {
+			return Report{}, err
 		}
-		if capturer == nil {
-			continue
-		}
-		started := time.Now()
-		var document page.Document
-		err := s.limiter.Run(ctx, func() error {
-			var err error
-			document, err = capturer.Capture(ctx, request.URL, session, options)
-			return err
-		})
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, limit.ErrSaturated) {
-				return Report{}, err
-			}
-			attempts = append(attempts, orchestrator.Attempt{Provider: provider, Outcome: "error", DurationMS: time.Since(started).Milliseconds(), Detail: captureError(err)})
-			continue
-		}
-		last = document
-		session = document.Session
-		classification := classify.Document(document)
-		outcome := string(classification.Kind)
-		if classification.Kind == classify.Accept {
-			outcome = "ok"
-		}
-		attempts = append(attempts, orchestrator.Attempt{Provider: provider, Outcome: outcome, Status: document.StatusCode, DurationMS: time.Since(started).Milliseconds(), Classification: string(classification.Kind), Detail: classification.Reason})
-		if classification.Kind == classify.Blocked || classification.Kind == classify.Retryable {
-			continue
-		}
-		report := Analyze(request.URL, document)
-		report.Attempts = attempts
-		if classification.Kind == classify.Dead {
-			report.Outcome = "dead"
-		} else if request.Profile == "" && provider == page.ProviderPatchright && len(attempts) > 1 {
-			s.routes.Record(parsed.Hostname(), provider)
-		}
-		return reportView(report, request.Verbose), nil
+		return Report{}, errors.New("discovery failed: " + string(page.ProviderPatchright) + ": " + captureError(err))
 	}
-	if last.Traffic != nil {
-		report := Analyze(request.URL, last)
+	classification := classify.Document(document)
+	outcome := string(classification.Kind)
+	if classification.Kind == classify.Accept {
+		outcome = "ok"
+	}
+	attempt := orchestrator.Attempt{Provider: page.ProviderPatchright, Outcome: outcome, Status: document.StatusCode, DurationMS: time.Since(started).Milliseconds(), Classification: string(classification.Kind), Detail: classification.Reason}
+	blocked := classification.Kind == classify.Blocked || classification.Kind == classify.Retryable
+	if blocked && document.Traffic == nil {
+		return Report{}, errors.New("discovery failed: " + string(page.ProviderPatchright) + ": " + classification.Reason)
+	}
+	report := Analyze(request.URL, document)
+	report.Attempts = []orchestrator.Attempt{attempt}
+	switch {
+	case classification.Kind == classify.Dead:
+		report.Outcome = "dead"
+	case blocked:
 		report.Outcome = "blocked"
-		report.Attempts = attempts
-		report.Warnings = append(report.Warnings, "page remained blocked after browser escalation")
-		return reportView(report, request.Verbose), nil
+		report.Warnings = append(report.Warnings, "page remained blocked in the browser")
 	}
-	if len(attempts) > 0 {
-		details := make([]string, 0, len(attempts))
-		for _, attempt := range attempts {
-			details = append(details, string(attempt.Provider)+": "+attempt.Detail)
-		}
-		return Report{}, errors.New("discovery failed: " + strings.Join(details, "; "))
-	}
-	return Report{}, errors.New("discovery failed: no browser capture available")
+	return reportView(report, request.Verbose), nil
 }
 
 var errorURL = regexp.MustCompile(`https?://[^\s"']+`)

@@ -5,29 +5,29 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"regexp"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/simonbalfe/pagelode/internal/proxy"
 )
 
-var proxySessionPattern = regexp.MustCompile(`(_(?:hard|locked)?session-)[A-Za-z0-9]+`)
-
 type Config struct {
-	Address            string
-	BrowserURL         string
-	BrowserToken       string
-	CapSolverAPIKey    string
-	CapSolverURL       string
-	CapSolverProxyURL  string
-	ProxyURL           string
-	ChromedpEnabled    bool
-	ProtectedDomains   []string
-	MaxConcurrency     int
-	BrowserConcurrency int
-	MaxWaiting         int
-	RequestTimeout     time.Duration
-	RouteTTL           time.Duration
+	Address           string
+	BrowserURL        string
+	BrowserToken      string
+	BrowserSettle     time.Duration
+	CapSolverAPIKey   string
+	CapSolverURL      string
+	CapSolverProxyURL string
+	ProxyURL          string
+	ProtectedDomains  []string
+	MaxConcurrency    int
+	MaxWaiting        int
+	RequestTimeout    time.Duration
+	RouteTTL          time.Duration
+	StatePath         string
 }
 
 func Load() (Config, error) {
@@ -39,20 +39,13 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	browserConcurrency, err := integer("PAGELODE_BROWSER_CONCURRENCY", 4, 1)
-	if err != nil {
-		return Config{}, err
-	}
-	if browserConcurrency > maxConcurrency {
-		return Config{}, fmt.Errorf("config: browser concurrency cannot exceed maximum concurrency")
-	}
 	maxWaiting, err := integer("PAGELODE_MAX_WAITING", 100, 0)
 	if err != nil {
 		return Config{}, err
 	}
-	chromedpEnabled, err := boolean("PAGELODE_CHROMEDP_ENABLED", true)
-	if err != nil {
-		return Config{}, err
+	settleMS, err := integer("PAGELODE_BROWSER_SETTLE_MS", 2000, 0)
+	if err != nil || settleMS > 10_000 {
+		return Config{}, fmt.Errorf("config: PAGELODE_BROWSER_SETTLE_MS must be between 0 and 10000")
 	}
 	requestTimeout, err := duration("PAGELODE_REQUEST_TIMEOUT", 90*time.Second)
 	if err != nil {
@@ -64,21 +57,16 @@ func Load() (Config, error) {
 	}
 	proxyURL := os.Getenv("PAGELODE_PROXY_URL")
 	if proxyURL != "" {
-		if err := validateURL(proxyURL, "http", "https", "socks4", "socks5"); err != nil {
+		if err := validateURL(proxy.WithSession(proxyURL, "session"), "http", "https", "socks4", "socks5"); err != nil {
 			return Config{}, fmt.Errorf("config: invalid PAGELODE_PROXY_URL: %w", err)
 		}
-		if proxyURL, err = freshProxySession(proxyURL); err != nil {
-			return Config{}, fmt.Errorf("config: PAGELODE_PROXY_URL session: %w", err)
-		}
 	}
-	capSolverProxyURL := os.Getenv("PAGELODE_CAPSOLVER_PROXY_URL")
-	if capSolverProxyURL == "" {
-		capSolverProxyURL = proxyURL
-	} else {
-		if err := validateURL(capSolverProxyURL, "http", "https", "socks4", "socks5"); err != nil {
+	capSolverProxyURL := value("PAGELODE_CAPSOLVER_PROXY_URL", proxyURL)
+	if capSolverProxyURL != "" {
+		if err := validateURL(proxy.WithSession(capSolverProxyURL, "session"), "http", "https", "socks4", "socks5"); err != nil {
 			return Config{}, fmt.Errorf("config: invalid PAGELODE_CAPSOLVER_PROXY_URL: %w", err)
 		}
-		if capSolverProxyURL, err = freshProxySession(capSolverProxyURL); err != nil {
+		if capSolverProxyURL, err = freshSession(capSolverProxyURL); err != nil {
 			return Config{}, fmt.Errorf("config: PAGELODE_CAPSOLVER_PROXY_URL session: %w", err)
 		}
 	}
@@ -91,34 +79,41 @@ func Load() (Config, error) {
 	if err := validateURL(browserURL, "http", "https"); err != nil {
 		return Config{}, fmt.Errorf("config: invalid PAGELODE_BROWSER_URL: %w", err)
 	}
+	statePath, err := defaultStatePath()
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
-		Address:            fmt.Sprintf(":%d", port),
-		BrowserURL:         browserURL,
-		BrowserToken:       os.Getenv("PAGELODE_BROWSER_TOKEN"),
-		CapSolverAPIKey:    os.Getenv("CAPSOLVER_API_KEY"),
-		CapSolverURL:       capSolverURL,
-		CapSolverProxyURL:  capSolverProxyURL,
-		ProxyURL:           proxyURL,
-		ChromedpEnabled:    chromedpEnabled,
-		ProtectedDomains:   domains(value("PAGELODE_PROTECTED_DOMAINS", "crunchbase.com")),
-		MaxConcurrency:     maxConcurrency,
-		BrowserConcurrency: browserConcurrency,
-		MaxWaiting:         maxWaiting,
-		RequestTimeout:     requestTimeout,
-		RouteTTL:           routeTTL,
+		Address:           fmt.Sprintf(":%d", port),
+		BrowserURL:        browserURL,
+		BrowserToken:      os.Getenv("PAGELODE_BROWSER_TOKEN"),
+		BrowserSettle:     time.Duration(settleMS) * time.Millisecond,
+		CapSolverAPIKey:   os.Getenv("CAPSOLVER_API_KEY"),
+		CapSolverURL:      capSolverURL,
+		CapSolverProxyURL: capSolverProxyURL,
+		ProxyURL:          proxyURL,
+		ProtectedDomains:  domains(value("PAGELODE_PROTECTED_DOMAINS", "crunchbase.com")),
+		MaxConcurrency:    maxConcurrency,
+		MaxWaiting:        maxWaiting,
+		RequestTimeout:    requestTimeout,
+		RouteTTL:          routeTTL,
+		StatePath:         statePath,
 	}, nil
 }
 
-func freshProxySession(raw string) (string, error) {
-	parsed, err := url.Parse(raw)
+func defaultStatePath() (string, error) {
+	if configured := os.Getenv("PAGELODE_STATE_PATH"); configured != "" {
+		return configured, nil
+	}
+	directory, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("config: set PAGELODE_STATE_PATH: %w", err)
 	}
-	if parsed.User == nil {
-		return raw, nil
-	}
-	password, ok := parsed.User.Password()
-	if !ok || !proxySessionPattern.MatchString(password) {
+	return filepath.Join(directory, "pagelode", "state.sqlite"), nil
+}
+
+func freshSession(raw string) (string, error) {
+	if !proxy.Sticky(raw) {
 		return raw, nil
 	}
 	const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
@@ -129,8 +124,7 @@ func freshProxySession(raw string) (string, error) {
 	for index, current := range id {
 		id[index] = alphabet[int(current)%len(alphabet)]
 	}
-	parsed.User = url.UserPassword(parsed.User.Username(), proxySessionPattern.ReplaceAllString(password, "${1}"+string(id)))
-	return parsed.String(), nil
+	return proxy.WithSession(raw, string(id)), nil
 }
 
 func integer(name string, fallback int, minimum int) (int, error) {
@@ -138,15 +132,6 @@ func integer(name string, fallback int, minimum int) (int, error) {
 	parsed, err := strconv.Atoi(raw)
 	if err != nil || parsed < minimum {
 		return 0, fmt.Errorf("config: %s must be an integer of at least %d", name, minimum)
-	}
-	return parsed, nil
-}
-
-func boolean(name string, fallback bool) (bool, error) {
-	raw := value(name, strconv.FormatBool(fallback))
-	parsed, err := strconv.ParseBool(raw)
-	if err != nil {
-		return false, fmt.Errorf("config: %s must be a boolean", name)
 	}
 	return parsed, nil
 }

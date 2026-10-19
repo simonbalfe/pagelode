@@ -1,11 +1,8 @@
 import type { Page, Request, Response } from "patchright";
-import type { Exchange, Traffic } from "./schema.ts";
+import type { CaptureLimits, Exchange, Traffic } from "./schema.ts";
 
-const maxRequests = 200;
-const maxBodyBytes = 256 << 10;
-const maxTotalBytes = 2 << 20;
-
-export function captureTraffic(page: Page): { finish: () => Promise<Traffic> } {
+export function captureTraffic(page: Page, limits: CaptureLimits): { finish: () => Promise<Traffic> } {
+  const { max_requests: maxRequests, max_body_bytes: maxBodyBytes, max_total_bytes: maxTotalBytes } = limits;
   const started = Date.now();
   const entries: Exchange[] = [];
   const requests = new Map<Request, Exchange>();

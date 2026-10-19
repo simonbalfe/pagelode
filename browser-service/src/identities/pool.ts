@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { BrowserContext } from "patchright";
 import { launchBrowser, type LaunchedBrowser } from "../browser/launch.ts";
-import { withProxySession, type Persona } from "../browser/persona.ts";
+import type { Persona } from "../browser/persona.ts";
 import type { Config } from "../config.ts";
 import { portableCookies } from "../render/replay.ts";
 import { ServiceError } from "../shared/errors.ts";
@@ -12,7 +12,6 @@ import type { Cookie } from "../shared/schemas.ts";
 
 type Identity = {
   readonly key: string;
-  readonly generation: number;
   readonly directory: string;
   readonly proxyURL: string | undefined;
   readonly createdAt: Date;
@@ -34,7 +33,6 @@ export type Lease = {
 
 export type IdentityView = {
   key: string;
-  generation: number;
   proxy: string;
   ip?: string;
   country?: string;
@@ -48,7 +46,6 @@ export type IdentityView = {
 
 export type Clearance = {
   identity: string;
-  generation: number;
   proxy_url?: string;
   headers: Record<string, string>;
   cookies: ReadonlyArray<Cookie>;
@@ -58,21 +55,20 @@ export class Identities {
   readonly #config: Config;
   readonly #log: Log;
   readonly #identities = new Map<string, Identity>();
-  readonly #generations = new Map<string, number>();
 
   constructor(config: Config, log: Log) {
     this.#config = config;
     this.#log = log;
   }
 
-  acquire(key: string, proxyTemplate: string | undefined): Lease {
+  acquire(key: string, proxyURL: string | undefined): Lease {
     let identity = this.#identities.get(key);
-    if (identity !== undefined && identity.proxyURL !== withProxySession(proxyTemplate, `${key}:${identity.generation}`)) {
+    if (identity !== undefined && identity.proxyURL !== proxyURL) {
       throw new ServiceError(409, "identity_conflict", `identity ${JSON.stringify(key)} is bound to a different proxy; rotate it first`);
     }
     if (identity === undefined) {
       this.#evictIdle();
-      identity = this.#create(key, proxyTemplate);
+      identity = this.#create(key, proxyURL);
       this.#identities.set(key, identity);
     }
     const leased = identity;
@@ -99,7 +95,6 @@ export class Identities {
   list(): ReadonlyArray<IdentityView> {
     return [...this.#identities.values()].map((identity) => ({
       key: identity.key,
-      generation: identity.generation,
       proxy: identity.proxyURL === undefined ? "direct" : new URL(identity.proxyURL).host,
       ...(identity.persona?.ip === undefined ? {} : { ip: identity.persona.ip }),
       ...(identity.persona?.country === undefined ? {} : { country: identity.persona.country }),
@@ -117,7 +112,6 @@ export class Identities {
     if (identity === undefined) throw new ServiceError(404, "not_found", `identity ${JSON.stringify(key)} is not warm`);
     return {
       identity: key,
-      generation: identity.generation,
       ...(identity.proxyURL === undefined ? {} : { proxy_url: identity.proxyURL }),
       headers: identity.headers,
       cookies: await portableCookies(await identity.context, url),
@@ -126,13 +120,12 @@ export class Identities {
 
   async rotate(key: string): Promise<void> {
     const identity = this.#identities.get(key);
-    this.#generations.set(key, (this.#generations.get(key) ?? 0) + 1);
     if (identity === undefined) return;
     if (identity.users > 0) throw new ServiceError(409, "identity_conflict", `identity ${JSON.stringify(key)} has renders in progress`);
     this.#identities.delete(key);
     await (await identity.context.catch(() => undefined))?.close();
     await rm(identity.directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
-    this.#log("identity_rotated", { key, generation: identity.generation + 1 });
+    this.#log("identity_rotated", { key });
   }
 
   async close(): Promise<void> {
@@ -141,13 +134,10 @@ export class Identities {
     await Promise.all(contexts.map(async (context) => (await context.catch(() => undefined))?.close()));
   }
 
-  #create(key: string, proxyTemplate: string | undefined): Identity {
-    const generation = this.#generations.get(key) ?? 0;
-    const proxyURL = withProxySession(proxyTemplate, `${key}:${generation}`);
-    const directory = join(this.#config.dataDirectory, `identity-${createHash("sha256").update(key).digest("hex").slice(0, 16)}-${generation}`);
+  #create(key: string, proxyURL: string | undefined): Identity {
+    const directory = join(this.#config.dataDirectory, `identity-${createHash("sha256").update(key).digest("hex").slice(0, 16)}`);
     const identity: Identity = {
       key,
-      generation,
       directory,
       proxyURL,
       createdAt: new Date(),

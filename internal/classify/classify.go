@@ -7,6 +7,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/simonbalfe/pagelode/internal/page"
+	"github.com/simonbalfe/pagelode/signatures"
 )
 
 type Kind string
@@ -26,28 +27,8 @@ type Result struct {
 	VisibleText int
 }
 
-type pattern struct {
-	label string
-	value *regexp.Regexp
-}
-
 var (
-	highConfidenceBlocks = []pattern{
-		{label: "Cloudflare challenge form", value: regexp.MustCompile(`(?is)challenge-form.*__cf_chl_f_tk=|/cdn-cgi/challenge-platform/.+orchestrate`)},
-		{label: "Cloudflare firewall response", value: regexp.MustCompile(`(?is)<span[^>]+class=["']cf-error-code["'][^>]*>\d{4}</span>`)},
-		{label: "Akamai reference block", value: regexp.MustCompile(`(?i)reference\s*#\s*\d+\.[0-9a-f]+\.\d+\.[0-9a-f]+`)},
-		{label: "PerimeterX challenge", value: regexp.MustCompile(`(?i)window\._pxAppId\s*=|captcha\.px-cdn\.net`)},
-		{label: "DataDome challenge", value: regexp.MustCompile(`(?i)captcha-delivery\.com`)},
-		{label: "Imperva challenge", value: regexp.MustCompile(`(?i)_Incapsula_Resource|Incapsula\s+incident\s+ID`)},
-		{label: "Google JavaScript wall", value: regexp.MustCompile(`(?i)[?&](?:amp;)?emsg=SG_REL`)},
-		{label: "Sucuri firewall", value: regexp.MustCompile(`(?i)Sucuri\s+WebSite\s+Firewall`)},
-	}
-	shortBlockPatterns = []pattern{
-		{label: "Cloudflare interstitial", value: regexp.MustCompile(`(?i)<title[^>]*>\s*just\s+a\s+moment|checking\s+(?:your\s+)?browser`)},
-		{label: "human verification", value: regexp.MustCompile(`(?i)please\s+verify\s+you\s+are\s+human|verifying\s+(?:that\s+)?you\s+are\s+human`)},
-		{label: "access denial", value: regexp.MustCompile(`(?i)access\s+denied|pardon\s+our\s+interruption|request\s+unsuccessful`)},
-		{label: "CAPTCHA challenge", value: regexp.MustCompile(`(?i)class=["'](?:g-recaptcha|h-captcha)["']|complete\s+(?:the\s+)?captcha`)},
-	}
+	patterns           = signatures.MustLoad()
 	javascriptRequired = regexp.MustCompile(`(?i)enable javascript|javascript (?:is )?required|requires javascript|javascript to run`)
 	domMutation        = regexp.MustCompile(`(?i)(?:appendChild|replaceChildren|insertAdjacentHTML|createElement|document\.write)\s*\(`)
 )
@@ -55,6 +36,9 @@ var (
 func Document(document page.Document) Result {
 	if document.StatusCode == 404 || document.StatusCode == 410 {
 		return Result{Kind: Dead, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
+	}
+	if reason, ok := challengeSignal(document); ok {
+		return Result{Kind: Blocked, Reason: reason}
 	}
 	if document.Type != page.ContentHTML {
 		if document.StatusCode >= 500 {
@@ -64,9 +48,9 @@ func Document(document page.Document) Result {
 	}
 
 	html := document.HTML
-	for _, candidate := range highConfidenceBlocks {
-		if candidate.value.MatchString(first(html, 500_000)) {
-			return Result{Kind: Blocked, Reason: candidate.label}
+	for _, candidate := range patterns.Blocks {
+		if candidate.Value.MatchString(first(html, 500_000)) {
+			return Result{Kind: Blocked, Reason: candidate.Label}
 		}
 	}
 	if document.StatusCode == 401 || document.StatusCode == 403 || document.StatusCode == 429 || document.StatusCode == 503 || document.StatusCode >= 520 && document.StatusCode <= 530 {
@@ -97,9 +81,9 @@ func Document(document page.Document) Result {
 	visibleLength := len([]rune(visible))
 	signalText := first(html, 30_000)
 	if visibleLength < 2_500 {
-		for _, candidate := range shortBlockPatterns {
-			if candidate.value.MatchString(signalText) {
-				return Result{Kind: Blocked, Reason: candidate.label, VisibleText: visibleLength}
+		for _, candidate := range patterns.ShortBlocks {
+			if candidate.Value.MatchString(signalText) {
+				return Result{Kind: Blocked, Reason: candidate.Label, VisibleText: visibleLength}
 			}
 		}
 	}
@@ -141,6 +125,35 @@ func Document(document page.Document) Result {
 		return Result{Kind: NeedsRender, Reason: strings.Join(reasons, "; "), RenderScore: score, VisibleText: visibleLength}
 	}
 	return Result{Kind: Accept, Reason: "usable HTML", RenderScore: score, VisibleText: visibleLength}
+}
+
+func challengeSignal(document page.Document) (string, bool) {
+	if document.Challenge != nil {
+		return fmt.Sprintf("%s challenge remained after browser settling", document.Challenge.Vendor), true
+	}
+	for _, header := range patterns.ChallengeHeaders {
+		if strings.Contains(strings.ToLower(headerValue(document.Headers, header.Name)), header.Value) {
+			return header.Label, true
+		}
+	}
+	for _, marker := range patterns.ChallengeURLs {
+		if strings.Contains(document.FinalURL, marker) {
+			return "challenge URL " + marker, true
+		}
+	}
+	return "", false
+}
+
+func headerValue(headers map[string]string, name string) string {
+	if value, ok := headers[name]; ok {
+		return value
+	}
+	for key, value := range headers {
+		if strings.EqualFold(key, name) {
+			return value
+		}
+	}
+	return ""
 }
 
 func emptyApplicationRoot(document *goquery.Document) bool {

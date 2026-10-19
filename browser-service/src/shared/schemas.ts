@@ -10,7 +10,12 @@ function urlWithProtocol(protocols: ReadonlyArray<string>, message: string) {
 
 export const httpUrlSchema = urlWithProtocol(["http:", "https:"], "must be an http or https URL");
 
-export const proxyUrlSchema = urlWithProtocol(["http:", "https:", "socks4:", "socks5:"], "must be an http, https, socks4, or socks5 URL");
+const sessionPlaceholders = ["{session}", "%7Bsession%7D", "%7bsession%7d"];
+
+export const proxyUrlSchema = urlWithProtocol(["http:", "https:", "socks4:", "socks5:"], "must be an http, https, socks4, or socks5 URL").refine(
+  (value) => !sessionPlaceholders.some((placeholder) => value.includes(placeholder)),
+  "proxy_url must not contain {session}; the caller chooses the proxy session",
+);
 
 export const profileNameSchema = z.string().regex(
   /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/,

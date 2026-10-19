@@ -40,7 +40,7 @@ func TestAuthenticatedEmailCrawl(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	client, err := browser.New(browsertest.Start(t), "", "")
+	client, err := browser.New(browsertest.Start(t), "", 500*time.Millisecond, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestAuthenticatedEmailCrawl(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	loader := NewLoader(httpfetch.New(""), nil, client, nil, memory.NewRoutes(time.Hour, nil), limit.New(1, 10), false)
+	loader := NewLoader(httpfetch.New(""), client, nil, memory.NewRoutes(time.Hour, nil))
 	service := New(loader, limit.New(4, 10), 4)
 	for _, test := range []struct {
 		name  string

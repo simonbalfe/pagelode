@@ -3,10 +3,12 @@ package browser
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,13 +22,15 @@ const (
 	maxResponseBytes = 32 << 20
 	defaultTimeout   = 45 * time.Second
 	minimumTimeout   = time.Second
+	rotationTimeout  = 10 * time.Second
 )
 
 type Client struct {
-	baseURL  string
-	token    string
-	proxyURL string
-	http     *http.Client
+	baseURL    string
+	token      string
+	settle     time.Duration
+	identities *Identities
+	http       *http.Client
 }
 
 type SessionRequest struct {
@@ -45,12 +49,12 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-func New(baseURL, token, proxyURL string) (*Client, error) {
+func New(baseURL, token string, settle time.Duration, identities *Identities) (*Client, error) {
 	parsed, err := url.Parse(baseURL)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
 		return nil, fmt.Errorf("browser service URL %q must be an absolute http or https URL", baseURL)
 	}
-	return &Client{baseURL: strings.TrimRight(baseURL, "/"), token: token, proxyURL: proxyURL, http: &http.Client{}}, nil
+	return &Client{baseURL: strings.TrimRight(baseURL, "/"), token: token, settle: settle, identities: identities, http: &http.Client{}}, nil
 }
 
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
@@ -62,8 +66,12 @@ func (c *Client) Capture(ctx context.Context, targetURL string, session page.Ses
 }
 
 func (c *Client) CreateSession(ctx context.Context, request SessionRequest) (Session, error) {
+	proxyURL, err := c.sessionProxy(request.Profile)
+	if err != nil {
+		return Session{}, err
+	}
 	body := sessionRequest{
-		ProxyURL:      c.proxyURL,
+		ProxyURL:      proxyURL,
 		Profile:       request.Profile,
 		CreateProfile: request.CreateProfile,
 		Headless:      request.Headless,
@@ -94,19 +102,64 @@ func (c *Client) render(ctx context.Context, targetURL string, session page.Sess
 		URL:             targetURL,
 		TimeoutMS:       timeout.Milliseconds(),
 		WaitUntil:       "domcontentloaded",
+		SettleMS:        c.settle.Milliseconds(),
 		Cookies:         session.Cookies,
-		ProxyURL:        c.proxyURL,
 		SettleChallenge: true,
 	}
 	if capture != nil {
-		request.Capture = &captureRequest{WaitMS: capture.WaitMS}
+		request.Capture = &captureRequest{WaitMS: capture.WaitMS, MaxRequests: page.MaxCaptureRequests, MaxBodyBytes: page.MaxCaptureBodyBytes, MaxTotalBytes: page.MaxCaptureTotalBytes}
 		request.Profile = capture.Profile
+	}
+	if c.identities != nil {
+		if request.Profile != "" {
+			request.ProxyURL = c.identities.profileProxy(request.Profile)
+		} else {
+			request.Identity, request.ProxyURL = c.identities.current()
+		}
 	}
 	var response renderResponse
 	if err := c.do(ctx, http.MethodPost, "/v1/render", request, &response); err != nil {
 		return page.Document{}, err
 	}
-	return document(response, session), nil
+	document := document(response, session)
+	if request.Identity != "" {
+		c.observe(ctx, request.Identity, targetURL, document)
+	}
+	return document, nil
+}
+
+func (c *Client) observe(ctx context.Context, key string, targetURL string, document page.Document) {
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		return
+	}
+	blocked := document.Challenge != nil || document.StatusCode == http.StatusUnauthorized || document.StatusCode == http.StatusForbidden || document.StatusCode == http.StatusTooManyRequests
+	retired, rotated, err := c.identities.observe(key, strings.ToLower(target.Hostname()), blocked)
+	if err != nil {
+		slog.Warn("identity generation not persisted", "error", err)
+	}
+	if !rotated {
+		return
+	}
+	rotateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rotationTimeout)
+	defer cancel()
+	if err := c.do(rotateCtx, http.MethodDelete, "/v1/identities/"+url.PathEscape(retired), nil, nil); err != nil {
+		slog.Warn("identity rotation not applied by browser service", "identity", retired, "error", err)
+	}
+}
+
+func (c *Client) sessionProxy(profile string) (string, error) {
+	if c.identities == nil {
+		return "", nil
+	}
+	if profile != "" {
+		return c.identities.profileProxy(profile), nil
+	}
+	seed := make([]byte, 8)
+	if _, err := rand.Read(seed); err != nil {
+		return "", fmt.Errorf("patchright: choose session proxy: %w", err)
+	}
+	return c.identities.proxyFor(fmt.Sprintf("session:%x", seed)), nil
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body, result any) error {
@@ -178,6 +231,8 @@ func document(response renderResponse, session page.Session) page.Document {
 		Title:      response.Title,
 		HTML:       response.HTML,
 		Type:       page.ContentHTML,
+		Headers:    response.Headers,
+		Challenge:  response.Challenge,
 		Session:    session,
 		Traffic:    response.Traffic,
 	}
@@ -187,26 +242,33 @@ type renderRequest struct {
 	URL             string          `json:"url"`
 	TimeoutMS       int64           `json:"timeout_ms"`
 	WaitUntil       string          `json:"wait_until"`
+	SettleMS        int64           `json:"settle_ms"`
 	Cookies         []page.Cookie   `json:"cookies,omitempty"`
 	ProxyURL        string          `json:"proxy_url,omitempty"`
 	SettleChallenge bool            `json:"settle_challenge"`
 	Capture         *captureRequest `json:"capture,omitempty"`
 	Profile         string          `json:"profile,omitempty"`
+	Identity        string          `json:"identity,omitempty"`
 }
 
 type captureRequest struct {
-	WaitMS int `json:"wait_ms"`
+	WaitMS        int `json:"wait_ms"`
+	MaxRequests   int `json:"max_requests"`
+	MaxBodyBytes  int `json:"max_body_bytes"`
+	MaxTotalBytes int `json:"max_total_bytes"`
 }
 
 type renderResponse struct {
-	StatusCode int           `json:"status_code"`
-	FinalURL   string        `json:"final_url"`
-	Title      string        `json:"title"`
-	HTML       string        `json:"html"`
-	UserAgent  string        `json:"user_agent"`
-	Cookies    []page.Cookie `json:"cookies"`
-	Traffic    *page.Capture `json:"traffic,omitempty"`
-	Replay     replay        `json:"replay"`
+	StatusCode int               `json:"status_code"`
+	FinalURL   string            `json:"final_url"`
+	Title      string            `json:"title"`
+	HTML       string            `json:"html"`
+	UserAgent  string            `json:"user_agent"`
+	Headers    map[string]string `json:"headers"`
+	Challenge  *page.Challenge   `json:"challenge,omitempty"`
+	Cookies    []page.Cookie     `json:"cookies"`
+	Traffic    *page.Capture     `json:"traffic,omitempty"`
+	Replay     replay            `json:"replay"`
 }
 
 type replay struct {

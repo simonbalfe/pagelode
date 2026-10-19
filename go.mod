@@ -8,8 +8,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
-	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
-	github.com/chromedp/chromedp v0.14.2
 	golang.org/x/net v0.58.0
 	modernc.org/sqlite v1.60.1
 )
@@ -22,14 +20,9 @@ require (
 	github.com/bogdanfinn/quic-go-utls v1.0.10-utls // indirect
 	github.com/bogdanfinn/utls v1.7.8-barnius // indirect
 	github.com/bogdanfinn/websocket v1.5.6-barnius // indirect
-	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/cloudflare/circl v1.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
 	github.com/go-shiori/dom v0.0.0-20230515143342-73569d674e1c // indirect
-	github.com/gobwas/httphead v0.1.0 // indirect
-	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/itlightning/dateparse v0.2.1 // indirect

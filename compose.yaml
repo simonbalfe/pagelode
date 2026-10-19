@@ -7,16 +7,19 @@ services:
       PAGELODE_BROWSER_TOKEN: ${BROWSER_SERVICE_TOKEN:?set BROWSER_SERVICE_TOKEN}
       PAGELODE_PROXY_URL: ${PAGELODE_PROXY_URL:-}
       PAGELODE_PROTECTED_DOMAINS: ${PAGELODE_PROTECTED_DOMAINS:-crunchbase.com}
-      PAGELODE_CHROMEDP_ENABLED: ${PAGELODE_CHROMEDP_ENABLED:-true}
       CAPSOLVER_API_KEY: ${CAPSOLVER_API_KEY:-}
     ports:
       - "8083:8083"
+    volumes:
+      - pagelode-data:/data
     depends_on:
       - browser
     restart: unless-stopped
 
   browser:
-    build: ./browser-service
+    build:
+      context: .
+      dockerfile: browser-service/Dockerfile
     environment:
       BROWSER_SERVICE_TOKEN: ${BROWSER_SERVICE_TOKEN:?set BROWSER_SERVICE_TOKEN}
       BROWSER_SERVICE_CONCURRENCY: ${BROWSER_SERVICE_CONCURRENCY:-4}
@@ -31,4 +34,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  pagelode-data:
   browser-data:

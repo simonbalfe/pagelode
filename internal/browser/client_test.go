@@ -52,7 +52,11 @@ func fakeService(t *testing.T, status int, response string) (*httptest.Server, c
 
 func newClient(t *testing.T, baseURL, token, proxyURL string) *Client {
 	t.Helper()
-	client, err := New(baseURL, token, proxyURL)
+	identities, err := NewIdentities(proxyURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := New(baseURL, token, 500*time.Millisecond, identities)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +65,7 @@ func newClient(t *testing.T, baseURL, token, proxyURL string) *Client {
 
 func TestNewRejectsInvalidURL(t *testing.T) {
 	for _, baseURL := range []string{"", "127.0.0.1:8090", "ftp://host", "http://"} {
-		if _, err := New(baseURL, "", ""); err == nil {
+		if _, err := New(baseURL, "", 0, nil); err == nil {
 			t.Errorf("New(%q) error = nil, want error", baseURL)
 		}
 	}
@@ -98,7 +102,7 @@ func TestRenderRequestBody(t *testing.T) {
 				t.Errorf("request = %s %s, want POST /v1/render", record.method, record.path)
 			}
 			body := record.body
-			if body["url"] != "https://example.org/" || body["wait_until"] != "domcontentloaded" || body["settle_challenge"] != true || body["proxy_url"] != "http://proxy:8080" {
+			if body["url"] != "https://example.org/" || body["wait_until"] != "domcontentloaded" || body["settle_challenge"] != true || body["proxy_url"] != "http://proxy:8080" || body["settle_ms"] != float64(500) {
 				t.Errorf("body = %v", body)
 			}
 			if body["timeout_ms"] != float64(45000) {
@@ -111,8 +115,11 @@ func TestRenderRequestBody(t *testing.T) {
 			if hasCapture != test.wantCapture {
 				t.Errorf("capture present = %t, want %t", hasCapture, test.wantCapture)
 			}
-			if hasCapture && capture["wait_ms"] != float64(250) {
-				t.Errorf("capture = %v, want wait_ms 250", capture)
+			if hasCapture && (capture["wait_ms"] != float64(250) || capture["max_requests"] != float64(page.MaxCaptureRequests) || capture["max_body_bytes"] != float64(page.MaxCaptureBodyBytes) || capture["max_total_bytes"] != float64(page.MaxCaptureTotalBytes)) {
+				t.Errorf("capture = %v, want wait_ms 250 and Go's capture limits", capture)
+			}
+			if _, hasIdentity := body["identity"]; hasIdentity == (test.profile != "") {
+				t.Errorf("identity present = %t, want %t (profiles render outside the identity pool)", hasIdentity, test.profile == "")
 			}
 			profile, hasProfile := body["profile"]
 			if hasProfile != (test.profile != "") || (hasProfile && profile != test.profile) {
@@ -147,7 +154,7 @@ func TestRenderTimeoutFollowsDeadline(t *testing.T) {
 }
 
 func TestRenderDecodesDocument(t *testing.T) {
-	server, _ := fakeService(t, http.StatusOK, `{"status_code":201,"final_url":"https://example.org/final","title":"Example","html":"<p>hi</p>","user_agent":"Agent/2","cookies":[{"name":"new","value":"2"}],"traffic":{"entries":[{"id":"1","url":"https://example.org/api"}],"dropped":3,"duration_ms":40}}`)
+	server, _ := fakeService(t, http.StatusOK, `{"status_code":201,"final_url":"https://example.org/final","title":"Example","html":"<p>hi</p>","user_agent":"Agent/2","headers":{"cf-mitigated":"challenge"},"challenge":{"vendor":"datadome","url":"https://geo.captcha-delivery.com/captcha/?t=fe"},"cookies":[{"name":"new","value":"2"}],"traffic":{"entries":[{"id":"1","url":"https://example.org/api"}],"dropped":3,"duration_ms":40}}`)
 	client := newClient(t, server.URL, "", "")
 	document, err := client.Capture(context.Background(), "https://example.org/", page.Session{UserAgent: "Agent/1", Cookies: []page.Cookie{{Name: "old"}}}, page.CaptureOptions{WaitMS: 100})
 	if err != nil {
@@ -161,6 +168,9 @@ func TestRenderDecodesDocument(t *testing.T) {
 	}
 	if document.Traffic == nil || len(document.Traffic.Entries) != 1 || document.Traffic.Dropped != 3 || document.Traffic.DurationMS != 40 {
 		t.Errorf("traffic = %+v", document.Traffic)
+	}
+	if document.Headers["cf-mitigated"] != "challenge" || document.Challenge == nil || document.Challenge.Vendor != page.ChallengeDataDome || document.Challenge.URL != "https://geo.captcha-delivery.com/captcha/?t=fe" {
+		t.Errorf("headers = %v, challenge = %+v; want the service's header and DataDome facts", document.Headers, document.Challenge)
 	}
 }
 

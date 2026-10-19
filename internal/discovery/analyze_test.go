@@ -15,7 +15,7 @@ func TestAnalyzeTraffic(t *testing.T) {
 		{URL: "https://example.com/graphql", Method: "POST", ResourceType: "Fetch", Status: 200, MIMEType: "application/json", RequestBody: `{"operationName":"GetListings","query":"query GetListings { listings { id } }","variables":{"after":"private-cursor"}}`, ResponseBody: `{"data":{"listings":[{"id":12}]}}`},
 		{URL: "https://www.google-analytics.com/collect?token=private-token", Method: "POST", ResourceType: "Fetch", Status: 200, MIMEType: "application/json"},
 	}
-	report := Analyze("https://example.com/?token=private-token", page.Document{FinalURL: "https://example.com/", Provider: page.ProviderChromedp, Traffic: &page.Capture{Entries: entries}, HTML: `<script type="application/ld+json">{"name":"Example"}</script>`})
+	report := Analyze("https://example.com/?token=private-token", page.Document{FinalURL: "https://example.com/", Provider: page.ProviderPatchright, Traffic: &page.Capture{Entries: entries}, HTML: `<script type="application/ld+json">{"name":"Example"}</script>`})
 	if report.Summary.EndpointCount != 2 || report.Summary.DataRequests != 3 || report.Summary.NoiseRequests != 1 {
 		t.Fatalf("summary = %+v, want 2 endpoints, 3 data, 1 noise", report.Summary)
 	}

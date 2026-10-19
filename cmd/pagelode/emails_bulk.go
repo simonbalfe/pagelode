@@ -86,9 +86,6 @@ func emailsBulk(configuration config.Config, args []string, stdout, stderr io.Wr
 
 	configuration.MaxConcurrency = *workers * pagesLoadedInParallelPerSite
 	configuration.MaxWaiting = *workers * pagesLoadedInParallelPerSite
-	if configuration.BrowserConcurrency > configuration.MaxConcurrency {
-		configuration.BrowserConcurrency = configuration.MaxConcurrency
-	}
 	app, err := newApplication(configuration)
 	if err != nil {
 		return err

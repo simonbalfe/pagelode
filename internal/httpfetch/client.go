@@ -22,6 +22,7 @@ const (
 
 type Client struct {
 	proxyURL string
+	current  func() string
 }
 
 type Form struct {
@@ -33,6 +34,10 @@ type Form struct {
 
 func New(proxyURL string) *Client {
 	return &Client{proxyURL: proxyURL}
+}
+
+func Following(current func() string) *Client {
+	return &Client{current: current}
 }
 
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
@@ -87,6 +92,7 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		StatusCode: response.StatusCode,
 		FinalURL:   finalURL,
 		Type:       contentType,
+		Headers:    responseHeaders(response.Header),
 		Session: page.Session{
 			UserAgent: effectiveUserAgent,
 			Cookies:   portableCookies(client.GetCookies(parsedFinalURL), parsedFinalURL.Hostname()),
@@ -98,6 +104,14 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		document.Text = strings.TrimSpace(string(body))
 	}
 	return document, nil
+}
+
+func responseHeaders(header http.Header) map[string]string {
+	headers := make(map[string]string, len(header))
+	for name, values := range header {
+		headers[strings.ToLower(name)] = strings.Join(values, ", ")
+	}
+	return headers
 }
 
 func (c *Client) Submit(ctx context.Context, form Form, session page.Session) (page.Document, error) {
@@ -167,6 +181,9 @@ func (c *Client) client(target *url.URL, session page.Session, extra ...tlsclien
 		tlsclient.WithCookieJar(tlsclient.NewCookieJar()),
 	}, extra...)
 	proxyURL := c.proxyURL
+	if c.current != nil {
+		proxyURL = c.current()
+	}
 	if session.ProxyURL != "" {
 		proxyURL = session.ProxyURL
 	}

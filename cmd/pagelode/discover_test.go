@@ -18,7 +18,7 @@ func TestDiscoverCLIFromHAR(t *testing.T) {
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		t.Fatal(err)
 	}
-	app := &application{discoverer: discovery.New(nil, nil, nil, nil, false)}
+	app := &application{discoverer: discovery.New(nil)}
 	var output bytes.Buffer
 	if err := app.discover(config.Config{RequestTimeout: time.Second}, []string{"--har", path}, &output, &output); err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestDiscoverCLIVerbosity(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"log":{"entries":[{"request":{"method":"GET","url":"https://example.com/api"},"response":{"content":{"mimeType":"application/json"}}}]}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	app := &application{discoverer: discovery.New(nil, nil, nil, nil, false)}
+	app := &application{discoverer: discovery.New(nil)}
 	for _, verbose := range []bool{false, true} {
 		args := []string{"--har", path}
 		if verbose {

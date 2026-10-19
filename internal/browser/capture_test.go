@@ -21,7 +21,7 @@ func startClient(t *testing.T) *browser.Client {
 	if os.Getenv("PAGELODE_BROWSER_TESTS") != "1" {
 		t.Skip("set PAGELODE_BROWSER_TESTS=1 to run browser service integration")
 	}
-	client, err := browser.New(browsertest.Start(t), "", "")
+	client, err := browser.New(browsertest.Start(t), "", 500*time.Millisecond, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

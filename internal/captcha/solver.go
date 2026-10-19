@@ -69,28 +69,31 @@ func (s *Solver) render(ctx context.Context, session page.Session, load func(pag
 }
 
 func (s *Solver) solve(ctx context.Context, document page.Document) ([]page.Cookie, error) {
+	challenge := document.Challenge
+	if challenge == nil {
+		return nil, nil
+	}
 	location, err := url.Parse(document.FinalURL)
 	if err != nil {
 		return nil, fmt.Errorf("captcha: parse final URL: %w", err)
 	}
-	if strings.HasPrefix(location.Hostname(), "www.google.") && strings.HasPrefix(location.Path, "/sorry") {
-		return s.solveGoogle(ctx, document, location)
+	switch {
+	case challenge.Vendor == page.ChallengeRecaptcha && strings.HasPrefix(location.Hostname(), "www.google.") && strings.HasPrefix(location.Path, "/sorry"):
+		return s.solveGoogle(ctx, document, *challenge, location)
+	case challenge.Vendor == page.ChallengeDataDome:
+		return s.solveDataDome(ctx, document, *challenge, location)
+	default:
+		return nil, nil
 	}
-	if strings.Contains(document.HTML, "captcha-delivery.com") {
-		return s.solveDataDome(ctx, document, location)
-	}
-	return nil, nil
 }
 
-func (s *Solver) solveGoogle(ctx context.Context, document page.Document, location *url.URL) ([]page.Cookie, error) {
+func (s *Solver) solveGoogle(ctx context.Context, document page.Document, challenge page.Challenge, location *url.URL) ([]page.Cookie, error) {
+	if challenge.SiteKey == "" {
+		return nil, nil
+	}
 	html, err := goquery.NewDocumentFromReader(strings.NewReader(document.HTML))
 	if err != nil {
 		return nil, fmt.Errorf("google captcha: parse page: %w", err)
-	}
-	widget := html.Find(".g-recaptcha[data-sitekey]").First()
-	websiteKey, ok := widget.Attr("data-sitekey")
-	if !ok {
-		return nil, nil
 	}
 	form := html.Find("textarea[name='g-recaptcha-response']").First().Closest("form")
 	if form.Length() == 0 {
@@ -105,8 +108,8 @@ func (s *Solver) solveGoogle(ctx context.Context, document page.Document, locati
 	}
 	token, err := s.tasks.Recaptcha(ctx, capsolver.RecaptchaTask{
 		WebsiteURL: document.FinalURL,
-		WebsiteKey: websiteKey,
-		DataS:      widget.AttrOr("data-s", ""),
+		WebsiteKey: challenge.SiteKey,
+		DataS:      challenge.DataS,
 		ProxyURL:   document.Session.ProxyURL,
 	})
 	if err != nil {
@@ -130,13 +133,9 @@ func (s *Solver) solveGoogle(ctx context.Context, document page.Document, locati
 	return granted, nil
 }
 
-func (s *Solver) solveDataDome(ctx context.Context, document page.Document, location *url.URL) ([]page.Cookie, error) {
-	html, err := goquery.NewDocumentFromReader(strings.NewReader(document.HTML))
-	if err != nil {
-		return nil, fmt.Errorf("datadome captcha: parse page: %w", err)
-	}
-	captchaURL, ok := html.Find("iframe[src*='captcha-delivery.com']").First().Attr("src")
-	if !ok || document.Session.ProxyURL == "" {
+func (s *Solver) solveDataDome(ctx context.Context, document page.Document, challenge page.Challenge, location *url.URL) ([]page.Cookie, error) {
+	captchaURL := challenge.URL
+	if captchaURL == "" || document.Session.ProxyURL == "" {
 		return nil, nil
 	}
 	captcha, err := url.Parse(captchaURL)

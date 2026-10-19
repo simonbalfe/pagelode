@@ -1,0 +1,33 @@
+{
+  "blocks": [
+    { "label": "Cloudflare challenge form", "pattern": "challenge-form.*__cf_chl_f_tk=|/cdn-cgi/challenge-platform/.+orchestrate", "flags": "is" },
+    { "label": "Cloudflare firewall response", "pattern": "<span[^>]+class=[\"']cf-error-code[\"'][^>]*>\\d{4}</span>", "flags": "is" },
+    { "label": "Akamai reference block", "pattern": "reference\\s*#\\s*\\d+\\.[0-9a-f]+\\.\\d+\\.[0-9a-f]+", "flags": "i" },
+    { "label": "PerimeterX challenge", "pattern": "window\\._pxAppId\\s*=|captcha\\.px-cdn\\.net", "flags": "i" },
+    { "label": "DataDome challenge", "pattern": "captcha-delivery\\.com", "flags": "i" },
+    { "label": "Imperva challenge", "pattern": "_Incapsula_Resource|Incapsula\\s+incident\\s+ID", "flags": "i" },
+    { "label": "Google JavaScript wall", "pattern": "[?&](?:amp;)?emsg=SG_REL", "flags": "i" },
+    { "label": "Sucuri firewall", "pattern": "Sucuri\\s+WebSite\\s+Firewall", "flags": "i" }
+  ],
+  "short_blocks": [
+    { "label": "Cloudflare interstitial", "pattern": "<title[^>]*>\\s*just\\s+a\\s+moment|checking\\s+(?:your\\s+)?browser", "flags": "i" },
+    { "label": "human verification", "pattern": "please\\s+verify\\s+you\\s+are\\s+human|verifying\\s+(?:that\\s+)?you\\s+are\\s+human", "flags": "i" },
+    { "label": "access denial", "pattern": "access\\s+denied|pardon\\s+our\\s+interruption|request\\s+unsuccessful", "flags": "i" },
+    { "label": "CAPTCHA challenge", "pattern": "class=[\"'](?:g-recaptcha|h-captcha)[\"']|complete\\s+(?:the\\s+)?captcha", "flags": "i" }
+  ],
+  "challenge": {
+    "headers": [
+      { "label": "Cloudflare challenge header", "name": "cf-mitigated", "value": "challenge" }
+    ],
+    "url_contains": ["__cf_chl_"],
+    "titles": ["just a moment", "one moment", "attention required", "security verification", "checking your browser"],
+    "text": ["verify you are human", "verify your session", "performing security verification", "cloudflare ray id", "enable javascript and cookies"],
+    "selectors": ["#challenge-form", "form[action*='/cdn-cgi/challenge-platform']", "script[src*='/cdn-cgi/challenge-platform/'][src*='orchestrate']"],
+    "hint_statuses": [401, 403, 429, 503],
+    "hint_headers": ["x-datadome"]
+  },
+  "captchas": {
+    "datadome_frame": "iframe[src*='captcha-delivery.com']",
+    "recaptcha_widget": ".g-recaptcha[data-sitekey]"
+  }
+}

@@ -1,7 +1,7 @@
 import type { Page } from "patchright";
+import signatures from "../../../signatures/signatures.json" with { type: "json" };
 import type { Log } from "../shared/log.ts";
 
-const challengeFrame = "iframe[src*='captcha-delivery.com']";
 const deviceCheckWaitMs = 15_000;
 
 export async function settleDataDome(page: Page, log: Log): Promise<void> {
@@ -16,6 +16,16 @@ export async function settleDataDome(page: Page, log: Log): Promise<void> {
   log("datadome_passed", { url: page.url() });
 }
 
+export async function findDataDome(page: Page): Promise<{ url?: string } | undefined> {
+  for (const frame of page.frames()) {
+    const iframe = frame.locator(signatures.captchas.datadome_frame).first();
+    if (await iframe.count().catch(() => 0) === 0) continue;
+    const url = await iframe.getAttribute("src", { timeout: 1_000 }).catch(() => null);
+    return url === null ? {} : { url };
+  }
+  return undefined;
+}
+
 async function challenged(page: Page): Promise<boolean> {
-  return (await page.locator(challengeFrame).count()) > 0;
+  return await findDataDome(page) !== undefined;
 }

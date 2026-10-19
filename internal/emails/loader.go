@@ -19,22 +19,19 @@ type Capturer interface {
 }
 
 type Loader struct {
-	http           orchestrator.Fetcher
-	chrome         Capturer
-	patchright     Capturer
-	capsolver      orchestrator.Fetcher
-	routes         *memory.Routes
-	browserLimiter *limit.Limiter
-	chromeEnabled  bool
+	http      orchestrator.Fetcher
+	browser   Capturer
+	capsolver orchestrator.Fetcher
+	routes    *memory.Routes
 }
 
-func NewLoader(http orchestrator.Fetcher, chrome, patchright Capturer, capsolver orchestrator.Fetcher, routes *memory.Routes, browserLimiter *limit.Limiter, chromeEnabled bool) *Loader {
-	return &Loader{http: http, chrome: chrome, patchright: patchright, capsolver: capsolver, routes: routes, browserLimiter: browserLimiter, chromeEnabled: chromeEnabled}
+func NewLoader(http orchestrator.Fetcher, browser Capturer, capsolver orchestrator.Fetcher, routes *memory.Routes) *Loader {
+	return &Loader{http: http, browser: browser, capsolver: capsolver, routes: routes}
 }
 
 func (l *Loader) Load(ctx context.Context, target string, options Options) (page.Document, error) {
 	if options.Profile != "" {
-		return l.browser(ctx, l.patchright, target, page.Session{}, options)
+		return l.render(ctx, target, page.Session{}, options)
 	}
 	parsed, err := url.Parse(target)
 	if err != nil {
@@ -48,11 +45,7 @@ func (l *Loader) Load(ctx context.Context, target string, options Options) (page
 			return page.Document{}, ctx.Err()
 		}
 		if err == nil {
-			classification := classify.Document(document)
-			if classification.Kind == classify.Blocked {
-				preferred = page.ProviderPatchright
-			}
-			if classification.Kind == classify.Dead {
+			if classify.Document(document).Kind == classify.Dead {
 				return document, nil
 			}
 			if usable(document) && (options.Render == "never" || !needsBrowser(document)) {
@@ -66,16 +59,7 @@ func (l *Loader) Load(ctx context.Context, target string, options Options) (page
 			return document, errors.New("page unavailable over HTTP")
 		}
 	}
-	if l.chromeEnabled && l.chrome != nil && preferred != page.ProviderPatchright {
-		rendered, renderErr := l.browser(ctx, l.chrome, target, document.Session, options)
-		if renderErr == nil {
-			return rendered, nil
-		}
-		if ctx.Err() != nil || errors.Is(renderErr, limit.ErrSaturated) {
-			return document, renderErr
-		}
-	}
-	rendered, renderErr := l.browser(ctx, l.patchright, target, document.Session, options)
+	rendered, renderErr := l.render(ctx, target, document.Session, options)
 	if renderErr == nil {
 		return rendered, nil
 	}
@@ -95,16 +79,11 @@ func (l *Loader) Load(ctx context.Context, target string, options Options) (page
 	return document, errors.New("page unavailable after browser fallback")
 }
 
-func (l *Loader) browser(ctx context.Context, capturer Capturer, target string, session page.Session, options Options) (page.Document, error) {
-	if capturer == nil {
+func (l *Loader) render(ctx context.Context, target string, session page.Session, options Options) (page.Document, error) {
+	if l.browser == nil {
 		return page.Document{}, errors.New("browser unavailable")
 	}
-	var document page.Document
-	err := l.browserLimiter.Run(ctx, func() error {
-		var err error
-		document, err = capturer.Capture(ctx, target, session, page.CaptureOptions{WaitMS: 500, Profile: options.Profile})
-		return err
-	})
+	document, err := l.browser.Capture(ctx, target, session, page.CaptureOptions{WaitMS: 500, Profile: options.Profile})
 	if err != nil {
 		return document, err
 	}

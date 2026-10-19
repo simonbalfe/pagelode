@@ -10,7 +10,6 @@ import (
 
 	"github.com/simonbalfe/pagelode/internal/classify"
 	"github.com/simonbalfe/pagelode/internal/extract"
-	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/page"
 )
@@ -44,26 +43,20 @@ type Result struct {
 }
 
 type Service struct {
-	http            Fetcher
-	chromedp        Fetcher
-	patchright      Fetcher
-	capsolver       Fetcher
-	routes          *memory.Routes
-	clearances      *memory.Clearances
-	browserLimiter  *limit.Limiter
-	chromedpEnabled bool
+	http       Fetcher
+	browser    Fetcher
+	capsolver  Fetcher
+	routes     *memory.Routes
+	clearances *memory.Clearances
 }
 
-func New(httpFetcher Fetcher, chromedpFetcher Fetcher, patchrightFetcher Fetcher, capSolverFetcher Fetcher, routes *memory.Routes, clearances *memory.Clearances, browserLimiter *limit.Limiter, chromedpEnabled bool) *Service {
+func New(httpFetcher Fetcher, browserFetcher Fetcher, capSolverFetcher Fetcher, routes *memory.Routes, clearances *memory.Clearances) *Service {
 	return &Service{
-		http:            httpFetcher,
-		chromedp:        chromedpFetcher,
-		patchright:      patchrightFetcher,
-		capsolver:       capSolverFetcher,
-		routes:          routes,
-		clearances:      clearances,
-		browserLimiter:  browserLimiter,
-		chromedpEnabled: chromedpEnabled,
+		http:       httpFetcher,
+		browser:    browserFetcher,
+		capsolver:  capSolverFetcher,
+		routes:     routes,
+		clearances: clearances,
 	}
 }
 
@@ -94,25 +87,7 @@ func (s *Service) Extract(ctx context.Context, input string) (Result, error) {
 	switch classification.Kind {
 	case classify.Dead:
 		return failedResult(state, document, "dead"), nil
-	case classify.Blocked:
-		return s.tryPatchright(ctx, &state, document.Session)
-	case classify.NeedsRender:
-		if s.chromedpEnabled && s.chromedp != nil {
-			chromedpDocument, chromedpClassification, chromedpOK := s.attemptBrowser(ctx, &state, page.ProviderChromedp, s.chromedp, document.Session)
-			if chromedpOK {
-				if result, done := s.resolveDocument(&state, chromedpDocument, chromedpClassification); done {
-					s.routes.Record(state.host, page.ProviderChromedp)
-					return result, nil
-				}
-				if chromedpClassification.Kind == classify.Dead {
-					return failedResult(state, chromedpDocument, "dead"), nil
-				}
-			}
-		}
-		return s.tryPatchright(ctx, &state, document.Session)
-	case classify.Retryable:
-		return s.tryPatchright(ctx, &state, document.Session)
-	case classify.Accept:
+	case classify.Blocked, classify.NeedsRender, classify.Retryable, classify.Accept:
 		return s.tryPatchright(ctx, &state, document.Session)
 	default:
 		return Result{}, fmt.Errorf("extract: unsupported classification %q", classification.Kind)
@@ -139,56 +114,31 @@ func (s *Service) tryReplay(ctx context.Context, state *runState) (Result, bool)
 }
 
 func (s *Service) tryPreferred(ctx context.Context, state *runState, provider page.Provider) (Result, bool) {
-	var fetcher Fetcher
-	switch provider {
-	case page.ProviderChromedp:
-		if !s.chromedpEnabled {
-			return Result{}, false
-		}
-		fetcher = s.chromedp
-	case page.ProviderPatchright:
-		fetcher = s.patchright
-	default:
+	if provider != page.ProviderPatchright || s.browser == nil {
 		return Result{}, false
 	}
-	if fetcher == nil {
-		return Result{}, false
-	}
-
-	document, classification, ok := s.attemptBrowser(ctx, state, provider, fetcher, page.Session{})
+	document, classification, ok := s.attempt(ctx, state, page.ProviderPatchright, s.browser, page.Session{})
 	if !ok {
-		if provider == page.ProviderPatchright {
-			result, _ := s.tryCapSolver(ctx, state, page.Session{})
-			return result, true
-		}
-		return Result{}, false
+		result, _ := s.tryCapSolver(ctx, state, page.Session{})
+		return result, true
 	}
 	if result, done := s.resolveDocument(state, document, classification); done {
-		s.routes.Record(state.host, provider)
+		s.routes.Record(state.host, page.ProviderPatchright)
 		s.clearances.Record(state.host, document.Session)
 		return result, true
 	}
 	if classification.Kind == classify.Dead {
 		return failedResult(*state, document, "dead"), true
 	}
-	if provider == page.ProviderChromedp && classification.Kind == classify.Blocked {
-		result, err := s.tryPatchright(ctx, state, document.Session)
-		if err == nil {
-			return result, true
-		}
-	}
-	if provider == page.ProviderPatchright {
-		result, _ := s.tryCapSolver(ctx, state, document.Session)
-		return result, true
-	}
-	return Result{}, false
+	result, _ := s.tryCapSolver(ctx, state, document.Session)
+	return result, true
 }
 
 func (s *Service) tryPatchright(ctx context.Context, state *runState, session page.Session) (Result, error) {
-	if s.patchright == nil || state.tried[page.ProviderPatchright] {
+	if s.browser == nil || state.tried[page.ProviderPatchright] {
 		return s.tryCapSolver(ctx, state, session)
 	}
-	document, classification, ok := s.attemptBrowser(ctx, state, page.ProviderPatchright, s.patchright, session)
+	document, classification, ok := s.attempt(ctx, state, page.ProviderPatchright, s.browser, session)
 	if !ok {
 		return s.tryCapSolver(ctx, state, session)
 	}
@@ -218,23 +168,6 @@ func (s *Service) tryCapSolver(ctx context.Context, state *runState, session pag
 		return failedResult(*state, document, "dead"), nil
 	}
 	return failedResult(*state, document, "failed"), nil
-}
-
-func (s *Service) attemptBrowser(ctx context.Context, state *runState, provider page.Provider, fetcher Fetcher, session page.Session) (page.Document, classify.Result, bool) {
-	var (
-		document page.Document
-		result   classify.Result
-		ok       bool
-	)
-	err := s.browserLimiter.Run(ctx, func() error {
-		document, result, ok = s.attempt(ctx, state, provider, fetcher, session)
-		return nil
-	})
-	if err != nil {
-		state.attempts = append(state.attempts, Attempt{Provider: provider, Outcome: "error", Detail: err.Error()})
-		return page.Document{}, classify.Result{}, false
-	}
-	return document, result, ok
 }
 
 func (s *Service) attempt(ctx context.Context, state *runState, provider page.Provider, fetcher Fetcher, session page.Session) (page.Document, classify.Result, bool) {

@@ -16,10 +16,10 @@ import (
 func (a *application) discover(configuration config.Config, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("pagelode discover", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	wait := flags.Int("wait-ms", 1500, "observe network activity after page load (100–10000 ms)")
+	wait := flags.Int("wait-ms", 1500, "longest wait for network activity after page load; ends earlier when the page goes quiet (100–10000 ms)")
 	profileName := flags.String("profile", "", "use a saved authenticated browser profile")
 	verbose := flags.Bool("verbose", false, "include request evidence, matching scores, and loading details")
-	stealth := flags.Bool("stealth", false, "load only with the Patchright stealth browser through PAGELODE_PROXY_URL, skipping Chromedp")
+	stealth := flags.Bool("stealth", false, "refuse to load unless the browser routes through PAGELODE_PROXY_URL")
 	harPath := flags.String("har", "", "analyze a HAR file without opening a browser")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

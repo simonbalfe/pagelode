@@ -1,12 +1,25 @@
 package memory
 
 import (
+	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/simonbalfe/pagelode/internal/page"
 )
+
+type Route struct {
+	Host     string
+	Provider page.Provider
+	Expires  time.Time
+}
+
+type RouteStore interface {
+	LoadRoutes(now time.Time) ([]Route, error)
+	SaveRoute(Route) error
+}
 
 type entry struct {
 	provider page.Provider
@@ -18,6 +31,7 @@ type Routes struct {
 	ttl       time.Duration
 	protected []string
 	entries   map[string]entry
+	store     RouteStore
 	now       func() time.Time
 }
 
@@ -30,6 +44,20 @@ func NewRoutes(ttl time.Duration, protected []string) *Routes {
 	}
 }
 
+func (r *Routes) Restore(store RouteStore) error {
+	routes, err := store.LoadRoutes(r.now())
+	if err != nil {
+		return fmt.Errorf("restore routes: %w", err)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, route := range routes {
+		r.entries[normalizeHost(route.Host)] = entry{provider: route.Provider, expires: route.Expires}
+	}
+	r.store = store
+	return nil
+}
+
 func (r *Routes) Preferred(host string) (page.Provider, bool) {
 	host = normalizeHost(host)
 	for _, suffix := range r.protected {
@@ -37,7 +65,6 @@ func (r *Routes) Preferred(host string) (page.Provider, bool) {
 			return page.ProviderPatchright, true
 		}
 	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	value, ok := r.entries[host]
@@ -55,9 +82,17 @@ func (r *Routes) Record(host string, provider page.Provider) {
 	if provider == page.ProviderTLS {
 		return
 	}
+	route := Route{Host: normalizeHost(host), Provider: provider, Expires: r.now().Add(r.ttl)}
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.entries[normalizeHost(host)] = entry{provider: provider, expires: r.now().Add(r.ttl)}
+	r.entries[route.Host] = entry{provider: route.Provider, expires: route.Expires}
+	store := r.store
+	r.mu.Unlock()
+	if store == nil {
+		return
+	}
+	if err := store.SaveRoute(route); err != nil {
+		slog.Warn("route not persisted", "host", route.Host, "error", err)
+	}
 }
 
 func (r *Routes) Size() int {

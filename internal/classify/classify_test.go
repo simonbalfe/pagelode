@@ -35,6 +35,21 @@ func TestDocument(t *testing.T) {
 			doc:  page.Document{StatusCode: 404, Type: page.ContentHTML, HTML: "<html><body>missing</body></html>"},
 			want: Dead,
 		},
+		{
+			name: "cloudflare challenge with custom title, detected by URL",
+			doc:  page.Document{StatusCode: 200, Type: page.ContentHTML, FinalURL: "https://www.glassdoor.com/Reviews/index.htm?__cf_chl_rt_tk=abc", HTML: "<html><title>Security | Glassdoor</title><body><p>" + strings.Repeat("Checking things. ", 300) + "</p></body></html>"},
+			want: Blocked,
+		},
+		{
+			name: "cloudflare challenge header on a long page",
+			doc:  page.Document{StatusCode: 200, Type: page.ContentHTML, Headers: map[string]string{"CF-Mitigated": "challenge"}, HTML: "<html><body><p>" + strings.Repeat("Useful content. ", 300) + "</p></body></html>"},
+			want: Blocked,
+		},
+		{
+			name: "challenge left after browser settling",
+			doc:  page.Document{StatusCode: 200, Type: page.ContentHTML, Challenge: &page.Challenge{Vendor: page.ChallengeDataDome, URL: "https://geo.captcha-delivery.com/captcha/?t=fe"}, HTML: "<html><body><p>" + strings.Repeat("Useful content. ", 300) + "</p></body></html>"},
+			want: Blocked,
+		},
 	}
 
 	for _, test := range tests {

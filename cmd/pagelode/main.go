@@ -18,7 +18,6 @@ import (
 	"github.com/simonbalfe/pagelode/internal/browser"
 	"github.com/simonbalfe/pagelode/internal/capsolver"
 	"github.com/simonbalfe/pagelode/internal/captcha"
-	"github.com/simonbalfe/pagelode/internal/chromefetch"
 	"github.com/simonbalfe/pagelode/internal/config"
 	"github.com/simonbalfe/pagelode/internal/discovery"
 	"github.com/simonbalfe/pagelode/internal/emails"
@@ -27,20 +26,19 @@ import (
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/orchestrator"
 	"github.com/simonbalfe/pagelode/internal/sitemap"
+	"github.com/simonbalfe/pagelode/internal/state"
 )
 
 const version = "0.1.0"
 
 type application struct {
-	emailFinder       *emails.Service
-	mapper            *sitemap.Service
-	extractor         *orchestrator.Service
-	discoverer        *discovery.Service
-	extractLimiter    *limit.Limiter
-	browserLimiter    *limit.Limiter
-	routes            *memory.Routes
-	chromedp          *chromefetch.Engine
-	capSolverChromedp *chromefetch.Engine
+	emailFinder    *emails.Service
+	mapper         *sitemap.Service
+	extractor      *orchestrator.Service
+	discoverer     *discovery.Service
+	extractLimiter *limit.Limiter
+	routes         *memory.Routes
+	state          *state.Store
 }
 
 func main() {
@@ -102,68 +100,77 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 }
 
 func newApplication(configuration config.Config) (*application, error) {
-	browserClient, err := browser.New(configuration.BrowserURL, configuration.BrowserToken, configuration.ProxyURL)
+	store, err := state.Open(configuration.StatePath)
+	if err != nil {
+		return nil, fmt.Errorf("open state %s: %w", configuration.StatePath, err)
+	}
+	app, err := wire(configuration, store)
+	if err != nil {
+		return nil, errors.Join(err, store.Close())
+	}
+	return app, nil
+}
+
+func wire(configuration config.Config, store *state.Store) (*application, error) {
+	routes := memory.NewRoutes(configuration.RouteTTL, configuration.ProtectedDomains)
+	if err := routes.Restore(store); err != nil {
+		return nil, err
+	}
+	clearances := memory.NewClearances(configuration.RouteTTL)
+	if err := clearances.Restore(store); err != nil {
+		return nil, err
+	}
+	identities, err := browser.NewIdentities(configuration.ProxyURL, store)
+	if err != nil {
+		return nil, err
+	}
+	browserClient, err := browser.New(configuration.BrowserURL, configuration.BrowserToken, configuration.BrowserSettle, identities)
 	if err != nil {
 		return nil, fmt.Errorf("configure browser service: %w", err)
 	}
-	chromedp, err := chromefetch.New(configuration.ProxyURL)
-	if err != nil {
-		return nil, fmt.Errorf("configure Chromedp: %w", err)
-	}
-	routes := memory.NewRoutes(configuration.RouteTTL, configuration.ProtectedDomains)
-	browserLimiter := limit.New(configuration.BrowserConcurrency, configuration.MaxWaiting)
 	extractLimiter := limit.New(configuration.MaxConcurrency, configuration.MaxWaiting)
-	httpClient := httpfetch.New(configuration.ProxyURL)
-	capSolverProxyURL := configuration.CapSolverProxyURL
-	if configuration.CapSolverAPIKey != "" && capSolverProxyURL != "" {
+	httpClient := httpfetch.Following(identities.CurrentProxy)
+	capSolverFetcher, captchaTasks, err := capSolver(configuration)
+	if err != nil {
+		return nil, err
+	}
+	renderer := captcha.New(browserClient, captchaTasks, httpClient)
+	emailLoader := emails.NewLoader(httpClient, renderer, capSolverFetcher, routes)
+	return &application{
+		mapper:         sitemap.New(httpClient, extractLimiter),
+		emailFinder:    emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency),
+		discoverer:     discovery.New(renderer).WithProxy(configuration.ProxyURL != ""),
+		extractor:      orchestrator.New(httpClient, renderer, capSolverFetcher, routes, clearances),
+		extractLimiter: extractLimiter,
+		routes:         routes,
+		state:          store,
+	}, nil
+}
+
+func capSolver(configuration config.Config) (orchestrator.Fetcher, captcha.Tasks, error) {
+	api := capsolver.NewAPI(configuration.CapSolverAPIKey, configuration.CapSolverURL)
+	if api == nil {
+		return nil, nil, nil
+	}
+	proxyURL := configuration.CapSolverProxyURL
+	if proxyURL != "" {
 		resolveContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		capSolverProxyURL, err = capsolver.ResolveProxy(resolveContext, capSolverProxyURL)
+		resolved, err := capsolver.ResolveProxy(resolveContext, proxyURL)
 		cancel()
 		if err != nil {
-			return nil, fmt.Errorf("configure CapSolver: %w", err)
+			return nil, nil, fmt.Errorf("configure CapSolver: %w", err)
 		}
+		proxyURL = resolved
 	}
-	capSolverAPI := capsolver.NewAPI(configuration.CapSolverAPIKey, configuration.CapSolverURL)
-	capSolverHTTPClient := httpfetch.New(capSolverProxyURL)
-	capSolverChromedp, err := chromefetch.New(capSolverProxyURL)
+	solverHTTP := httpfetch.New(proxyURL)
+	client, err := capsolver.New(api, proxyURL, solverHTTP, solverHTTP)
 	if err != nil {
-		return nil, fmt.Errorf("configure CapSolver browser: %w", err)
+		return nil, nil, fmt.Errorf("configure CapSolver: %w", err)
 	}
-	capSolverClient, err := capsolver.New(capSolverAPI, capSolverProxyURL, capSolverHTTPClient, capSolverChromedp)
-	if err != nil {
-		return nil, fmt.Errorf("configure CapSolver: %w", err)
+	if client == nil {
+		return nil, api, nil
 	}
-	var capSolverFetcher orchestrator.Fetcher
-	if capSolverClient != nil {
-		capSolverFetcher = capSolverClient
-	}
-	var captchaTasks captcha.Tasks
-	if capSolverAPI != nil {
-		captchaTasks = capSolverAPI
-	}
-	patchright := captcha.New(browserClient, captchaTasks, httpClient)
-	extractor := orchestrator.New(
-		httpClient,
-		chromedp,
-		patchright,
-		capSolverFetcher,
-		routes,
-		memory.NewClearances(configuration.RouteTTL),
-		browserLimiter,
-		configuration.ChromedpEnabled,
-	)
-	emailLoader := emails.NewLoader(httpClient, chromedp, patchright, capSolverFetcher, routes, browserLimiter, configuration.ChromedpEnabled)
-	return &application{
-		mapper:            sitemap.New(httpClient, extractLimiter),
-		emailFinder:       emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency),
-		discoverer:        discovery.New(chromedp, patchright, routes, browserLimiter, configuration.ChromedpEnabled).WithProxy(configuration.ProxyURL != ""),
-		extractor:         extractor,
-		extractLimiter:    extractLimiter,
-		browserLimiter:    browserLimiter,
-		routes:            routes,
-		chromedp:          chromedp,
-		capSolverChromedp: capSolverChromedp,
-	}, nil
+	return client, api, nil
 }
 
 func (a *application) extract(configuration config.Config, args []string, stdout io.Writer, stderr io.Writer) error {
@@ -207,7 +214,7 @@ func (a *application) extract(configuration config.Config, args []string, stdout
 
 func (a *application) serve(configuration config.Config, output io.Writer) error {
 	logger := slog.New(slog.NewJSONHandler(output, nil))
-	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.browserLimiter, a.routes, configuration.RequestTimeout, logger).WithEmails(a.emailFinder).WithMap(a.mapper)
+	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.routes, configuration.RequestTimeout, logger).WithEmails(a.emailFinder).WithMap(a.mapper)
 	server := &http.Server{
 		Addr:              configuration.Address,
 		Handler:           apiServer.Handler(),
@@ -228,7 +235,7 @@ func (a *application) serve(configuration config.Config, output io.Writer) error
 		}
 	}()
 
-	logger.Info("pagelode listening", "address", configuration.Address, "chromedp", configuration.ChromedpEnabled, "protected_domains", configuration.ProtectedDomains)
+	logger.Info("pagelode listening", "address", configuration.Address, "protected_domains", configuration.ProtectedDomains, "state", configuration.StatePath)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("serve: %w", err)
 	}
@@ -236,7 +243,7 @@ func (a *application) serve(configuration config.Config, output io.Writer) error
 }
 
 func (a *application) Close() error {
-	return errors.Join(a.chromedp.Close(), a.capSolverChromedp.Close())
+	return a.state.Close()
 }
 
 func attemptDetail(attempts []orchestrator.Attempt) string {

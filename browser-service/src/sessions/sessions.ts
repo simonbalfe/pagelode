@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BrowserContext } from "patchright";
 import { launchBrowser } from "../browser/launch.ts";
-import { withProxySession } from "../browser/persona.ts";
 import type { Config } from "../config.ts";
 import type { ProfileLocks } from "../profiles/locks.ts";
 import { profileDirectory, restoreCookies, saveCookies } from "../profiles/store.ts";
@@ -85,8 +84,7 @@ export class Sessions {
       const id = randomBytes(16).toString("hex");
       const port = await freeDebuggingPort();
       const headless = request.headless ?? this.#config.headless;
-      const proxyURL = withProxySession(request.proxy_url, profile === undefined ? `session:${id}` : `profile:${profile}`);
-      ({ context } = await launchBrowser(this.#config, this.#log, { directory, proxyURL, headless, args: [`--remote-debugging-port=${port}`] }));
+      ({ context } = await launchBrowser(this.#config, this.#log, { directory, proxyURL: request.proxy_url, headless, args: [`--remote-debugging-port=${port}`] }));
       if (profile !== undefined) await restoreCookies(context, directory);
       const browserPath = await browserDevtoolsPath(port);
       if (request.start_url !== undefined) await (context.pages()[0] ?? await context.newPage()).goto(request.start_url, { waitUntil: "domcontentloaded", timeout: 45_000 });

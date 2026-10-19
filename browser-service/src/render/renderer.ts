@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { launchBrowser } from "../browser/launch.ts";
-import { withProxySession } from "../browser/persona.ts";
 import type { Config } from "../config.ts";
 import type { Identities } from "../identities/pool.ts";
 import type { ProfileLocks } from "../profiles/locks.ts";
@@ -61,13 +60,12 @@ export class Renderer {
   async #renderInProfile(input: RenderRequest, name: string, signal: AbortSignal): Promise<RenderResult> {
     const directory = await profileDirectory(this.#config.profilesDirectory, name, false);
     return this.#locks.withRender(name, () => this.#limiter.run(signal, async () => {
-      const proxyURL = withProxySession(input.proxy_url, `profile:${name}`);
-      const { context } = await launchBrowser(this.#config, this.#log, { directory, proxyURL, headless: this.#config.headless });
+      const { context } = await launchBrowser(this.#config, this.#log, { directory, proxyURL: input.proxy_url, headless: this.#config.headless });
       try {
         await restoreCookies(context, directory);
         const result = await renderPage(context, input, { signal, log: this.#log });
         await saveCookies(context, directory);
-        return { ...result, replay: { ...result.replay, ...(proxyURL === undefined ? {} : { proxy_url: proxyURL }) } };
+        return { ...result, replay: { ...result.replay, ...(input.proxy_url === undefined ? {} : { proxy_url: input.proxy_url }) } };
       } finally {
         await context.close();
       }

@@ -21,14 +21,11 @@ type apiCapturer struct{ calls int }
 
 func (c *apiCapturer) Capture(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error) {
 	c.calls++
-	return page.Document{Provider: page.ProviderChromedp, Type: page.ContentHTML, Traffic: &page.Capture{Entries: []page.Exchange{{URL: "https://example.com/api/listings", Method: "GET", MIMEType: "application/json", ResponseBody: `{"items":[{"id":1}]}`}}}}, nil
+	return page.Document{Provider: page.ProviderPatchright, Type: page.ContentHTML, Traffic: &page.Capture{Entries: []page.Exchange{{URL: "https://example.com/api/listings", Method: "GET", MIMEType: "application/json", ResponseBody: `{"items":[{"id":1}]}`}}}}, nil
 }
 
 func discoveryServer(capturer discovery.Capturer) *Server {
-	routes := memory.NewRoutes(time.Hour, nil)
-	browserLimiter := limit.New(1, 1)
-	service := discovery.New(capturer, nil, routes, browserLimiter, true)
-	return New(nil, service, limit.New(2, 2), browserLimiter, routes, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return New(nil, discovery.New(capturer), limit.New(2, 2), memory.NewRoutes(time.Hour, nil), time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 func TestDiscoveryEndpoint(t *testing.T) {

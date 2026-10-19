@@ -7,10 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/simonbalfe/pagelode/internal/limit"
-	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/page"
 )
 
@@ -27,35 +24,19 @@ func (s *captureStub) Capture(_ context.Context, _ string, _ page.Session, optio
 	return s.document, s.err
 }
 
-func TestDiscoverEscalatesBlockedPage(t *testing.T) {
-	chrome := &captureStub{document: page.Document{Provider: page.ProviderChromedp, StatusCode: 403, HTML: `<title>Just a moment</title><form id="challenge-form"></form>`, Type: page.ContentHTML, Traffic: &page.Capture{}}}
-	patch := &captureStub{document: page.Document{Provider: page.ProviderPatchright, StatusCode: 200, HTML: `<main><h1>Listings</h1><p>This page contains useful listing content and enough text for the classifier to accept the rendered document successfully.</p></main>`, Type: page.ContentHTML, Traffic: &page.Capture{Entries: []page.Exchange{{URL: "https://example.com/api", Method: "GET", MIMEType: "application/json", ResponseBody: `{"items":[]}`}}}}}
-	service := New(chrome, patch, memory.NewRoutes(time.Hour, nil), limit.New(1, 1), true)
-	report, err := service.Discover(context.Background(), Request{URL: "example.com", Verbose: true})
+func TestDiscoverReportsPageStillBlockedInBrowser(t *testing.T) {
+	browser := &captureStub{document: page.Document{Provider: page.ProviderPatchright, StatusCode: 403, HTML: `<title>Just a moment</title><form id="challenge-form"></form>`, Type: page.ContentHTML, Traffic: &page.Capture{}}}
+	report, err := New(browser).Discover(context.Background(), Request{URL: "example.com", Verbose: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Page.Provider != page.ProviderPatchright || len(report.Attempts) != 2 || chrome.calls != 1 || patch.calls != 1 {
-		t.Errorf("report = %+v, calls = %d/%d", report, chrome.calls, patch.calls)
-	}
-}
-
-func TestDiscoverHonorsProtectedRoute(t *testing.T) {
-	chrome := &captureStub{}
-	patch := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
-	service := New(chrome, patch, memory.NewRoutes(time.Hour, []string{"example.com"}), limit.New(1, 1), true)
-	_, err := service.Discover(context.Background(), Request{URL: "https://example.com"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if chrome.calls != 0 || patch.calls != 1 {
-		t.Errorf("calls = %d/%d, want 0/1", chrome.calls, patch.calls)
+	if report.Outcome != "blocked" || len(report.Attempts) != 1 || browser.calls != 1 {
+		t.Errorf("report outcome = %q, attempts = %d, calls = %d; want blocked after one capture", report.Outcome, len(report.Attempts), browser.calls)
 	}
 }
 
 func TestDiscoverPropagatesCancellation(t *testing.T) {
-	service := New(&captureStub{err: context.DeadlineExceeded}, nil, memory.NewRoutes(time.Hour, nil), limit.New(1, 1), true)
-	_, err := service.Discover(context.Background(), Request{URL: "https://example.com"})
+	_, err := New(&captureStub{err: context.DeadlineExceeded}).Discover(context.Background(), Request{URL: "https://example.com"})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("error = %v, want deadline exceeded", err)
 	}
@@ -71,7 +52,7 @@ func TestHARDiscovery(t *testing.T) {
 	item.Response.Content.Encoding = "base64"
 	item.Response.Content.Text = base64.StdEncoding.EncodeToString([]byte(`{"items":[{"id":1}],"nextCursor":"secret"}`))
 	har.Log.Entries = []HAREntry{item}
-	service := New(nil, nil, nil, nil, false)
+	service := New(nil)
 	report, err := service.Discover(context.Background(), Request{HAR: &har})
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +77,7 @@ func TestDiscoveryVerbosity(t *testing.T) {
 	item.Response.Content.MIMEType = "application/json"
 	item.Response.Content.Text = `{"items":[{"id":1}]}`
 	har := HAR{Log: HARLog{Entries: []HAREntry{item}}}
-	service := New(nil, nil, nil, nil, false)
+	service := New(nil)
 	for _, verbose := range []bool{false, true} {
 		report, err := service.Discover(context.Background(), Request{HAR: &har, Verbose: verbose})
 		if err != nil {
@@ -115,33 +96,29 @@ func TestDiscoveryVerbosity(t *testing.T) {
 	}
 }
 
-func TestDiscoveryProfileUsesPatchright(t *testing.T) {
-	chrome := &captureStub{}
-	patch := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
-	service := New(chrome, patch, memory.NewRoutes(time.Hour, nil), limit.New(1, 1), true)
-	_, err := service.Discover(context.Background(), Request{URL: "example.com", Profile: "account"})
-	if err != nil {
+func TestDiscoveryPassesProfile(t *testing.T) {
+	browser := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
+	if _, err := New(browser).Discover(context.Background(), Request{URL: "example.com", Profile: "account"}); err != nil {
 		t.Fatal(err)
 	}
-	if chrome.calls != 0 || patch.calls != 1 || patch.options.Profile != "account" {
-		t.Errorf("calls=%d/%d profile=%q", chrome.calls, patch.calls, patch.options.Profile)
+	if browser.calls != 1 || browser.options.Profile != "account" {
+		t.Errorf("calls=%d profile=%q, want one capture with profile account", browser.calls, browser.options.Profile)
 	}
 }
 
-func TestDiscoveryStealthSkipsChromedpAndRequiresProxy(t *testing.T) {
-	chrome := &captureStub{document: page.Document{Provider: page.ProviderChromedp, Traffic: &page.Capture{}}}
-	patch := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
-	service := New(chrome, patch, memory.NewRoutes(time.Hour, nil), limit.New(1, 1), true)
+func TestDiscoveryStealthRequiresProxy(t *testing.T) {
+	browser := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
+	service := New(browser)
 	if _, err := service.Discover(context.Background(), Request{URL: "example.com", Stealth: true}); !errors.Is(err, ErrStealthProxy) {
 		t.Fatalf("without proxy error = %v, want ErrStealthProxy", err)
 	}
-	if chrome.calls != 0 || patch.calls != 0 {
-		t.Fatalf("without proxy calls = %d/%d, want 0/0", chrome.calls, patch.calls)
+	if browser.calls != 0 {
+		t.Fatalf("without proxy calls = %d, want 0", browser.calls)
 	}
 	if _, err := service.WithProxy(true).Discover(context.Background(), Request{URL: "example.com", Stealth: true}); err != nil {
 		t.Fatal(err)
 	}
-	if chrome.calls != 0 || patch.calls != 1 {
-		t.Errorf("calls = %d/%d, want 0/1", chrome.calls, patch.calls)
+	if browser.calls != 1 {
+		t.Errorf("calls = %d, want 1", browser.calls)
 	}
 }

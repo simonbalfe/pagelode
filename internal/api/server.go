@@ -28,18 +28,16 @@ type Server struct {
 	extractor      *orchestrator.Service
 	discoverer     *discovery.Service
 	extractLimiter *limit.Limiter
-	browserLimiter *limit.Limiter
 	routes         *memory.Routes
 	timeout        time.Duration
 	logger         *slog.Logger
 }
 
-func New(extractor *orchestrator.Service, discoverer *discovery.Service, extractLimiter *limit.Limiter, browserLimiter *limit.Limiter, routes *memory.Routes, timeout time.Duration, logger *slog.Logger) *Server {
+func New(extractor *orchestrator.Service, discoverer *discovery.Service, extractLimiter *limit.Limiter, routes *memory.Routes, timeout time.Duration, logger *slog.Logger) *Server {
 	return &Server{
 		extractor:      extractor,
 		discoverer:     discoverer,
 		extractLimiter: extractLimiter,
-		browserLimiter: browserLimiter,
 		routes:         routes,
 		timeout:        timeout,
 		logger:         logger,
@@ -60,11 +58,10 @@ func (s *Server) health(response http.ResponseWriter, _ *http.Request) {
 	writeJSON(response, http.StatusOK, map[string]any{
 		"ok":            true,
 		"service":       "pagelode",
-		"engines":       []string{"tls", "chromedp", "patchright", "capsolver"},
+		"engines":       []string{"tls", "patchright", "capsolver"},
 		"learnedRoutes": s.routes.Size(),
 		"limits": map[string]any{
 			"extraction": s.extractLimiter.Snapshot(),
-			"browser":    s.browserLimiter.Snapshot(),
 		},
 	})
 }

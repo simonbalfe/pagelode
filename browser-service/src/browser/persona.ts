@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
@@ -115,10 +114,4 @@ export async function writePreferences(directory: string, persona: Persona, prox
     ...(languages === "" ? {} : { intl: { ...existing.intl, accept_languages: languages, selected_languages: languages } }),
     ...(proxied ? { webrtc: { ...existing.webrtc, ip_handling_policy: "disable_non_proxied_udp", multiple_routes_enabled: false, nonproxied_udp_enabled: false } } : {}),
   }));
-}
-
-export function withProxySession(proxyURL: string | undefined, seed: string): string | undefined {
-  if (proxyURL === undefined) return undefined;
-  const session = createHash("sha256").update(seed).digest("hex").slice(0, 12);
-  return proxyURL.replaceAll("{session}", session).replaceAll("%7Bsession%7D", session).replaceAll("%7bsession%7d", session);
 }

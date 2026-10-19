@@ -76,7 +76,7 @@ func TestGoogleSorryIsSolvedOverHTTPAndRendered(t *testing.T) {
 	t.Parallel()
 
 	results := &renderer{documents: []page.Document{
-		{FinalURL: sorryURL, HTML: sorryHTML, Session: browserSession()},
+		{FinalURL: sorryURL, HTML: sorryHTML, Challenge: googleChallenge(), Session: browserSession()},
 		{FinalURL: "https://www.google.com/search?q=shoes", HTML: "<html>results</html>"},
 	}}
 	solver := &tasks{}
@@ -109,7 +109,7 @@ func TestGoogleSorryIsSolvedOverHTTPAndRendered(t *testing.T) {
 func TestGoogleSorryFailsWhenTheAnswerIsRejected(t *testing.T) {
 	t.Parallel()
 
-	results := &renderer{documents: []page.Document{{FinalURL: sorryURL, HTML: sorryHTML, Session: browserSession()}}}
+	results := &renderer{documents: []page.Document{{FinalURL: sorryURL, HTML: sorryHTML, Challenge: googleChallenge(), Session: browserSession()}}}
 	_, err := New(results, &tasks{}, &submitter{}).Fetch(context.Background(), "https://www.google.com/search?q=shoes", page.Session{})
 	if err == nil {
 		t.Fatal("Fetch() error = nil, want rejected answer")
@@ -124,7 +124,7 @@ func TestDataDomeSliderIsSolvedAndRendered(t *testing.T) {
 
 	captchaURL := "https://geo.captcha-delivery.com/captcha/?initialCid=abc&t=fe"
 	results := &renderer{documents: []page.Document{
-		{FinalURL: "https://shop.example/item", HTML: `<html><body><iframe src="https://geo.captcha-delivery.com/captcha/?initialCid=abc&amp;t=fe"></iframe></body></html>`, Session: browserSession()},
+		{FinalURL: "https://shop.example/item", HTML: `<html><body><iframe src="https://geo.captcha-delivery.com/captcha/?initialCid=abc&amp;t=fe"></iframe></body></html>`, Challenge: &page.Challenge{Vendor: page.ChallengeDataDome, URL: captchaURL}, Session: browserSession()},
 		{FinalURL: "https://shop.example/item", HTML: "<html>item</html>"},
 	}}
 	solver := &tasks{}
@@ -148,17 +148,17 @@ func TestDataDomeSliderIsSolvedAndRendered(t *testing.T) {
 func TestUnsolvablePagesReturnTheFirstRender(t *testing.T) {
 	t.Parallel()
 
-	banned := `<html><iframe src="https://geo.captcha-delivery.com/captcha/?initialCid=abc&t=bv"></iframe></html>`
-	slider := `<html><iframe src="https://geo.captcha-delivery.com/captcha/?initialCid=abc&t=fe"></iframe></html>`
+	banned := &page.Challenge{Vendor: page.ChallengeDataDome, URL: "https://geo.captcha-delivery.com/captcha/?initialCid=abc&t=bv"}
+	slider := &page.Challenge{Vendor: page.ChallengeDataDome, URL: "https://geo.captcha-delivery.com/captcha/?initialCid=abc&t=fe"}
 	for _, test := range []struct {
 		name     string
 		document page.Document
 		tasks    Tasks
 	}{
 		{name: "ordinary page", document: page.Document{FinalURL: "https://example.com/", HTML: "<html>ok</html>", Session: browserSession()}, tasks: &tasks{}},
-		{name: "banned DataDome IP", document: page.Document{FinalURL: "https://shop.example/", HTML: banned, Session: browserSession()}, tasks: &tasks{}},
-		{name: "DataDome without a proxy", document: page.Document{FinalURL: "https://shop.example/", HTML: slider, Session: page.Session{UserAgent: "Chrome"}}, tasks: &tasks{}},
-		{name: "no CapSolver key", document: page.Document{FinalURL: sorryURL, HTML: sorryHTML, Session: browserSession()}},
+		{name: "banned DataDome IP", document: page.Document{FinalURL: "https://shop.example/", Challenge: banned, Session: browserSession()}, tasks: &tasks{}},
+		{name: "DataDome without a proxy", document: page.Document{FinalURL: "https://shop.example/", Challenge: slider, Session: page.Session{UserAgent: "Chrome"}}, tasks: &tasks{}},
+		{name: "no CapSolver key", document: page.Document{FinalURL: sorryURL, HTML: sorryHTML, Challenge: googleChallenge(), Session: browserSession()}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
@@ -175,4 +175,8 @@ func TestUnsolvablePagesReturnTheFirstRender(t *testing.T) {
 			}
 		})
 	}
+}
+
+func googleChallenge() *page.Challenge {
+	return &page.Challenge{Vendor: page.ChallengeRecaptcha, SiteKey: "site-key", DataS: "data-s-value"}
 }

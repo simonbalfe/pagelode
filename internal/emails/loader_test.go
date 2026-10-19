@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simonbalfe/pagelode/internal/limit"
 	"github.com/simonbalfe/pagelode/internal/memory"
 	"github.com/simonbalfe/pagelode/internal/page"
 )
@@ -30,10 +29,10 @@ func TestLoaderRouting(t *testing.T) {
 		want                string
 	}{
 		{name: "HTTP footer", body: `<footer>fast@example.org</footer>`, status: 200, want: "http"},
-		{name: "JavaScript shell", body: `<div id="app"></div><script src="/app.js"></script>`, status: 200, want: "chrome"},
-		{name: "blocked", body: `<p>Access denied</p>`, status: 403, want: "patchright"},
-		{name: "protected", protected: true, want: "patchright"},
-		{name: "profile", profile: "account", want: "patchright"},
+		{name: "JavaScript shell", body: `<div id="app"></div><script src="/app.js"></script>`, status: 200, want: "browser"},
+		{name: "blocked", body: `<p>Access denied</p>`, status: 403, want: "browser"},
+		{name: "protected", protected: true, want: "browser"},
+		{name: "profile", profile: "account", want: "browser"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var calls []string
@@ -41,20 +40,18 @@ func TestLoaderRouting(t *testing.T) {
 				calls = append(calls, "http")
 				return page.Document{HTML: test.body, Type: page.ContentHTML, FinalURL: "https://example.org/", StatusCode: test.status}, nil
 			})
-			browser := func(name string) captureFunc {
-				return func(_ context.Context, target string, _ page.Session, options page.CaptureOptions) (page.Document, error) {
-					calls = append(calls, name)
-					if options.Profile != test.profile {
-						t.Errorf("profile %q", options.Profile)
-					}
-					return page.Document{HTML: `<p>rendered@example.org</p>`, FinalURL: target, StatusCode: 200, Type: page.ContentHTML}, nil
+			browser := captureFunc(func(_ context.Context, target string, _ page.Session, options page.CaptureOptions) (page.Document, error) {
+				calls = append(calls, "browser")
+				if options.Profile != test.profile {
+					t.Errorf("profile %q", options.Profile)
 				}
-			}
+				return page.Document{HTML: `<p>rendered@example.org</p>`, FinalURL: target, StatusCode: 200, Type: page.ContentHTML}, nil
+			})
 			var protected []string
 			if test.protected {
 				protected = []string{"example.org"}
 			}
-			loader := NewLoader(http, browser("chrome"), browser("patchright"), nil, memory.NewRoutes(time.Hour, protected), limit.New(1, 10), true)
+			loader := NewLoader(http, browser, nil, memory.NewRoutes(time.Hour, protected))
 			_, err := loader.Load(context.Background(), "https://example.org/", Options{Render: "auto", Profile: test.profile})
 			if err != nil {
 				t.Fatal(err)

@@ -1,6 +1,6 @@
 FROM oven/bun:1.3.5-debian
 
-WORKDIR /app
+WORKDIR /app/browser-service
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl xvfb fluxbox pulseaudio \
     libgl1 libglx-mesa0 libgl1-mesa-dri libegl1 libgles2 \
@@ -10,14 +10,15 @@ RUN apt-get update \
   && rm -rf /tmp/chrome.deb /var/lib/apt/lists/* \
   && mkdir -p /data /home/bun/.fluxbox \
   && chown -R bun:bun /data /home/bun
-COPY package.json bun.lock tsconfig.json ./
+COPY browser-service/package.json browser-service/bun.lock browser-service/tsconfig.json ./
 RUN bun install --frozen-lockfile --production
-COPY --chown=bun:bun desktop/fluxbox-init /home/bun/.fluxbox/init
-COPY --chown=bun:bun desktop/fluxbox-apps /home/bun/.fluxbox/apps
-COPY desktop ./desktop
-COPY src ./src
-COPY public ./public
-COPY docker-entrypoint.sh ./
+COPY --chown=bun:bun browser-service/desktop/fluxbox-init /home/bun/.fluxbox/init
+COPY --chown=bun:bun browser-service/desktop/fluxbox-apps /home/bun/.fluxbox/apps
+COPY browser-service/desktop ./desktop
+COPY signatures /app/signatures
+COPY browser-service/src ./src
+COPY browser-service/public ./public
+COPY browser-service/docker-entrypoint.sh ./
 ENV BROWSER_SERVICE_HOST=0.0.0.0 \
     BROWSER_SERVICE_PORT=8090 \
     BROWSER_SERVICE_HEADLESS=false \

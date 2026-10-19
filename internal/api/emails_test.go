@@ -25,7 +25,7 @@ func (emailLoader) Load(_ context.Context, target string, _ emails.Options) (pag
 
 func TestEmailsEndpoint(t *testing.T) {
 	limiter := limit.New(1, 0)
-	server := New(nil, nil, limiter, limit.New(1, 0), memory.NewRoutes(time.Hour, nil), time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))).WithEmails(emails.New(emailLoader{}, limiter, 1))
+	server := New(nil, nil, limiter, memory.NewRoutes(time.Hour, nil), time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))).WithEmails(emails.New(emailLoader{}, limiter, 1))
 	for _, test := range []struct {
 		body   string
 		status int
