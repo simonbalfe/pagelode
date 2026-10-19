@@ -19,11 +19,11 @@ rate on the same corpus.
 ```text
 caller
   -> PageLode HTTP API (Go)
-     -> host policy + learned route
+     -> stored clearance replay
+     -> host policy + learned route (persisted) -> Patchright -> extraction (Go)
      -> browser-profiled HTTP
-        -> accept -----------------------> extraction (Go)
-        -> JavaScript shell -> chromedp ------> extraction (Go)
-        -> block -----------> Patchright -> extraction (Go)
+        -> accept ------------------------------------> extraction (Go)
+        -> JavaScript shell or block -> Patchright ----> extraction (Go)
      -> Markdown, links, attempts
 
 Patchright adapter (TypeScript)
@@ -46,9 +46,9 @@ Patchright adapter (TypeScript)
 
 - Port the structural anti-bot checks from the current OpenExtract design.
 - Add Spider-style weighted JavaScript-render detection.
-- Route confirmed blocks directly to Patchright instead of wasting a chromedp attempt.
+- Route confirmed blocks directly to Patchright instead of wasting an extra browser attempt.
 - Carry the HTTP user agent and cookies into browser fallbacks.
-- Learn successful browser routes per hostname with an expiring in-memory cache.
+- Learn successful browser routes per hostname with an expiring cache, persisted in SQLite since 19 October 2026.
 
 ### 3. Extraction parity
 
@@ -59,7 +59,7 @@ Patchright adapter (TypeScript)
 
 ### 4. Browser hardening
 
-- Reuse chromedp and Patchright browser processes.
+- Reuse Patchright browser processes in the single browser service.
 - Add proxy/fingerprint coherence and persistent named sessions where needed.
 - Port optional Turnstile token-provider support behind the browser contract.
 - Add browser recycling, request interception, and per-domain wait profiles.
@@ -74,7 +74,7 @@ Patchright adapter (TypeScript)
 ## Initial acceptance gates
 
 - No JavaScript shell may be reported as `outcome=ok` in the fixture suite.
-- Confirmed challenge responses must skip chromedp.
+- Confirmed challenge responses must go straight to Patchright.
 - Patchright must receive coherent UA, cookies, and proxy settings, and must keep the browser's native locale and timezone because Cloudflare detects emulated values.
 - Every attempt must have a bounded timeout and a recorded classification reason.
 - The service must reject saturated queues before starting more browser work.
@@ -82,7 +82,7 @@ Patchright adapter (TypeScript)
 ## Known first-slice gaps
 
 - HTML and text are supported first; PDF extraction is a cutover blocker.
-- Learned routes are process-local; a shared store is unnecessary until multiple replicas need it.
+- Learned routes persist in a local SQLite file; a shared store is unnecessary until multiple replicas need it.
 - External CAPTCHA token providers are not in the first slice.
 - Domain-specific interaction recipes are deferred until corpus evidence justifies them.
 

@@ -6,16 +6,19 @@ Status recorded on 5 October 2026.
 
 ```mermaid
 flowchart LR
-    Target[Protected page] --> HTTP[HTTP request]
-    HTTP -->|Challenge| Patchright[Patchright: real Chrome]
-    Patchright -->|Still blocked| Bootstrap[Fetch challenge through sticky proxy]
+    Target[Protected page] --> Replay{Stored clearance?}
+    Replay -->|Usable| Classifier[Classify and extract]
+    Replay -->|None or unusable| HTTP[HTTP request]
+    HTTP -->|Challenge| Patchright[Browser service: Patchright, real Chrome]
+    Patchright -->|Passed| Classifier
+    Patchright -->|Still blocked| Bootstrap[Fetch challenge over HTTP through sticky proxy]
     Bootstrap --> CapSolver[CapSolver AntiCloudflareTask]
     CapSolver --> Session[Clearance cookie + matching user agent]
-    Session --> Chromedp[Chromedp through the same proxy]
-    Chromedp --> Classifier[Classify and extract]
+    Session --> Solved[Fetch solved page over HTTP through the same proxy]
+    Solved --> Classifier
 ```
 
-Patchright is the primary path. CapSolver is an optional last resort, enabled only when `CAPSOLVER_API_KEY` and either `PAGELODE_CAPSOLVER_PROXY_URL` or `PAGELODE_PROXY_URL` are set.
+Patchright is the primary path. A passed challenge records the clearance and the `patchright` route in the state file, so a later run, even a new process, replays it or goes straight to the browser. CapSolver is an optional last resort, enabled only when `CAPSOLVER_API_KEY` and either `PAGELODE_CAPSOLVER_PROXY_URL` or `PAGELODE_PROXY_URL` are set. Since 19 October 2026 its solved page is fetched with the HTTP client instead of a browser; that path has not been re-measured.
 
 ## Requirements
 
@@ -44,15 +47,25 @@ Before the locale and timezone override was removed, Patchright failed every run
 
 ## CapSolver results
 
-CapSolver returned a `cf_clearance` cookie on every task, but Cloudflare accepted it on only 1 of 9 replays. Using the same sticky IP, the exact solved user agent, and a Chrome TLS fingerprint did not change that. The fallback is unreliable and should not be relied on when Patchright can pass.
+CapSolver returned a `cf_clearance` cookie on every task, but Cloudflare accepted it on only 1 of 9 replays (5 October 2026, solved page loaded in the former browser tier). Using the same sticky IP, the exact solved user agent, and a Chrome TLS fingerprint did not change that. The fallback is unreliable and should not be relied on when Patchright can pass.
 
 CapSolver rejects proxies it cannot authenticate before solving. It requires a sticky proxy with a username and password.
 
 ## Known gaps
 
 - The browser service container now runs headed Google Chrome on an Xvfb virtual display. Container results are in [browser service](browser-service.md), not in the table above.
-- With a `_session-<id>` proxy, each PageLode server process keeps one proxy session until restart. Only CLI runs get a new session automatically. A `{session}` placeholder gives each browser service identity its own session, and rotating the identity gets a new one; see [configuration](configuration.md#fresh-session-per-run).
+- Proxy sessions are derived from the browser identity and stay stable across runs; PageLode rotates to a new session only after a host blocks the identity twice in a row. See [configuration](configuration.md#proxy-sessions).
 - Crunchbase has not been retested since the locale fix.
+
+## Live check, 19 October 2026
+
+Mac, home IP, local headed browser service, no CapSolver.
+
+| Target | Result |
+|---|---|
+| scrapingcourse Cloudflare challenge | `tls` attempt blocked by "Cloudflare challenge header"; `patchright` ok in about 19 seconds |
+| scrapingcourse antibot challenge, new process | Went straight to `patchright` from the persisted route; ok in 0.9 seconds |
+| react.dev | ok over `tls` |
 
 ## Test command
 

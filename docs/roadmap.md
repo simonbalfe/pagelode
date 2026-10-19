@@ -12,7 +12,7 @@ Implemented today:
 - Printing Press endpoint classification and grouping.
 - Named authenticated Patchright profiles, including session-cookie persistence.
 - Compact discovery reports with optional verbose request evidence.
-- HTTP, chromedp, and Patchright loading with shared limits and escalation.
+- HTTP and Patchright browser-service loading with shared limits, escalation, and route memory and clearances persisted in SQLite.
 
 All features below are planned. Proposed routes and commands are not available yet. Keep the existing Markdown `/extract` and network-analysis `/discover` contracts. Go owns orchestration, analysis, limits, jobs, and reports; Patchright owns browser interactions. External model and proxy credentials remain caller-owned.
 
@@ -65,7 +65,7 @@ Offer optional schema-guided model extraction with caller-supplied model configu
 
 **Status: implemented.** `pagelode emails` and `POST /emails` crawl contact and directory pages, extract published addresses from full HTML and captured JSON, decode common obfuscation, deduplicate addresses, and retain source URLs. Page, address, and duration limits bound each search. Named profiles use serial Patchright captures.
 
-See [email finding documentation](emails.md) for usage, response fields, rendering controls, and fixed crawl limits. Fixture tests cover prioritization, sitemaps, footer addresses, encoded and multiple mailto recipients, structured data, obfuscation, duplicates, crawl bounds, failed pages, query redaction, and profile routing. The smoke test checks JavaScript-loaded contact JSON through Chromedp and Patchright.
+See [email finding documentation](emails.md) for usage, response fields, rendering controls, and fixed crawl limits. Fixture tests cover prioritization, sitemaps, footer addresses, encoded and multiple mailto recipients, structured data, obfuscation, duplicates, crawl bounds, failed pages, query redaction, and profile routing. The smoke test checks JavaScript-loaded contact JSON through the Patchright browser service.
 
 Remaining improvements: explicit path filters, configurable crawl depth and browser readiness, shared page caching, per-host scheduling, and JSONL/CSV export.
 
@@ -87,7 +87,7 @@ Persist checkpoints and configuration so interrupted work can resume. Define res
 
 ## Rendering controls and dynamic content
 
-Expose readiness controls such as waiting for a selector or bounded condition, rather than relying only on a fixed delay. Support bounded browser actions, resource blocking, viewport and locale configuration, frame inspection, and Shadow DOM access where needed.
+The render API already waits until the page goes quiet (capped by `settle_ms`) and accepts a `wait_for` selector; expose these readiness controls to callers and add bounded conditions beyond a selector. Support bounded browser actions, resource blocking, viewport and locale configuration, frame inspection, and Shadow DOM access where needed.
 
 Handle lazy loading, load-more controls, infinite scroll, and virtualized lists. Accumulate records or network responses during scrolling so items removed from the DOM remain available. Return explicit coverage limits when scrolling stops.
 

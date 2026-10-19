@@ -11,19 +11,23 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 | `PORT` | `8083` | HTTP server port |
 | `PAGELODE_BROWSER_URL` | `http://127.0.0.1:8090` | Base URL of the browser service (`http` or `https`) |
 | `PAGELODE_BROWSER_TOKEN` | empty | Bearer token sent to the browser service; must match `BROWSER_SERVICE_TOKEN` |
-| `PAGELODE_PROXY_URL` | empty | Shared HTTP, HTTPS, SOCKS4, or SOCKS5 proxy for every loader |
+| `PAGELODE_PROXY_URL` | empty | Shared HTTP, HTTPS, SOCKS4, or SOCKS5 proxy template for every loader; see [proxies](#proxies) |
 | `CAPSOLVER_API_KEY` | empty | Enable CapSolver: the Cloudflare fallback, Google `/sorry`, and DataDome sliders. Only the PageLode process reads it |
 | `PAGELODE_CAPSOLVER_URL` | `https://api.capsolver.com` | CapSolver API base URL |
 | `PAGELODE_CAPSOLVER_PROXY_URL` | shared proxy or empty | Sticky authenticated proxy used for solving and the solved request |
 | `PAGELODE_PROTECTED_DOMAINS` | `crunchbase.com` | Comma-separated hosts routed directly to Patchright |
-| `PAGELODE_CHROMEDP_ENABLED` | `true` | Enable the ordinary JavaScript-rendering layer |
 | `PAGELODE_MAX_CONCURRENCY` | `20` | Maximum active extraction requests |
-| `PAGELODE_BROWSER_CONCURRENCY` | `4` | Maximum active Chromedp and Patchright jobs |
-| `PAGELODE_MAX_WAITING` | `100` | Maximum requests waiting for either limiter |
+| `PAGELODE_MAX_WAITING` | `100` | Maximum extraction requests waiting for a slot |
 | `PAGELODE_REQUEST_TIMEOUT` | `90s` | Deadline for a complete extraction |
 | `PAGELODE_ROUTE_TTL` | `30m` | Lifetime of a learned hostname route |
+| `PAGELODE_BROWSER_SETTLE_MS` | `2000` | Longest wait for a browser render to go quiet after load, 0–10000 ms; sent as `settle_ms`. Quiet pages return sooner |
+| `PAGELODE_STATE_PATH` | user configuration directory plus `pagelode/state.sqlite` | SQLite file for learned routes, clearances, and identity generations |
 
-`PAGELODE_BROWSER_CONCURRENCY` cannot exceed `PAGELODE_MAX_CONCURRENCY`.
+Browser concurrency is limited only by the browser service (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`). When its queue is full it answers `429 saturated`; PageLode records an `error` attempt.
+
+### State file
+
+`PAGELODE_STATE_PATH` defaults to `~/Library/Application Support/pagelode/state.sqlite` on macOS and `~/.config/pagelode/state.sqlite` on Linux. It holds learned routes, clearances (cookies, browser headers, proxy URL), and the current identity generation per proxy, so routes and clearances survive restarts and separate CLI runs. The file is created with mode `0600` because clearances are private. Rows are loaded at start, expired rows are pruned, and every change is written through; a failed write is logged and does not stop the request. The Docker image sets it to `/data/state.sqlite` on the `pagelode-data` volume.
 
 ## Browser service
 
@@ -44,7 +48,7 @@ See [browser service](browser-service.md) for every variable, the HTTP API, sess
 
 ## Proxies
 
-PageLode works with any proxy provider. Set one URL and every loader (HTTP, Chromedp, Patchright) uses it:
+PageLode works with any proxy provider. Set one URL and every loader (HTTP, Patchright, CapSolver) uses it:
 
 ```sh
 PAGELODE_PROXY_URL=http://username:password@proxy.example.com:8080
@@ -52,7 +56,7 @@ PAGELODE_PROXY_URL=http://username:password@proxy.example.com:8080
 
 - Accepted schemes are `http`, `https`, `socks4`, and `socks5`.
 - IP-allowlisted proxies work without `username:password@`.
-- Prefer the provider's HTTP endpoint. Chrome does not support authenticated SOCKS5, so a `socks5://user:pass@…` proxy fails in Patchright and Chromedp.
+- Prefer the provider's HTTP endpoint. Chrome does not support authenticated SOCKS5, so a `socks5://user:pass@…` proxy fails in Patchright.
 - Providers that use `host:port:user:pass` strings must be rewritten as `http://user:pass@host:port`.
 
 ### Use a sticky session
@@ -61,21 +65,34 @@ A browser page makes many connections. If the provider gives each connection a n
 
 The proxy's country does not need to match the machine's timezone. For an HTTP or HTTPS proxy, the browser service looks up the proxy's exit IP and launches Chrome with a matching timezone and languages, and turns off non-proxied WebRTC UDP. See [browser service](browser-service.md).
 
-### Fresh session per run
+### Proxy sessions
 
-When the proxy password contains `_session-<id>`, `_hardsession-<id>`, or `_lockedsession-<id>`, PageLode replaces the ID with a random one at startup. Every CLI run gets a new sticky IP, and all loaders in that run share it. A long-running server keeps one session until it restarts or the provider's session lifetime expires.
+`PAGELODE_PROXY_URL` is a template. PageLode owns the sticky session in it when the URL contains either:
+
+- a `{session}` placeholder, written raw or URL-encoded (`%7Bsession%7D`), or
+- a provider password token `_session-<id>`, `_hardsession-<id>`, or `_lockedsession-<id>`.
 
 ```sh
 PAGELODE_PROXY_URL=http://username:password_session-any1234_lifetime-30@proxy.example.com:3000
 ```
 
-Other session formats, such as a session ID in the username, are used unchanged. Change the ID yourself to get a new IP.
+PageLode derives the session from the browser identity, not from the run:
 
-The browser service also replaces a `{session}` placeholder in the proxy URL with a stable ID per browser identity, profile, or session, so each one keeps its own sticky IP and rotating an identity gets a new one. Write it URL-encoded (`%7Bsession%7D`) in `PAGELODE_PROXY_URL`; the Go loaders use the URL as written. See [browser service](browser-service.md).
+| Use | Session |
+|---|---|
+| Anonymous renders and plain HTTP | Derived from the identity key `pl-<hash of template>-g<generation>`; stable across runs |
+| Saved profiles | Derived from `profile:<name>` |
+| Ad-hoc browser sessions | Random per session |
+
+Plain HTTP follows the current identity's proxy, so HTTP and the browser share one exit IP. When one host blocks the identity on 2 consecutive renders (status 401, 403, or 429, or a remaining challenge), PageLode moves to the next generation, which gives a new session and IP, stores it in the state file, and asks the browser service to delete the old identity.
+
+Other session formats, such as a session ID in the username without `{session}`, are used unchanged and never rotate. Change the ID yourself to get a new IP.
+
+The browser service receives only concrete proxy URLs and rejects any containing `{session}`. See [browser service](browser-service.md#identities-and-rotation).
 
 ### CapSolver proxy
 
-`PAGELODE_CAPSOLVER_PROXY_URL` sets a separate proxy for the CapSolver fallback only. If it is unset, CapSolver uses `PAGELODE_PROXY_URL`. CapSolver needs a sticky proxy with a username and password, because its clearance cookie is bound to the IP that solved the challenge. PageLode replays the solved cookies and user agent through that same proxy.
+`PAGELODE_CAPSOLVER_PROXY_URL` sets a separate proxy for the CapSolver fallback only. If it is unset, CapSolver uses `PAGELODE_PROXY_URL`. CapSolver needs a sticky proxy with a username and password, because its clearance cookie is bound to the IP that solved the challenge. Its session is filled with a random ID once per process. PageLode fetches the challenge and the solved page over the HTTP client through that same proxy.
 
 ## Passing Cloudflare challenges
 
@@ -102,7 +119,7 @@ The browser service Docker image runs headed Google Chrome on an Xvfb virtual di
 
 ## Protected domains
 
-Protected domains begin at Patchright instead of spending time on the HTTP and Chromedp layers.
+Protected domains go straight to the browser service instead of spending time on an HTTP attempt.
 
 ```sh
 PAGELODE_PROTECTED_DOMAINS=example.com,another.example

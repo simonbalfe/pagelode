@@ -81,7 +81,7 @@ Expose title, canonical URL, meta description, links, headings, JSON-LD, and bas
 
 ### 3. Complete discovery capture coverage
 
-The discovery interface above is implemented; extend its capture coverage as use cases require. Start with automated chromedp capture and the common analyzer, then add HAR input and capture parity in Patchright. Keep analysis and grouping in Go; the browser adapter returns captured observations. Link response samples to the page and interaction that caused them.
+The discovery interface above is implemented with Patchright capture in the browser service, HAR input, and the common analyzer; extend its capture coverage as use cases require. Keep analysis and grouping in Go; the browser adapter returns captured observations. Link response samples to the page and interaction that caused them.
 
 **Done when:** importing a fixture HAR yields stable endpoint groups and redacted evidence; a local JavaScript fixture produces the same inventory through live capture.
 
@@ -138,4 +138,4 @@ Add CLI subcommands for `fetch`, `discover`, `scrape`, `crawl`, and `search`, wi
 
 ## First build slice
 
-The discovery slice is implemented with `/discover`, chromedp and Patchright capture, HAR input, and a per-page endpoint analyzer. See [discovery.md](discovery.md) for the current contract and limits. Build structured selectors, collection recipes, storage, and MCP after discovery works. This ordering makes the requested page breakdown available before expanding the surrounding scraping workflow.
+The discovery slice is implemented with `/discover`, Patchright capture through the browser service, HAR input, and a per-page endpoint analyzer. See [discovery.md](discovery.md) for the current contract and limits. Build structured selectors, collection recipes, storage, and MCP after discovery works. This ordering makes the requested page breakdown available before expanding the surrounding scraping workflow.

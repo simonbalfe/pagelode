@@ -19,7 +19,7 @@ pagelode discover --verbose https://example.com/listings
 pagelode discover --stealth https://example.com/listings
 ```
 
-Discovery always prints JSON. The default report omits request evidence, evidence references, sequence details, and loading attempts. Use `--verbose` or API `"verbose": true` to include those details. Verbose reports still redact credentials. `--wait-ms` controls the observation period after navigation completes: default 1500 milliseconds, minimum 100, maximum 10000. The configured extraction timeout bounds the whole operation.
+Discovery always prints JSON. The default report omits request evidence, evidence references, sequence details, and loading attempts. Use `--verbose` or API `"verbose": true` to include those details. Verbose reports still redact credentials. `--wait-ms` is the longest the capture keeps observing after navigation: it ends earlier once the page goes quiet (200 ms without content requests or DOM changes; see [waiting for the page](browser-service.md#waiting-for-the-page)). Default 1500 milliseconds, minimum 100, maximum 10000. The configured extraction timeout bounds the whole operation.
 
 HAR input runs the same analyzer without opening a browser. The CLI accepts files up to 4 MiB, including standard HAR metadata and base64 response bodies. An optional URL after `--har` identifies the page being analyzed.
 
@@ -104,7 +104,7 @@ pagelode discover --profile creatorcrawl --verbose creatorcrawl.com
 
 The login command opens a visible browser session on the browser service host at the URL, with a one-hour limit, and prints its CDP URL. Sign in manually, including any MFA, then press Enter in the terminal; PageLode closes the session and the browser service saves the profile. The profile saves cookies, including session cookies, local storage, and the browser's other persistent state. Session storage is tied to individual tabs and is not guaranteed to survive reopening. No credentials need to be passed to PageLode.
 
-Go validates profile names and passes the name to the browser service, which owns profile storage. Named discovery launches the profile's browser on the service, using its `BROWSER_SERVICE_HEADLESS` setting, restores the saved cookies, and closes the browser afterward so that state is saved and the profile is released. It always uses Patchright, even when ordinary discovery would use chromedp. A missing profile fails (`profile_not_found`) with a login instruction rather than silently running unauthenticated. Each profile has its own browser directory; normal discovery does not select a named profile. The browser service runs one render at a time per profile and rejects a profile held by an open login session (`profile_in_use`), so finish logging in before discovering.
+Go validates profile names and passes the name to the browser service, which owns profile storage. Named discovery launches the profile's browser on the service, using its `BROWSER_SERVICE_HEADLESS` setting, restores the saved cookies, and closes the browser afterward so that state is saved and the profile is released. A missing profile fails (`profile_not_found`) with a login instruction rather than silently running unauthenticated. Each profile has its own browser directory; normal discovery does not select a named profile. The browser service runs one render at a time per profile and rejects a profile held by an open login session (`profile_in_use`), so finish logging in before discovering.
 
 API callers select an existing profile with `{"url":"https://creatorcrawl.com","profile":"creatorcrawl","verbose":false}`. Profiles belong to the browser service; every PageLode instance pointed at the same `PAGELODE_BROWSER_URL` sees the same profiles. Profiles apply to live discovery only, not HAR input.
 
@@ -112,9 +112,16 @@ The browser service stores profiles under `BROWSER_SERVICE_PROFILES_DIR`. It def
 
 ## Loading and limits
 
-Discovery starts with chromedp because even a usable HTML page can make useful data requests. Protected hostname rules or disabled chromedp route it directly to Patchright. A blocked or failed chromedp load escalates to Patchright. Both paths use the existing proxy configuration, classification, and browser limiter. Capturing a normal page does not teach extraction to skip its cheap HTTP attempt.
+Discovery loads the page once, in the browser service (provider `patchright`), because even a usable HTML page can make useful data requests. There is no escalation and no route memory: capturing a normal page does not teach extraction to skip its cheap HTTP attempt. The capture uses the existing proxy configuration and classification, and the browser service's own queue limits concurrency.
 
-Stealth discovery (`--stealth` or API `"stealth": true`) skips that waterfall: the page loads once, in Patchright, through `PAGELODE_PROXY_URL`. A server without that proxy rejects stealth requests instead of loading the page from its own address. Profile discovery already uses Patchright only and accepts `stealth` to require the proxy as well.
+| Capture result | Report |
+|---|---|
+| Usable | `outcome: ok` |
+| Blocked or retryable, with traffic captured | `outcome: blocked` with the warning "page remained blocked in the browser" |
+| Blocked, no traffic | Error |
+| Dead (404 or 410) | `outcome: dead` |
+
+Stealth discovery (`--stealth` or API `"stealth": true`) only refuses to run unless `PAGELODE_PROXY_URL` is set, so the page is never loaded from the server's own address. Every capture already uses the browser service.
 
 Retained traffic is bounded to 200 entries, 256 KiB per body, and 2 MiB of bodies per load. Schemas inspect at most eight nested levels, twenty array samples, and 512 fields per schema. The report records dropped or truncated observations. Stream and binary protocol payloads are identified by their transport signals rather than decoded into record schemas. Discovery observes initial loading and the configured wait period; explicit clicks, scrolling, and endpoint replay are future additions.
 
@@ -125,11 +132,10 @@ Header values and raw request/response bodies are private capture inputs. Public
 | Module | Responsibility |
 |---|---|
 | `internal/page/capture.go` | Portable browser traffic values and capture limits |
-| `internal/chromefetch/capture.go` | CDP event collection and bounded body retrieval |
 | `browser-service/src/render/capture.ts` | Patchright network collection |
 | `browser-service/src/profiles/` | Profile directories, saved cookies (`store.ts`), and per-profile locks (`locks.ts`) |
 | `internal/browser/client.go` | Render and capture requests to the browser service over HTTP |
-| `internal/discovery/service.go` | Input validation, loading, escalation, and shared limits |
+| `internal/discovery/service.go` | Input validation, the single browser capture, and outcome mapping |
 | `internal/discovery/classifier.go` | Ported Printing Press scoring and path matching |
 | `internal/discovery/view.go` | Report verbosity |
 | `internal/profile/store.go` | Named profile name validation |
@@ -146,10 +152,10 @@ Header values and raw request/response bodies are private capture inputs. Public
 ```sh
 make check
 make smoke
-PAGELODE_BROWSER_TESTS=1 go test -race ./internal/chromefetch ./internal/browser ./internal/emails
+PAGELODE_BROWSER_TESTS=1 go test -race ./internal/browser ./internal/emails
 ```
 
-The browser tests require installed Chromium/Chrome, Bun, and the browser service dependencies (`bun install` and `bunx patchright install chromium` in `browser-service/`, or `make setup`). `internal/browser/browsertest` starts the real browser service with `bun`, headless on bundled Chromium. The tests load local REST/GraphQL fixtures and exercise concurrent chromedp loads and real Patchright renders through the service. Unit tests cover grouping, mixed response types, pagination, redaction, HAR decoding, input validation, and fallback routing.
+The browser tests require Bun and the browser service dependencies (`bun install` and `bunx patchright install chromium` in `browser-service/`, or `make setup`). `internal/browser/browsertest` starts the real browser service with `bun`, headless on bundled Chromium. The tests load local REST/GraphQL fixtures and exercise real Patchright renders and captures through the service. Unit tests cover grouping, mixed response types, pagination, redaction, HAR decoding, input validation, and fallback routing.
 
 ## Planned interactive discovery
 

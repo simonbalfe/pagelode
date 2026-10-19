@@ -58,7 +58,7 @@ Anonymous page loads use up to four concurrent workers within the service's shar
 
 The extractor reads full HTML before Markdown cleanup, preserving contact details in headers and footers. It handles multiple and percent-encoded mailto recipients, visible text, email fields in JSON-LD and embedded JSON, explicit `[at]`/`(at)` and `[dot]`/`(dot)` obfuscation, and Cloudflare's encoded email attributes and links. Captured successful JSON responses are searched for email fields. Script code and elements with `hidden` or `aria-hidden="true"` attributes are excluded. Addresses are lowercased, checked for syntax, sorted, and deduplicated while retaining their sources.
 
-`auto` starts with HTTP and escalates JavaScript shells or pages with signals of dynamically loaded contact data. If HTTP already yields addresses, it keeps that fast result. `always` captures browser-rendered pages even when HTTP would find addresses; use it to inspect additional JavaScript-loaded contacts. `never` stays on HTTP. Browser captures observe traffic for 500 ms after loading, so later interactions and delayed responses can require future readiness controls.
+`auto` starts with HTTP and escalates JavaScript shells or pages with signals of dynamically loaded contact data to a browser capture in the browser service. Hosts with a remembered Patchright route or a protected-domain rule skip HTTP. A dead HTTP page stops there. If HTTP already yields addresses, it keeps that fast result. `always` captures browser-rendered pages even when HTTP would find addresses; use it to inspect additional JavaScript-loaded contacts. `never` stays on HTTP and reports an error for pages that need a browser. An unusable capture falls back to CapSolver when it is configured. Usable anonymous captures record the route for the host. Browser captures observe traffic until the page goes quiet, for at most 500 ms after loading, so later interactions and slower delayed responses can require future readiness controls.
 
 ## Authenticated searches
 
@@ -73,4 +73,4 @@ Address syntax and presence establish that an address was published; they do not
 
 ## Code organization
 
-`internal/emails` owns request validation, page loading policy, candidate selection, address decoding, and bounded crawling. The CLI and API share its service. HTTP, Chromedp, and Patchright provide the existing acquisition and capture implementations; the browser service contains no email extraction logic.
+`internal/emails` owns request validation, page loading policy, candidate selection, address decoding, and bounded crawling. The CLI and API share its service. HTTP and the Patchright browser service provide the acquisition and capture implementations; the browser service contains no email extraction logic.

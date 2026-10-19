@@ -8,10 +8,10 @@ Give it a URL and it returns the useful content, page title, internal links, and
 
 Many web pages can be downloaded directly. Others need JavaScript, and some place a browser check in front of their content. Using a full browser for every request is slow and expensive, so PageLode uses a simple waterfall:
 
-1. Load the page with a browser-like HTTP client.
-2. If JavaScript is required, render it with Chromedp and Chromium.
-3. If the page appears blocked, retry it with Patchright.
-4. If Cloudflare still blocks the page and CapSolver is configured, obtain a valid browser session and retry through the same proxy.
+1. Replay a stored browser clearance for the domain, when one exists.
+2. Load the page with a browser-like HTTP client.
+3. If JavaScript is required or the page appears blocked, render it with Patchright in the browser service.
+4. If the page is still blocked and CapSolver is configured, obtain a valid session and retry through the same proxy.
 5. Remove navigation, advertising, and other clutter.
 6. Return readable Markdown and useful metadata.
 
@@ -19,7 +19,7 @@ PageLode keeps the main service in Go. Patchright, whose browser tooling is buil
 
 ## Quick start
 
-You need Go, Bun, and Chromium installed. On macOS and Windows the browser service uses Google Chrome by default, so install Chrome as well.
+You need Go and Bun installed. On macOS and Windows the browser service uses Google Chrome by default, so install Chrome as well.
 
 ```sh
 make setup
@@ -28,7 +28,7 @@ make run-browser   # in a second terminal
 ./bin/pagelode example.com
 ```
 
-PageLode prints the cleaned page as Markdown. The browser service listens on `http://127.0.0.1:8090`; PageLode calls it only when a page needs Patchright.
+PageLode prints the cleaned page as Markdown. The browser service listens on `http://127.0.0.1:8090`; PageLode calls it whenever a page needs a browser.
 
 For the complete result, including the loader attempts:
 
@@ -68,9 +68,9 @@ Captures a page's network traffic and prints a JSON report of its data endpoints
 
 | Option | Default | Effect |
 |---|---|---|
-| `--wait-ms` | `1500` | Observe network activity after page load, 100–10000 ms |
+| `--wait-ms` | `1500` | Longest wait for network activity after page load, 100–10000 ms; ends earlier when the page goes quiet |
 | `--profile` | none | Use a saved signed-in browser profile |
-| `--stealth` | off | Skip Chromedp and load only with the Patchright stealth browser through `PAGELODE_PROXY_URL`. Fails when no proxy is configured |
+| `--stealth` | off | Refuse to run unless `PAGELODE_PROXY_URL` is set. Every capture already uses the Patchright browser service |
 | `--verbose` | off | Include request evidence, matching scores, and loading details |
 | `--har` | none | Analyze a HAR file instead of opening a browser. An optional URL names the page it came from |
 
@@ -194,14 +194,14 @@ Compose starts two containers that share `BROWSER_SERVICE_TOKEN`:
 
 | Service | Image | Port |
 |---|---|---|
-| `pagelode` | Go binary plus Debian Chromium for Chromedp, in service mode | `8083` |
+| `pagelode` | Go binary in service mode; learned routes, clearances, and identities persist in the `pagelode-data` volume at `/data` | `8083` |
 | `browser` | Bun browser service with headed Google Chrome on an Xvfb virtual display | `127.0.0.1:8090` |
 
 Browser data and profiles persist in the `browser-data` volume at `/data`. `BROWSER_TZ` sets the browser container's timezone (default `Etc/UTC`). See [browser service](docs/browser-service.md) for the API, sessions, identities, and the container.
 
 ## Current scope
 
-PageLode currently supports HTML and text pages. It detects common block pages and JavaScript-only shells, limits response sizes and concurrency, and remembers the best loader for recently visited domains.
+PageLode currently supports HTML and text pages. It detects common block pages and JavaScript-only shells, limits response sizes and concurrency, and remembers the best loader and browser clearances per domain in a local SQLite file that survives restarts.
 
 It does not guarantee access to protected websites. The optional CapSolver fallback requires an API key and a sticky authenticated proxy. Some sites also require authenticated sessions or permission from the site owner. Use PageLode responsibly and follow applicable terms, robots policies, and laws.
 
@@ -209,6 +209,7 @@ It does not guarantee access to protected websites. The optional CapSolver fallb
 
 - [Architecture](docs/architecture.md)
 - [Browser service](docs/browser-service.md)
+- [Browser stack decision](docs/browser-stack-decision.md)
 - [Browser routing](docs/browser-routing.md)
 - [Endpoint discovery](docs/discovery.md)
 - [Email finding](docs/emails.md)
@@ -224,7 +225,7 @@ make check
 make smoke
 ```
 
-`make check` runs the Go tests, race detector, vet, and the browser service type check (`bun run check` in `browser-service/`). `make smoke` starts the browser service and PageLode, then verifies all three loading paths against local fixtures.
+`make check` runs the Go tests, race detector, vet, and the browser service type check (`bun run check` in `browser-service/`). `make smoke` starts the browser service and PageLode, verifies the HTTP and browser paths against local fixtures, and checks that a second CLI run reuses the persisted route. `scripts/stealth-check.sh` renders bot-detector.rebrowser.net through the service and fails on any red check.
 
 ## License
 
