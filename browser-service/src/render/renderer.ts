@@ -49,8 +49,7 @@ export class Renderer {
       deadline.reject(new ServiceError(504, "render_failed", `render exceeded ${limitMs} ms; browser restarted`));
     }, limitMs);
     try {
-      const environment = { signal, log: this.#log, proxyURL: lease.proxyURL, capsolver: this.#config.capsolver };
-      const result = await Promise.race([lease.context.then((context) => renderPage(context, input, environment)), deadline.promise]);
+      const result = await Promise.race([lease.context.then((context) => renderPage(context, input, { signal, log: this.#log })), deadline.promise]);
       lease.recordHeaders(result.replay.headers);
       return { ...result, replay: { ...result.replay, identity: key, ...(lease.proxyURL === undefined ? {} : { proxy_url: lease.proxyURL }) } };
     } finally {
@@ -66,7 +65,7 @@ export class Renderer {
       const { context } = await launchBrowser(this.#config, this.#log, { directory, proxyURL, headless: this.#config.headless });
       try {
         await restoreCookies(context, directory);
-        const result = await renderPage(context, input, { signal, log: this.#log, proxyURL, capsolver: this.#config.capsolver });
+        const result = await renderPage(context, input, { signal, log: this.#log });
         await saveCookies(context, directory);
         return { ...result, replay: { ...result.replay, ...(proxyURL === undefined ? {} : { proxy_url: proxyURL }) } };
       } finally {

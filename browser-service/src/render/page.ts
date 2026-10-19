@@ -1,10 +1,8 @@
 import type { BrowserContext, Page, Request } from "patchright";
-import { clearDataDome } from "../captcha/datadome.ts";
-import { clearGoogleSorry } from "../captcha/google.ts";
-import type { CapSolverSettings } from "../config.ts";
 import type { Log } from "../shared/log.ts";
 import { captureTraffic } from "./capture.ts";
 import { settleChallenge } from "./challenge.ts";
+import { settleDataDome } from "./datadome.ts";
 import { portableCookies, replayHeaders } from "./replay.ts";
 import type { RenderRequest, RenderResult } from "./schema.ts";
 
@@ -13,8 +11,6 @@ const settleDelayMs = 500;
 export type RenderEnvironment = {
   readonly signal: AbortSignal;
   readonly log: Log;
-  readonly proxyURL: string | undefined;
-  readonly capsolver: CapSolverSettings | undefined;
 };
 
 export async function renderPage(context: BrowserContext, input: RenderRequest, environment: RenderEnvironment): Promise<RenderResult> {
@@ -38,10 +34,7 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
     const response = await page.goto(input.url, { timeout: input.timeout_ms, waitUntil: input.wait_until });
     log("navigation_complete", { status: response?.status() ?? 0, title: await page.title(), url: page.url() });
     if (input.settle_challenge) await settleChallenge(page, log);
-    if (input.solve_captcha) {
-      await clearDataDome(page, environment);
-      await clearGoogleSorry(page, environment);
-    }
+    if (input.solve_captcha) await settleDataDome(page, log);
     await page.waitForTimeout(input.capture?.wait_ms ?? settleDelayMs);
     return {
       status_code: documentStatus || response?.status() || 0,

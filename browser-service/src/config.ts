@@ -19,8 +19,6 @@ const environmentSchema = z.object({
   BROWSER_SERVICE_PROFILES_DIR: z.string().default(""),
   BROWSER_SERVICE_DATA_DIR: z.string().default(""),
   BROWSER_SERVICE_DEBUG: flag.default(false),
-  CAPSOLVER_API_KEY: z.string().default(""),
-  CAPSOLVER_URL: z.url().default("https://api.capsolver.com"),
 });
 
 export type Config = {
@@ -38,12 +36,6 @@ export type Config = {
   readonly profilesDirectory: string;
   readonly dataDirectory: string;
   readonly debug: boolean;
-  readonly capsolver: CapSolverSettings | undefined;
-};
-
-export type CapSolverSettings = {
-  readonly apiKey: string;
-  readonly url: string;
 };
 
 function userConfigDirectory(): string {
@@ -80,6 +72,5 @@ export function loadConfig(environment: NodeJS.ProcessEnv): Config {
     profilesDirectory: parsed.BROWSER_SERVICE_PROFILES_DIR || join(userConfigDirectory(), "pagelode", "profiles"),
     dataDirectory: parsed.BROWSER_SERVICE_DATA_DIR || defaultDataDirectory(),
     debug: parsed.BROWSER_SERVICE_DEBUG,
-    capsolver: parsed.CAPSOLVER_API_KEY === "" ? undefined : { apiKey: parsed.CAPSOLVER_API_KEY, url: parsed.CAPSOLVER_URL },
   };
 }
