@@ -24,40 +24,27 @@ type Client struct {
 	proxyURL string
 }
 
+type Form struct {
+	Method  string
+	Action  string
+	Values  url.Values
+	Referer string
+}
+
 func New(proxyURL string) *Client {
 	return &Client{proxyURL: proxyURL}
 }
 
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
-	jar := tlsclient.NewCookieJar()
-	profile := profiles.Chrome_150
-	if session.Replayable() {
-		profile = profiles.Chrome_152
-	}
-	options := []tlsclient.HttpClientOption{
-		tlsclient.WithTimeoutSeconds(30),
-		tlsclient.WithClientProfile(profile),
-		tlsclient.WithCookieJar(jar),
-	}
-	proxyURL := c.proxyURL
-	if session.ProxyURL != "" {
-		proxyURL = session.ProxyURL
-	}
-	if proxyURL != "" {
-		options = append(options, tlsclient.WithProxyUrl(proxyURL))
-	}
-	client, err := tlsclient.NewHttpClient(tlsclient.NewNoopLogger(), options...)
-	if err != nil {
-		return page.Document{}, fmt.Errorf("http fetch: create TLS client: %w", err)
-	}
-	defer client.CloseIdleConnections()
 	parsedTargetURL, err := url.Parse(targetURL)
 	if err != nil {
 		return page.Document{}, fmt.Errorf("http fetch: parse target URL: %w", err)
 	}
-	if len(session.Cookies) > 0 {
-		jar.SetCookies(parsedTargetURL, requestCookies(session.Cookies))
+	client, err := c.client(parsedTargetURL, session)
+	if err != nil {
+		return page.Document{}, err
 	}
+	defer client.CloseIdleConnections()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
@@ -111,6 +98,89 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		document.Text = strings.TrimSpace(string(body))
 	}
 	return document, nil
+}
+
+func (c *Client) Submit(ctx context.Context, form Form, session page.Session) (page.Document, error) {
+	action, err := url.Parse(form.Action)
+	if err != nil {
+		return page.Document{}, fmt.Errorf("http submit: parse action: %w", err)
+	}
+	client, err := c.client(action, session, tlsclient.WithNotFollowRedirects())
+	if err != nil {
+		return page.Document{}, err
+	}
+	defer client.CloseIdleConnections()
+	method := strings.ToUpper(form.Method)
+	var body io.Reader
+	if method == http.MethodPost {
+		body = strings.NewReader(form.Values.Encode())
+	} else {
+		method = http.MethodGet
+		action.RawQuery = form.Values.Encode()
+	}
+	request, err := http.NewRequestWithContext(ctx, method, action.String(), body)
+	if err != nil {
+		return page.Document{}, fmt.Errorf("http submit: create request: %w", err)
+	}
+	effectiveUserAgent := userAgent
+	if session.UserAgent != "" {
+		effectiveUserAgent = session.UserAgent
+	}
+	request.Header = requestHeaders(effectiveUserAgent, session)
+	request.Header.Set("sec-fetch-site", "same-origin")
+	request.Header.Set("referer", form.Referer)
+	if body != nil {
+		request.Header.Set("content-type", "application/x-www-form-urlencoded")
+		request.Header.Set("origin", action.Scheme+"://"+action.Host)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return page.Document{}, fmt.Errorf("http submit: request: %w", err)
+	}
+	if _, err := io.Copy(io.Discard, io.LimitReader(response.Body, maxResponseBytes)); err != nil {
+		_ = response.Body.Close()
+		return page.Document{}, fmt.Errorf("http submit: read response: %w", err)
+	}
+	if err := response.Body.Close(); err != nil {
+		return page.Document{}, fmt.Errorf("http submit: close response: %w", err)
+	}
+	return page.Document{
+		Provider:   page.ProviderTLS,
+		StatusCode: response.StatusCode,
+		FinalURL:   action.String(),
+		Type:       page.ContentUnknown,
+		Session: page.Session{
+			UserAgent: effectiveUserAgent,
+			Cookies:   portableCookies(client.GetCookies(action), action.Hostname()),
+		},
+	}, nil
+}
+
+func (c *Client) client(target *url.URL, session page.Session, extra ...tlsclient.HttpClientOption) (tlsclient.HttpClient, error) {
+	profile := profiles.Chrome_150
+	if session.Replayable() {
+		profile = profiles.Chrome_152
+	}
+	options := append([]tlsclient.HttpClientOption{
+		tlsclient.WithTimeoutSeconds(30),
+		tlsclient.WithClientProfile(profile),
+		tlsclient.WithCookieJar(tlsclient.NewCookieJar()),
+	}, extra...)
+	proxyURL := c.proxyURL
+	if session.ProxyURL != "" {
+		proxyURL = session.ProxyURL
+	}
+	if proxyURL != "" {
+		options = append(options, tlsclient.WithProxyUrl(proxyURL))
+	}
+	client, err := tlsclient.NewHttpClient(tlsclient.NewNoopLogger(), options...)
+	if err != nil {
+		return nil, fmt.Errorf("http fetch: create TLS client: %w", err)
+	}
+	if len(session.Cookies) > 0 {
+		client.SetCookies(target, requestCookies(session.Cookies))
+	}
+	return client, nil
 }
 
 func requestHeaders(userAgent string, session page.Session) http.Header {

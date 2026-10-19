@@ -61,11 +61,12 @@ func TestFetchSolvesAndPassesSession(t *testing.T) {
 	defer server.Close()
 
 	downstream := &sessionFetcher{}
-	client, err := New("key", server.URL, "http://user:pass@proxy.example:8080", downstream, downstream)
+	api := NewAPI("key", server.URL)
+	api.pollWait = time.Millisecond
+	client, err := New(api, "http://user:pass@proxy.example:8080", downstream, downstream)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	client.pollWait = time.Millisecond
 	document, err := client.Fetch(context.Background(), "https://example.com/page", page.Session{})
 	if err != nil {
 		t.Fatalf("Fetch() error = %v", err)
@@ -90,7 +91,7 @@ func TestFetchSolvesAndPassesSession(t *testing.T) {
 func TestNewIsDisabledWithoutCredentials(t *testing.T) {
 	t.Parallel()
 
-	client, err := New("", "https://api.capsolver.com", "", &sessionFetcher{}, &sessionFetcher{})
+	client, err := New(NewAPI("", "https://api.capsolver.com"), "", &sessionFetcher{}, &sessionFetcher{})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -104,5 +105,51 @@ func TestSolverProxyRequiresAuthentication(t *testing.T) {
 
 	if _, err := solverProxy("http://proxy.example:8080"); err == nil {
 		t.Fatal("solverProxy() error = nil")
+	}
+}
+
+func TestRecaptchaRunsThroughTheGivenProxy(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name      string
+		proxyURL  string
+		wantType  string
+		wantProxy string
+	}{
+		{name: "proxied", proxyURL: "http://user:pass@proxy.example:8080", wantType: "ReCaptchaV2Task", wantProxy: "http:proxy.example:8080:user:pass"},
+		{name: "direct", wantType: "ReCaptchaV2TaskProxyLess"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				var payload struct {
+					Task map[string]any `json:"task"`
+				}
+				if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+					t.Errorf("decode request: %v", err)
+				}
+				if request.URL.Path == "/createTask" {
+					proxy, _ := payload.Task["proxy"].(string)
+					if payload.Task["type"] != test.wantType || proxy != test.wantProxy || payload.Task["recaptchaDataSValue"] != "data-s" {
+						t.Errorf("task = %#v", payload.Task)
+					}
+					_, _ = writer.Write([]byte(`{"errorId":0,"taskId":"task-1"}`))
+					return
+				}
+				_, _ = writer.Write([]byte(`{"errorId":0,"status":"ready","solution":{"gRecaptchaResponse":"token"}}`))
+			}))
+			defer server.Close()
+			api := NewAPI("key", server.URL)
+			api.pollWait = time.Millisecond
+
+			token, err := api.Recaptcha(context.Background(), RecaptchaTask{WebsiteURL: "https://www.google.com/sorry/index", WebsiteKey: "site", DataS: "data-s", ProxyURL: test.proxyURL})
+			if err != nil {
+				t.Fatalf("Recaptcha() error = %v", err)
+			}
+			if token != "token" {
+				t.Errorf("Recaptcha() = %q, want token", token)
+			}
+		})
 	}
 }

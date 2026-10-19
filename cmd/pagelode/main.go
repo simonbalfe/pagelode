@@ -17,6 +17,7 @@ import (
 	"github.com/simonbalfe/pagelode/internal/api"
 	"github.com/simonbalfe/pagelode/internal/browser"
 	"github.com/simonbalfe/pagelode/internal/capsolver"
+	"github.com/simonbalfe/pagelode/internal/captcha"
 	"github.com/simonbalfe/pagelode/internal/chromefetch"
 	"github.com/simonbalfe/pagelode/internal/config"
 	"github.com/simonbalfe/pagelode/internal/discovery"
@@ -122,12 +123,13 @@ func newApplication(configuration config.Config) (*application, error) {
 			return nil, fmt.Errorf("configure CapSolver: %w", err)
 		}
 	}
+	capSolverAPI := capsolver.NewAPI(configuration.CapSolverAPIKey, configuration.CapSolverURL)
 	capSolverHTTPClient := httpfetch.New(capSolverProxyURL)
 	capSolverChromedp, err := chromefetch.New(capSolverProxyURL)
 	if err != nil {
 		return nil, fmt.Errorf("configure CapSolver browser: %w", err)
 	}
-	capSolverClient, err := capsolver.New(configuration.CapSolverAPIKey, configuration.CapSolverURL, capSolverProxyURL, capSolverHTTPClient, capSolverChromedp)
+	capSolverClient, err := capsolver.New(capSolverAPI, capSolverProxyURL, capSolverHTTPClient, capSolverChromedp)
 	if err != nil {
 		return nil, fmt.Errorf("configure CapSolver: %w", err)
 	}
@@ -135,21 +137,26 @@ func newApplication(configuration config.Config) (*application, error) {
 	if capSolverClient != nil {
 		capSolverFetcher = capSolverClient
 	}
+	var captchaTasks captcha.Tasks
+	if capSolverAPI != nil {
+		captchaTasks = capSolverAPI
+	}
+	patchright := captcha.New(browserClient, captchaTasks, httpClient)
 	extractor := orchestrator.New(
 		httpClient,
 		chromedp,
-		browserClient,
+		patchright,
 		capSolverFetcher,
 		routes,
 		memory.NewClearances(configuration.RouteTTL),
 		browserLimiter,
 		configuration.ChromedpEnabled,
 	)
-	emailLoader := emails.NewLoader(httpClient, chromedp, browserClient, capSolverFetcher, routes, browserLimiter, configuration.ChromedpEnabled)
+	emailLoader := emails.NewLoader(httpClient, chromedp, patchright, capSolverFetcher, routes, browserLimiter, configuration.ChromedpEnabled)
 	return &application{
 		mapper:            sitemap.New(httpClient, extractLimiter),
 		emailFinder:       emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency),
-		discoverer:        discovery.New(chromedp, browserClient, routes, browserLimiter, configuration.ChromedpEnabled).WithProxy(configuration.ProxyURL != ""),
+		discoverer:        discovery.New(chromedp, patchright, routes, browserLimiter, configuration.ChromedpEnabled).WithProxy(configuration.ProxyURL != ""),
 		extractor:         extractor,
 		extractLimiter:    extractLimiter,
 		browserLimiter:    browserLimiter,
