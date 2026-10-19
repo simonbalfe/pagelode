@@ -188,3 +188,29 @@ In `auto` mode, `needsBrowser` decides whether a usable HTTP page still needs re
 - Browser captures wait until the page goes quiet, for at most 500 ms after loading, so that network traffic can be observed.
 - Every usable browser capture without a profile records its provider in route memory.
 - Profile loads always use the browser service and never record routes.
+
+## HTTP coverage benchmark
+
+How many pages HTTP alone can serve, and what the browser is asked to do with the rest. Measured on 19 October 2026 on an Apple M4 Pro from a UK home IP without a proxy: 10,000 distinct page URLs from the Common Crawl sample in `data/commoncrawl.duckdb` (9,360 hosts), sent to `pagelode serve` with 400 requests in flight (`PAGELODE_MAX_CONCURRENCY=400`) and the browser service unreachable, so every result is the HTTP attempt.
+
+| Result of the HTTP attempt | URLs | Share | Would the browser help? |
+|---|---:|---:|---|
+| Content extracted over HTTP | 8,082 | 80.8% | Not needed |
+| JavaScript shell (`needs_render`) | 553 | 5.5% | Yes |
+| Blocked or challenge | 457 | 4.6% | Yes |
+| Timeout (30 s HTTP client limit) | 174 | 1.7% | Rarely |
+| HTML fetched but nothing extractable | 155 | 1.6% | Sometimes |
+| Dead page (404/410) | 146 | 1.5% | No; the waterfall already stops |
+| Domain does not exist | 118 | 1.2% | No |
+| Non-HTML response (PDF, image, other files) | 113 | 1.1% | No |
+| Bad TLS certificate | 73 | 0.7% | No |
+| Server error (5xx) | 49 | 0.5% | Rarely |
+| Other transport errors | 39 | 0.4% | Unknown |
+| Connection refused or reset | 19 | 0.2% | No |
+| HTTP client fails with `protocol negotiated` on HTTP/1.1-only servers | 17 | 0.2% | No; a tls-client bug, `curl` loads these pages |
+| Other 4xx | 5 | 0.1% | Rarely |
+
+- **Throughput:** 10,000 URLs in 105 s, 95 URLs/s overall and about 130 URLs/s before the slowest requests; the tail is the 30 s client timeout. HTTP attempt latency: p50 1.06 s, p90 2.9 s, p99 30 s.
+- **Escalation that cannot help:** the current waterfall sends every transport error, non-HTML or empty extraction, and 5xx to the browser. About 9% of URLs fall in those rows, against 10.1% that genuinely need a browser.
+- **Fixes this points to:** retry over HTTP/1.1 on `protocol negotiated`; end `no such host`, refused connections, and certificate errors as failed without a browser; stop non-HTML responses at HTTP; retry 5xx over HTTP once before rendering. See [Katana notes](katana.md#suggested-order).
+- **Earlier mixed run:** with the browser service enabled at `BROWSER_SERVICE_CONCURRENCY=32`, the service process exited after about 60 s on an unhandled Patchright rejection (`Network.setCacheDisabled` on a closed session), failing every later browser render. The service needs a process-level guard for rejections that escape a render.

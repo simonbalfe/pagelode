@@ -211,6 +211,7 @@ It does not guarantee access to protected websites. The optional CapSolver fallb
 - [Browser service](docs/browser-service.md)
 - [Browser stack decision](docs/browser-stack-decision.md)
 - [Browser routing](docs/browser-routing.md)
+- [What PageLode can take from Katana](docs/katana.md)
 - [Endpoint discovery](docs/discovery.md)
 - [Email finding](docs/emails.md)
 - [Configuration](docs/configuration.md)
