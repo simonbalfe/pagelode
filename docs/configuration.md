@@ -12,7 +12,7 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 | `PAGELODE_BROWSER_URL` | `http://127.0.0.1:8090` | Base URL of the browser service (`http` or `https`) |
 | `PAGELODE_BROWSER_TOKEN` | empty | Bearer token sent to the browser service; must match `BROWSER_SERVICE_TOKEN` |
 | `PAGELODE_PROXY_URL` | empty | Shared HTTP, HTTPS, SOCKS4, or SOCKS5 proxy for every loader |
-| `CAPSOLVER_API_KEY` | empty | Enable the managed Cloudflare fallback |
+| `CAPSOLVER_API_KEY` | empty | Enable CapSolver: the Cloudflare fallback, Google `/sorry`, and DataDome sliders. Only the PageLode process reads it |
 | `PAGELODE_CAPSOLVER_URL` | `https://api.capsolver.com` | CapSolver API base URL |
 | `PAGELODE_CAPSOLVER_PROXY_URL` | shared proxy or empty | Sticky authenticated proxy used for solving and the solved request |
 | `PAGELODE_PROTECTED_DOMAINS` | `crunchbase.com` | Comma-separated hosts routed directly to Patchright |
@@ -27,7 +27,7 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 
 ## Browser service
 
-The browser service owns the browser mode, Chrome channel, and saved profiles. The main settings:
+The browser service owns the browser mode, Chrome channel, and saved profiles. It holds no CapSolver key. The main settings:
 
 | Variable | Default | Purpose |
 |---|---:|---|

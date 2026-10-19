@@ -18,7 +18,7 @@ Both use the same classifier (`internal/classify`) and route memory (`internal/m
 | `replay` | `bogdanfinn/tls-client` with a browser-harvested session: same proxy IP, cookies, and Chrome headers | Cheapest | Tried first when a browser render has recorded a clearance for the host; see [clearance replay](browser-service.md#clearance-replay) |
 | `tls` | `bogdanfinn/tls-client` with a Chrome TLS profile | Cheapest | Always tried first unless a route is remembered |
 | `chromedp` | `chromedp/chromedp` driving one reusable Chromium | Medium | JavaScript shells; skipped when `PAGELODE_CHROMEDP_ENABLED=false` |
-| `patchright` | Patchright in the browser service (`browser-service/`), called over HTTP by `internal/browser` | High | Challenge pages, protected domains, and every other failure |
+| `patchright` | Patchright in the browser service (`browser-service/`), called over HTTP by `internal/browser`; `internal/captcha` solves Google `/sorry` and DataDome sliders in the result when `CAPSOLVER_API_KEY` is set | High | Challenge pages, protected domains, and every other failure |
 | `capsolver` | CapSolver API, then Chromedp with the solved session | Highest | Optional last resort; needs `CAPSOLVER_API_KEY` and a sticky authenticated proxy |
 
 The cookies and user agent from the HTTP attempt are passed to each browser fallback.

@@ -102,11 +102,13 @@ Patchright handles confirmed challenge pages, protected domains, and failures th
 
 For an ordinary render, the service leases a warm browser identity: a persistent Chrome context keyed by identity or proxy, launched with the timezone and languages of the proxy's exit IP. It opens a fresh page, applies the cookies, renders the page, makes a bounded attempt to settle visible challenges, and returns HTML plus updated cookies. A render with a named profile launches that profile's own persistent context instead. See [browser service](browser-service.md).
 
+When `CAPSOLVER_API_KEY` is set, `internal/captcha` wraps every Patchright render. A render that ends on Google's `/sorry` reCAPTCHA or a DataDome slider is solved in Go through the identity's proxy and rendered again with the solved cookie; see [captchas](browser-service.md#captchas).
+
 ### CapSolver
 
 CapSolver is an optional final escalation for Cloudflare challenges that remain after local Patchright. The Go client fetches the live challenge through a sticky proxy, creates an `AntiCloudflareTask`, polls within the extraction deadline, converts the returned clearance cookies and user agent into a portable session, and renders the target with Chromedp through the same proxy.
 
-It is disabled unless both `CAPSOLVER_API_KEY` and an authenticated solver proxy are available. API keys and proxy credentials are never included in attempt logs.
+It is disabled unless both `CAPSOLVER_API_KEY` and an authenticated solver proxy are available. API keys and proxy credentials are never included in attempt logs. The same key also enables the Google and DataDome solving above, which needs no separate solver proxy.
 
 ## Browser service boundary
 
@@ -233,7 +235,8 @@ Request contexts carry deadlines through the API, orchestrator, loaders, browser
 | `internal/httpfetch` | Profiled direct HTTP loader and session capture |
 | `internal/chromefetch` | Ordinary JavaScript rendering with Chromedp |
 | `internal/browser` | HTTP client for the browser service: render, capture, and sessions |
-| `internal/capsolver` | Managed Cloudflare task polling and solved-session handoff |
+| `internal/capsolver` | CapSolver task polling: Cloudflare solved-session handoff, reCAPTCHA tokens, DataDome cookies |
+| `internal/captcha` | Solves Google `/sorry` and DataDome sliders left in Patchright renders, then renders again |
 | `internal/classify` | Block, render, retry, dead, and accept decisions |
 | `internal/extract` | Readability, DOM cleanup, Markdown, links, structured data |
 | `internal/memory` | Expiring hostname-to-provider routes |
