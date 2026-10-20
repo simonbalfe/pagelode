@@ -1,6 +1,6 @@
 # Site mapping
 
-`pagelode map` and `POST /map` list the page URLs of one site. Flags are listed in the [CLI reference](cli.md#pagelode-map).
+`pagelode map` and `POST /map` list the page URLs of one site. Flags are listed in the [CLI reference](cli.md#pagelode-map). To see the data endpoints a single page calls, use `pagelode map endpoints`; see [endpoint discovery](discovery.md).
 
 ```sh
 pagelode map example.com

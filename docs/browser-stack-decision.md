@@ -80,7 +80,7 @@ This was acceptable only because routing sent it unprotected JavaScript shells a
 
 ### Chromedp removal gate
 
-Not run. Kept as the measurement that was planned: the same real lead list (about 200 domains) through `pagelode emails-bulk` twice with the service running, once with Chromedp enabled and once disabled.
+Not run. Kept as the measurement that was planned: the same real lead list (about 200 domains) through `pagelode emails --input` twice with the service running, once with Chromedp enabled and once disabled.
 
 | Measure | Remove Chromedp if disabling it |
 |---|---|

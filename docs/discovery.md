@@ -5,18 +5,18 @@ PageLode exposes two operations:
 | Interface | Result |
 |---|---|
 | `POST /extract` or `pagelode extract <URL>` | Clean Markdown, links, and extraction attempts |
-| `POST /discover` or `pagelode discover <URL>` | A structured breakdown of the requests and data sources observed during a page load |
+| `POST /discover` or `pagelode map endpoints <URL>` | A structured breakdown of the requests and data sources observed during a page load |
 
 Discovery loads the page with browser instrumentation active before navigation. Go analyzes the captured requests into endpoint descriptions. Each result belongs to one input page.
 
 ## Use the CLI
 
 ```sh
-pagelode discover https://example.com/listings
-pagelode discover --wait-ms 3000 https://example.com/listings
-pagelode discover --har capture.har
-pagelode discover --verbose https://example.com/listings
-pagelode discover --stealth https://example.com/listings
+pagelode map endpoints https://example.com/listings
+pagelode map endpoints --wait-ms 3000 https://example.com/listings
+pagelode map endpoints --har capture.har
+pagelode map endpoints --verbose https://example.com/listings
+pagelode map endpoints --stealth https://example.com/listings
 ```
 
 Discovery always prints JSON. The default report omits request evidence, evidence references, sequence details, and loading attempts. Use `--verbose` or API `"verbose": true` to include those details. Verbose reports still redact credentials. `--wait-ms` is the longest the capture keeps observing after navigation: it ends earlier once the page goes quiet (200 ms without content requests or DOM changes; see [waiting for the page](browser-service.md#waiting-for-the-page)). Default 1500 milliseconds, minimum 100, maximum 10000. The configured extraction timeout bounds the whole operation.
@@ -112,8 +112,8 @@ Endpoint groups use lowercase hostname, uppercase trimmed method, and normalized
 
 ```sh
 pagelode profile login creatorcrawl https://creatorcrawl.com
-pagelode discover --profile creatorcrawl creatorcrawl.com
-pagelode discover --profile creatorcrawl --verbose creatorcrawl.com
+pagelode map endpoints --profile creatorcrawl creatorcrawl.com
+pagelode map endpoints --profile creatorcrawl --verbose creatorcrawl.com
 ```
 
 The login command opens a visible browser session on the browser service host at the URL, with a one-hour limit, and prints its CDP URL. Sign in manually, including any MFA, then press Enter in the terminal; PageLode closes the session and the browser service saves the profile. The profile saves cookies, including session cookies, local storage, and the browser's other persistent state. Session storage is tied to individual tabs and is not guaranteed to survive reopening. No credentials need to be passed to PageLode.
@@ -145,21 +145,21 @@ Header values and raw request/response bodies are private capture inputs. Public
 
 | Module | Responsibility |
 |---|---|
-| `page/capture.go` | Portable browser traffic values and capture limits |
+| `pkg/page/capture.go` | Portable browser traffic values and capture limits |
 | `browser-service/src/render/capture.ts` | Patchright network collection |
 | `browser-service/src/profiles/` | Profile directories, saved cookies (`store.ts`), and per-profile locks (`locks.ts`) |
-| `browser/client.go` | Render and capture requests to the browser service over HTTP |
-| `discovery/service.go` | Input validation, the single browser capture, and outcome mapping |
-| `discovery/classifier.go` | Ported Printing Press scoring and path matching |
-| `discovery/view.go` | Report verbosity |
-| `profile/store.go` | Named profile name validation |
-| `cmd/pagelode/profile.go` | Interactive profile login |
-| `discovery/analyze.go` | Endpoint grouping, public evidence, and coverage reporting |
-| `discovery/schema.go` | Observed JSON/form/query shapes |
-| `discovery/signals.go` | Protocol, auth, pagination, and protection analysis |
-| `discovery/har.go` | Offline HAR normalization |
+| `pkg/browser/client.go` | Render and capture requests to the browser service over HTTP |
+| `pkg/discovery/service.go` | Input validation, the single browser capture, and outcome mapping |
+| `pkg/discovery/classifier.go` | Ported Printing Press scoring and path matching |
+| `pkg/discovery/view.go` | Report verbosity |
+| `pkg/profile/store.go` | Named profile name validation |
+| `internal/cli/profile.go` | Interactive profile login |
+| `pkg/discovery/analyze.go` | Endpoint grouping, public evidence, and coverage reporting |
+| `pkg/discovery/schema.go` | Observed JSON/form/query shapes |
+| `pkg/discovery/signals.go` | Protocol, auth, pagination, and protection analysis |
+| `pkg/discovery/har.go` | Offline HAR normalization |
 | `internal/api/discover.go` | HTTP interface |
-| `cmd/pagelode/discover.go` | CLI interface |
+| `internal/cli/endpoints.go` | CLI interface |
 
 ## Verification
 

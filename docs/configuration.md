@@ -13,7 +13,7 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 | `PAGELODE_BROWSER_TOKEN` | empty | Bearer token sent to every browser service node; must match `BROWSER_SERVICE_TOKEN` |
 | `PAGELODE_BROWSER_IDENTITIES` | `1` | Browser identities, each with its own proxy session. Hosts are spread over them by a stable hash, each rotates on its own, and identity `n` renders on node `n` modulo the node count |
 | `PAGELODE_BROWSER_NODE_SLOTS` | `4` | Renders PageLode sends to one browser service node at once; match that node's `BROWSER_SERVICE_CONCURRENCY` |
-| `PAGELODE_QUEUE_URL` | empty | Postgres URL (`postgres://` or `postgresql://`) of the shared queue used by `pagelode batch` |
+| `PAGELODE_QUEUE_URL` | empty | Postgres URL (`postgres://` or `postgresql://`) of the shared queue used by `pagelode extract batch` |
 | `PAGELODE_PROXY_URL` | empty | Shared HTTP, HTTPS, SOCKS4, or SOCKS5 proxy template for every loader; see [proxies](#proxies) |
 | `CAPSOLVER_API_KEY` | empty | Enable CapSolver: the Cloudflare fallback, Google `/sorry`, and DataDome sliders. Only the PageLode process reads it |
 | `PAGELODE_CAPSOLVER_URL` | `https://api.capsolver.com` | CapSolver API base URL |
@@ -136,4 +136,4 @@ For a private deployment, place PageLode behind an authenticated reverse proxy, 
 
 ## Authenticated discovery
 
-Use `pagelode profile login <name> <URL>` to create a persistent Patchright login and `pagelode discover --profile <name> <URL>` to reuse it. Login opens a visible browser on the browser service host; discovery with a profile uses the service's `BROWSER_SERVICE_HEADLESS` setting. Profiles are stored by the browser service under `BROWSER_SERVICE_PROFILES_DIR`. See [endpoint discovery](discovery.md#authenticated-profiles) for session storage and API usage.
+Use `pagelode profile login <name> <URL>` to create a persistent Patchright login and `pagelode map endpoints --profile <name> <URL>` to reuse it. Login opens a visible browser on the browser service host; discovery with a profile uses the service's `BROWSER_SERVICE_HEADLESS` setting. Profiles are stored by the browser service under `BROWSER_SERVICE_PROFILES_DIR`. See [endpoint discovery](discovery.md#authenticated-profiles) for session storage and API usage.

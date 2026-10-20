@@ -10,7 +10,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/simonbalfe/pagelode/emails"
+	"github.com/simonbalfe/pagelode/pkg/emails"
 )
 
 const schema = `

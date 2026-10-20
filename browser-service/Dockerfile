@@ -15,7 +15,7 @@ RUN bun install --frozen-lockfile --production
 COPY --chown=bun:bun browser-service/desktop/fluxbox-init /home/bun/.fluxbox/init
 COPY --chown=bun:bun browser-service/desktop/fluxbox-apps /home/bun/.fluxbox/apps
 COPY browser-service/desktop ./desktop
-COPY signatures /app/signatures
+COPY pkg/signatures /app/pkg/signatures
 COPY browser-service/src ./src
 COPY browser-service/public ./public
 COPY browser-service/docker-entrypoint.sh ./

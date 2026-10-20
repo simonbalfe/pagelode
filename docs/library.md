@@ -1,6 +1,6 @@
 # Using PageLode as a library
 
-The packages at the module root are importable; `internal/` holds the app's HTTP API, config, and SQLite stores.
+The packages under `pkg/` are importable; `internal/` holds the app's CLI, HTTP API, config, and SQLite stores.
 
 - Shared types: `page` — loader-neutral documents, sessions, and captures.
 - Loaders:
@@ -38,8 +38,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/simonbalfe/pagelode/httpfetch"
-	"github.com/simonbalfe/pagelode/page"
+	"github.com/simonbalfe/pagelode/pkg/httpfetch"
+	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 func main() {

@@ -22,8 +22,8 @@ The API serves the same operations as the CLI:
 |---|---|---|
 | `POST /extract` | `pagelode <URL>` | `{"url"}` |
 | `POST /map` | `pagelode map` | `{"url", "limit", "maxDurationMs", "subdomains", "include", "exclude", "depth", "render", "explore"}` |
-| `POST /discover` | `pagelode discover` | `{"url", "waitMs", "profile", "stealth", "verbose"}` or `{"har"}` for an offline capture |
+| `POST /discover` | `pagelode map endpoints` | `{"url", "waitMs", "profile", "stealth", "verbose"}` or `{"har"}` for an offline capture |
 | `POST /emails` | `pagelode emails` | `{"url", "maxPages", "maxEmails", "maxDurationMs", "profile", "render"}` |
 | `GET /healthz` | none | none |
 
-`emails-bulk`, `batch`, `profile login`, and `version` have no API form. Request fields, status codes, and response formats are described in [site mapping](map.md), [endpoint discovery](discovery.md), and [email finding](emails.md).
+`extract batch`, `emails --input`, `profile login`, and `version` have no API form. Request fields, status codes, and response formats are described in [site mapping](map.md), [endpoint discovery](discovery.md), and [email finding](emails.md).

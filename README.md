@@ -20,22 +20,22 @@ make run-browser   # in a second terminal
 | Command | What it does | Output |
 |---|---|---|
 | `pagelode <URL>` / `extract` | Load one page and clean it | Markdown, or `--json` with links and loader attempts |
+| `extract batch` | `extract` for millions of URLs across many machines | Gzipped JSONL; queue in Postgres |
 | `map` | List a site's pages, page templates, and script endpoints | One URL per line, or `--json` |
-| `discover` | Find the data endpoints behind a page | JSON report |
-| `emails` | Find published email addresses on a site | One address per line |
-| `emails-bulk` | `emails` for a list of sites | SQLite database |
-| `batch` | `extract` for millions of URLs across many machines | Gzipped JSONL; queue in Postgres |
+| `map endpoints` | Find the data endpoints behind a page | JSON report |
+| `emails` | Find published email addresses on a site; `--input` for a list of sites | One address per line, or SQLite with `--input` |
 | `profile login` | Save a signed-in browser for `--profile` | Named profile |
 | `serve` | Run the same operations as an HTTP API | API on `PORT` (default `8083`) |
 
 ```sh
 pagelode example.com
 pagelode map --json example.com
-pagelode discover https://example.com/listings
+pagelode map endpoints https://example.com/listings
 pagelode emails example.com
+pagelode emails --input sites.txt
 ```
 
-A typical workflow: `map` the site to find its page types, `extract` a sample of each, `discover` the endpoints behind the interesting ones, then `emails` for contacts.
+A typical workflow: `map` the site to find its page types, `extract` a sample of each, `map endpoints` on the interesting ones, then `emails` for contacts.
 
 Run `pagelode help <command>` for every flag. Settings come from environment variables; see [configuration](docs/configuration.md).
 

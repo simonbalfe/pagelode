@@ -40,7 +40,7 @@ Use the separate `POST /discover` interface:
 }
 ```
 
-This is implemented through `POST /discover` and `pagelode discover <URL>`. A normal extraction returns content; discovery returns a structured page analysis. Both use the same Go loading service. HAR input runs the same analyzer on an existing capture.
+This is implemented through `POST /discover` and `pagelode map endpoints <URL>`. A normal extraction returns content; discovery returns a structured page analysis. Both use the same Go loading service. HAR input runs the same analyzer on an existing capture.
 
 For discovery, browser instrumentation must be active before navigation even when direct HTTP returns usable HTML. Capture the initial document, redirects, XHR/fetch responses, relevant resource metadata, and request initiators where available. Attribute each request to the page and frame that caused it. Each page in a multi-page job gets its own breakdown; an aggregated endpoint index may deduplicate shared endpoints while retaining those page references.
 

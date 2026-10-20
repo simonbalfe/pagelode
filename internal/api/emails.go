@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/simonbalfe/pagelode/emails"
-	"github.com/simonbalfe/pagelode/limit"
+	"github.com/simonbalfe/pagelode/pkg/emails"
+	"github.com/simonbalfe/pagelode/pkg/limit"
 )
 
 func (s *Server) WithEmails(finder *emails.Service) *Server {

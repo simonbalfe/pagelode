@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/simonbalfe/pagelode/discovery"
-	"github.com/simonbalfe/pagelode/limit"
+	"github.com/simonbalfe/pagelode/pkg/discovery"
+	"github.com/simonbalfe/pagelode/pkg/limit"
 )
 
 func (s *Server) discover(response http.ResponseWriter, request *http.Request) {

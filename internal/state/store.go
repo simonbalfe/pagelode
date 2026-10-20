@@ -11,8 +11,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/simonbalfe/pagelode/memory"
-	"github.com/simonbalfe/pagelode/page"
+	"github.com/simonbalfe/pagelode/pkg/memory"
+	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 const schema = `

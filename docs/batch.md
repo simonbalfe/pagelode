@@ -1,14 +1,14 @@
 # Batch scraping
 
-`pagelode batch` scrapes millions of URLs from one shared Postgres queue. Any number of `batch run` processes, on any number of machines, can work on the same queue at once.
+`pagelode extract batch` scrapes millions of URLs from one shared Postgres queue. Any number of `extract batch run` processes, on any number of machines, can work on the same queue at once.
 
 ```sh
 export PAGELODE_QUEUE_URL=postgres://user:pass@host/db
-pagelode batch import urls.txt
+pagelode extract batch import urls.txt
 PAGELODE_BROWSER_URL=http://b1:8090,http://b2:8090 PAGELODE_BROWSER_IDENTITIES=8 \
-  pagelode batch run --http-workers 400 --out /data/pages --until-empty
-pagelode batch status
-pagelode batch retry --state failed --to pending
+  pagelode extract batch run --http-workers 400 --out /data/pages --until-empty
+pagelode extract batch status
+pagelode extract batch retry --state failed --to pending
 ```
 
 ## Flow
@@ -38,7 +38,7 @@ flowchart LR
 
 `--browser-workers` defaults to every browser slot: the number of `PAGELODE_BROWSER_URL` nodes × `PAGELODE_BROWSER_NODE_SLOTS`. Set `PAGELODE_BROWSER_NODE_SLOTS` to each node's `BROWSER_SERVICE_CONCURRENCY`, so Go never sends a node more renders than it runs at once. Hosts map to `PAGELODE_BROWSER_IDENTITIES` identity slots by hash; each slot has its own proxy session, warm Chrome context, and rotation, and lives on node `slot % nodes`. A node that refuses connections is skipped for 15 s and its renders go to the next node. See [configuration](configuration.md).
 
-## Flags (`batch run`)
+## Flags (`extract batch run`)
 
 | Flag | Default | Effect |
 |---|---|---|

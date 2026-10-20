@@ -6,9 +6,9 @@ Three pathways make the decision:
 
 | Pathway | Entry point | Decision code |
 |---|---|---|
-| `/extract` and `pagelode <url>` | `orchestrator.Service.Extract` | `orchestrator/orchestrator.go` |
-| `/emails` and `pagelode emails` | `emails.Loader.Load` | `emails/loader.go` |
-| `/discover` and `pagelode discover` | `discovery.Service` | `discovery/service.go`; one browser capture, no escalation or route memory; see [discovery](discovery.md#loading-and-limits) |
+| `/extract` and `pagelode <url>` | `orchestrator.Service.Extract` | `pkg/orchestrator/orchestrator.go` |
+| `/emails` and `pagelode emails` | `emails.Loader.Load` | `pkg/emails/loader.go` |
+| `/discover` and `pagelode map endpoints` | `discovery.Service` | `pkg/discovery/service.go`; one browser capture, no escalation or route memory; see [discovery](discovery.md#loading-and-limits) |
 
 Extraction and email loading use the same classifier (`classify`) and route memory (`memory`), persisted in SQLite (`internal/state`).
 
@@ -25,7 +25,7 @@ The cookies and user agent from the HTTP attempt are passed to each browser fall
 
 ## Classification
 
-`classify.Document` runs after every attempt. The checks run in this order, and the first match wins. Block patterns and challenge signals come from `signatures/signatures.json`, shared with the browser service.
+`classify.Document` runs after every attempt. The checks run in this order, and the first match wins. Block patterns and challenge signals come from `pkg/signatures/signatures.json`, shared with the browser service.
 
 | Order | Condition | Result |
 |---|---|---|

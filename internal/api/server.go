@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/simonbalfe/pagelode/discovery"
-	"github.com/simonbalfe/pagelode/emails"
-	"github.com/simonbalfe/pagelode/limit"
-	"github.com/simonbalfe/pagelode/memory"
-	"github.com/simonbalfe/pagelode/orchestrator"
-	"github.com/simonbalfe/pagelode/sitemap"
+	"github.com/simonbalfe/pagelode/pkg/discovery"
+	"github.com/simonbalfe/pagelode/pkg/emails"
+	"github.com/simonbalfe/pagelode/pkg/limit"
+	"github.com/simonbalfe/pagelode/pkg/memory"
+	"github.com/simonbalfe/pagelode/pkg/orchestrator"
+	"github.com/simonbalfe/pagelode/pkg/sitemap"
 )
 
 const maximumRequestBytes = 16 << 10

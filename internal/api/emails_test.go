@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simonbalfe/pagelode/emails"
-	"github.com/simonbalfe/pagelode/limit"
-	"github.com/simonbalfe/pagelode/memory"
-	"github.com/simonbalfe/pagelode/page"
+	"github.com/simonbalfe/pagelode/pkg/emails"
+	"github.com/simonbalfe/pagelode/pkg/limit"
+	"github.com/simonbalfe/pagelode/pkg/memory"
+	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 type emailLoader struct{}

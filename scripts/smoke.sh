@@ -91,6 +91,8 @@ for fixture_host in 127.0.0.1 localhost; do
 done
 "$work_dir/pagelode" emails --max-pages 1 --render never "http://127.0.0.1:$fixture_port/emails.html" > "$work_dir/emails-cli.txt"
 grep -qx 'footer@example.org' "$work_dir/emails-cli.txt"
-"$work_dir/pagelode" discover --wait-ms 100 "http://127.0.0.1:$fixture_port/discover.html" > "$work_dir/discovery-cli.json"
+printf 'http://127.0.0.1:%s/emails.html\n' "$fixture_port" | "$work_dir/pagelode" emails --input - --max-pages 1 --workers 1 --db "$work_dir/emails.sqlite" > "$work_dir/emails-input.txt" 2>/dev/null
+grep -q '^1 sites crawled, 1 with emails' "$work_dir/emails-input.txt"
+"$work_dir/pagelode" map endpoints --wait-ms 100 "http://127.0.0.1:$fixture_port/discover.html" > "$work_dir/discovery-cli.json"
 grep -q '"path": "/data.json"' "$work_dir/discovery-cli.json"
 printf '%s\n' 'PageLode smoke test passed: extraction, persisted routes, discovery, and email finding through the browser service'

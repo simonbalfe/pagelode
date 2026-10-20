@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/simonbalfe/pagelode/proxy"
+	"github.com/simonbalfe/pagelode/pkg/proxy"
 )
 
 type Config struct {

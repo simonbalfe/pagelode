@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/simonbalfe/pagelode/limit"
-	"github.com/simonbalfe/pagelode/sitemap"
+	"github.com/simonbalfe/pagelode/pkg/limit"
+	"github.com/simonbalfe/pagelode/pkg/sitemap"
 )
 
 func (s *Server) WithMap(mapper *sitemap.Service) *Server {
