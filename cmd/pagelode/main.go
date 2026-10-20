@@ -137,7 +137,7 @@ func wire(configuration config.Config, store *state.Store) (*application, error)
 	renderer := captcha.New(browserClient, captchaTasks, httpClient)
 	emailLoader := emails.NewLoader(httpClient, renderer, capSolverFetcher, routes)
 	return &application{
-		mapper:         sitemap.New(httpClient, extractLimiter),
+		mapper:         sitemap.New(httpClient, extractLimiter).WithBrowser(browserClient),
 		emailFinder:    emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency),
 		discoverer:     discovery.New(renderer).WithProxy(configuration.ProxyURL != ""),
 		extractor:      orchestrator.New(httpClient, renderer, capSolverFetcher, routes, clearances),

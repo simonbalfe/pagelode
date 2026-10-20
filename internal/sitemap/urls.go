@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/simonbalfe/pagelode/internal/urlshape"
 )
 
 const maximumPageLinks = 5000
@@ -152,4 +153,74 @@ func (g globs) match(value string) bool {
 		}
 	}
 	return false
+}
+
+func templatesOf(entries []Entry) []urlshape.Template {
+	if len(entries) == 0 {
+		return nil
+	}
+	urls := make([]string, len(entries))
+	for i, entry := range entries {
+		urls[i] = entry.URL
+	}
+	return urlshape.Templates(urls, templateThreshold)
+}
+
+const maximumRobotsRules = 200
+
+type robotsRule struct {
+	allow   bool
+	length  int
+	pattern *regexp.Regexp
+}
+
+type robotsRules []robotsRule
+
+func parseRobotsRules(body string) robotsRules {
+	var rules robotsRules
+	applies, afterAgent := false, false
+	for _, line := range strings.Split(body, "\n") {
+		if comment := strings.Index(line, "#"); comment >= 0 {
+			line = line[:comment]
+		}
+		name, value, found := strings.Cut(strings.TrimSpace(line), ":")
+		if !found {
+			continue
+		}
+		name, value = strings.ToLower(strings.TrimSpace(name)), strings.TrimSpace(value)
+		switch name {
+		case "user-agent":
+			applies = applies && afterAgent || value == "*"
+			afterAgent = true
+		case "allow", "disallow":
+			afterAgent = false
+			if !applies || value == "" || len(rules) >= maximumRobotsRules {
+				continue
+			}
+			expression := "^" + strings.ReplaceAll(regexp.QuoteMeta(value), `\*`, ".*")
+			if strings.HasSuffix(expression, `\$`) {
+				expression = strings.TrimSuffix(expression, `\$`) + "$"
+			}
+			rules = append(rules, robotsRule{allow: name == "allow", length: len(value), pattern: regexp.MustCompile(expression)})
+		}
+	}
+	return rules
+}
+
+func (r robotsRules) blocks(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	target := parsed.EscapedPath()
+	if parsed.RawQuery != "" {
+		target += "?" + parsed.RawQuery
+	}
+	best, blocked := -1, false
+	for _, rule := range r {
+		if rule.pattern.MatchString(target) && (rule.length > best || rule.length == best && rule.allow) {
+			best, blocked = rule.length, !rule.allow
+		}
+	}
+	return blocked
 }

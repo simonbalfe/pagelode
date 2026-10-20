@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/url"
 	"strings"
+
+	"github.com/simonbalfe/pagelode/internal/urlshape"
 )
 
 const (
@@ -20,6 +22,9 @@ type Request struct {
 	Subdomains    bool     `json:"subdomains,omitempty"`
 	Include       []string `json:"include,omitempty"`
 	Exclude       []string `json:"exclude,omitempty"`
+	Depth         int      `json:"depth,omitempty"`
+	Render        string   `json:"render,omitempty"`
+	Explore       bool     `json:"explore,omitempty"`
 }
 
 func (r Request) Validate() (Request, error) {
@@ -57,15 +62,33 @@ func (r Request) Validate() (Request, error) {
 			}
 		}
 	}
+	if r.Depth == 0 {
+		r.Depth = defaultDepth
+	}
+	if r.Depth < 1 || r.Depth > maximumDepth {
+		return Request{}, errors.New("depth must be between 1 and 5")
+	}
+	switch r.Render {
+	case "":
+		r.Render = renderNever
+	case renderNever, renderAuto, renderAlways:
+	default:
+		return Request{}, errors.New("render must be never, auto, or always")
+	}
+	if r.Explore && r.Render == renderNever {
+		return Request{}, errors.New("explore needs render auto or always")
+	}
 	return r, nil
 }
 
 type Report struct {
-	URL      string   `json:"url"`
-	Outcome  string   `json:"outcome"`
-	URLs     []Entry  `json:"urls"`
-	Summary  Summary  `json:"summary"`
-	Warnings []string `json:"warnings,omitempty"`
+	URL       string              `json:"url"`
+	Outcome   string              `json:"outcome"`
+	URLs      []Entry             `json:"urls"`
+	Summary   Summary             `json:"summary"`
+	Warnings  []string            `json:"warnings,omitempty"`
+	Endpoints []string            `json:"endpoints,omitempty"`
+	Templates []urlshape.Template `json:"templates,omitempty"`
 }
 
 type Entry struct {
@@ -75,13 +98,19 @@ type Entry struct {
 }
 
 type Summary struct {
-	URLsFound    int   `json:"urlsFound"`
-	SitemapsRead int   `json:"sitemapsRead"`
-	DurationMS   int64 `json:"durationMs"`
-	Limited      bool  `json:"limited"`
+	URLsFound     int   `json:"urlsFound"`
+	SitemapsRead  int   `json:"sitemapsRead"`
+	PagesCrawled  int   `json:"pagesCrawled"`
+	PagesRendered int   `json:"pagesRendered,omitempty"`
+	RobotsSkipped int   `json:"robotsSkipped,omitempty"`
+	DurationMS    int64 `json:"durationMs"`
+	Limited       bool  `json:"limited"`
 }
 
 const (
-	sourceSitemap = "sitemap"
-	sourcePage    = "page"
+	sourceSitemap  = "sitemap"
+	sourcePage     = "page"
+	sourceLink     = "link"
+	sourceRendered = "rendered"
+	sourceExplore  = "explore"
 )

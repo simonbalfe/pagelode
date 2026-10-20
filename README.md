@@ -43,7 +43,7 @@ pagelode [--json] <URL>
 pagelode extract [--json] <URL>
 pagelode discover [--wait-ms 1500] [--profile <name>] [--stealth] [--verbose] <URL>
 pagelode discover --har <capture.har> [<URL>]
-pagelode map [--limit 500] [--max-duration 30s] [--include <path>] [--exclude <path>] [--subdomains] [--json] <URL>
+pagelode map [--limit 500] [--max-duration 30s] [--depth 2] [--render never] [--explore] [--include <path>] [--exclude <path>] [--subdomains] [--json] <URL>
 pagelode emails [--max-pages 20] [--max-emails 100] [--max-duration 30s] [--render auto] [--profile <name>] [--verbose] <URL>
 pagelode emails-bulk [--db data/emails.sqlite] [--workers 32] [--max-pages 8] [--max-emails 50] [--max-duration 20s] [--render never] <file|->
 pagelode profile login <name> <URL>
@@ -76,7 +76,17 @@ Captures a page's network traffic and prints a JSON report of its data endpoints
 
 ### `pagelode map`
 
-Lists the page URLs of one site, one per line. It reads `robots.txt` sitemaps, follows sitemap indexes (up to 25 sitemaps), falls back to `/sitemap.xml` and `/sitemap_index.xml`, then adds the start page's links. It uses plain HTTP only, with no browser. URLs are canonicalized (fragments and tracking parameters removed), deduplicated, and limited to the site's host and its `www` twin. Compressed `.xml.gz` sitemaps are skipped with a warning.
+Lists the page URLs of one site, one per line. It reads `robots.txt` sitemaps (including `.xml.gz`), follows sitemap indexes (up to 25 sitemaps), falls back to `/sitemap.xml` and `/sitemap_index.xml`, then crawls page links breadth-first from the start page. URLs are canonicalized (fragments and tracking parameters removed), deduplicated, and limited to the site's host and its `www` twin.
+
+The crawl is built to find the right pages, not every page:
+
+- **Depth.** `--depth 1` reads only the start page; the default `2` also reads the pages it links to. At most 200 pages are fetched.
+- **Sampling.** Every discovered URL is listed, but only the first 20 pages of one URL shape (host, first path segment, segment count, query names) are fetched for further links, so 5,000 tag pages cost 20 fetches.
+- **Duplicates.** A page whose visible text is a near-duplicate (simhash within 3 bits, at least 200 characters) of one already read adds its links to the list but is not expanded.
+- **Robots.** Pages that the `User-agent: *` rules of `robots.txt` disallow are listed when linked but never fetched; `robotsSkipped` counts them.
+- **Scripts.** Same-site `<script src>` files (up to 20) and inline scripts are scanned for endpoint paths such as `/api/users`, reported as `endpoints`. Static assets are ignored.
+- **Templates.** `--json` groups the URLs into path templates such as `/tag/*` with a count and sample URLs, so one sample per page type can be scraped.
+- **Browser.** `--render auto` loads a page in the browser service only when the HTTP result needs JavaScript (up to 25 pages); `always` renders every crawled page up to that cap. `--explore` also scrolls and clicks safe controls on the start page (up to 5 pages) and lists the URLs it reaches; it needs `--render auto` or `always`. Without a browser service these options fall back to HTTP with a warning.
 
 | Option | Default | Effect |
 |---|---|---|
@@ -85,9 +95,12 @@ Lists the page URLs of one site, one per line. It reads `robots.txt` sitemaps, f
 | `--include` | all | Keep only URLs whose path matches this pattern, such as `/blog/*`; `*` matches any characters. Repeatable |
 | `--exclude` | none | Drop URLs whose path matches this pattern. Wins over `--include`. Repeatable |
 | `--subdomains` | off | Also include subdomains of the site |
-| `--json` | off | Print the report: each URL with its `source` (`sitemap` or `page`) and `lastModified`, plus sitemap counts and warnings |
+| `--depth` | `2` | Link levels to follow from the start page, 1–5 |
+| `--render` | `never` | `never`, `auto`, or `always`: when pages load in the browser service |
+| `--explore` | off | Scroll and click safe controls on the start page to reveal links; needs `--render auto` or `always` |
+| `--json` | off | Print the report: each URL with its `source` (`sitemap`, `page`, `link`, `rendered`, or `explore`) and `lastModified`, plus `endpoints`, `templates`, crawl counts, and warnings |
 
-Exits `1` only when no URL was found and nothing could be loaded. `POST /map` takes `{"url", "limit", "maxDurationMs", "subdomains", "include", "exclude"}` and returns the same report.
+Exits `1` only when no URL was found and nothing could be loaded. `POST /map` takes `{"url", "limit", "maxDurationMs", "subdomains", "include", "exclude", "depth", "render", "explore"}` and returns the same report. `scripts/discovery-bench.sh <site>` compares a map against Katana, when installed, and prints URL counts per source.
 
 ### `pagelode emails`
 

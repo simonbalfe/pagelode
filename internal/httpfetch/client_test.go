@@ -1,6 +1,8 @@
 package httpfetch
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +12,53 @@ import (
 
 	"github.com/simonbalfe/pagelode/internal/page"
 )
+
+func TestFetchReadsCompressedSitemapAndJavaScript(t *testing.T) {
+	t.Parallel()
+
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if _, err := writer.Write([]byte(`<urlset><url><loc>https://example.test/a</loc></url></urlset>`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	binary := append([]byte{0x1f, 0x8b}, make([]byte, 20)...)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/sitemap.xml.gz":
+			w.Header().Set("Content-Type", "application/x-gzip")
+			_, _ = w.Write(compressed.Bytes())
+		case "/archive.gz":
+			w.Header().Set("Content-Type", "application/gzip")
+			_, _ = w.Write(binary)
+		case "/app.js":
+			w.Header().Set("Content-Type", "application/javascript")
+			_, _ = w.Write([]byte(`fetch("/api/items")`))
+		}
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		path     string
+		wantType page.ContentType
+		wantText string
+	}{
+		{"/sitemap.xml.gz", page.ContentText, `<urlset><url><loc>https://example.test/a</loc></url></urlset>`},
+		{"/app.js", page.ContentText, `fetch("/api/items")`},
+		{"/archive.gz", page.ContentUnknown, ""},
+	}
+	for _, test := range tests {
+		document, err := New("").Fetch(context.Background(), server.URL+test.path, page.Session{})
+		if err != nil {
+			t.Fatalf("Fetch(%s) error = %v", test.path, err)
+		}
+		if document.Type != test.wantType || document.Text != test.wantText {
+			t.Errorf("Fetch(%s) = type %q text %q, want type %q text %q", test.path, document.Type, document.Text, test.wantType, test.wantText)
+		}
+	}
+}
 
 func TestSubmitPostsFormAndKeepsRedirectCookies(t *testing.T) {
 	t.Parallel()

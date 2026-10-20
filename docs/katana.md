@@ -1,6 +1,6 @@
 # What PageLode can take from Katana
 
-[Katana](https://github.com/projectdiscovery/katana) is ProjectDiscovery's Go crawler (MIT, about 17.7k stars). This page records what in it is useful to PageLode, read from its source on 19 October 2026. Nothing here is implemented yet; the [roadmap](roadmap.md) owns priorities.
+[Katana](https://github.com/projectdiscovery/katana) is ProjectDiscovery's Go crawler (MIT, about 17.7k stars). This page records what in it is useful to PageLode, read from its source on 19 October 2026. The [roadmap](roadmap.md) owns priorities. Status on 20 October 2026: URL-shape sampling, content-similarity skipping, cycle-safe breadth-first crawling, robots rules, and regex endpoint extraction from scripts are implemented in `pagelode map`; jsluice is not used because it needs cgo and the build is `CGO_ENABLED=0`. Endpoint classification gaps (SOAP, GraphQL variants, gRPC-Web, auth schemes) are closed in discovery. Katana's headless engine and stealth remain unused by design. Ported ideas are credited in `licenses/katana.txt`.
 
 ## How Katana is built
 
@@ -52,8 +52,8 @@ Worth reusing from its headless code, implemented in the service rather than wit
 ## Suggested order
 
 1. **Escalation fixes from the [HTTP coverage benchmark](browser-routing.md#http-coverage-benchmark)** (no Katana code): about 9% of URLs reached the browser without a browser being able to help.
-2. **jsluice in discovery** to find endpoints in the page's JavaScript, bounded by size.
-3. **URL-shape and content-similarity filters** for crawl and email budgets.
-4. **Endpoint classification rules** for GraphQL and SOAP, compared with Katana's knowledge base.
+2. **Script endpoint extraction** (done in `map` with a pure-Go regex scan; jsluice would need cgo).
+3. **URL-shape and content-similarity filters** (done in `map`; email budgets still to do).
+4. **Endpoint classification rules** for GraphQL and SOAP (done in discovery).
 5. **URL-change poll** in the service's quiet wait for client-side routed apps.
 6. **Recorded login flows** for profiles.

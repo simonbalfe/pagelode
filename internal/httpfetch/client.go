@@ -1,6 +1,8 @@
 package httpfetch
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -87,6 +89,12 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 	}
 
 	contentType := detectContentType(response.Header.Get("content-type"), parsedFinalURL.Path)
+	if gzipResource(response.Header.Get("content-type"), parsedFinalURL.Path) {
+		if unzipped, ok := gunzip(body); ok {
+			body = unzipped
+			contentType = page.ContentText
+		}
+	}
 	document := page.Document{
 		Provider:   page.ProviderTLS,
 		StatusCode: response.StatusCode,
@@ -104,6 +112,27 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		document.Text = strings.TrimSpace(string(body))
 	}
 	return document, nil
+}
+
+func gzipResource(header string, path string) bool {
+	mediaType, _, _ := mime.ParseMediaType(header)
+	return mediaType == "application/gzip" || mediaType == "application/x-gzip" || strings.HasSuffix(strings.ToLower(path), ".gz")
+}
+
+func gunzip(body []byte) ([]byte, bool) {
+	if len(body) < 2 || body[0] != 0x1f || body[1] != 0x8b {
+		return nil, false
+	}
+	reader, err := gzip.NewReader(bytes.NewReader(body))
+	if err != nil {
+		return nil, false
+	}
+	defer reader.Close()
+	inflated, err := io.ReadAll(io.LimitReader(reader, maxResponseBytes+1))
+	if err != nil || len(inflated) > maxResponseBytes || bytes.IndexByte(inflated[:min(len(inflated), 512)], 0) >= 0 {
+		return nil, false
+	}
+	return inflated, true
 }
 
 func responseHeaders(header http.Header) map[string]string {
@@ -267,7 +296,7 @@ func detectContentType(header string, path string) page.ContentType {
 		return page.ContentHTML
 	case mediaType == "application/pdf":
 		return page.ContentPDF
-	case strings.HasPrefix(mediaType, "text/") || mediaType == "application/json" || mediaType == "application/xml":
+	case strings.HasPrefix(mediaType, "text/") || mediaType == "application/json" || mediaType == "application/xml" || mediaType == "application/javascript" || mediaType == "application/x-javascript" || mediaType == "application/ecmascript":
 		return page.ContentText
 	default:
 		return page.ContentUnknown

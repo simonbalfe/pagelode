@@ -23,23 +23,29 @@ const (
 type Service struct {
 	fetcher orchestrator.Fetcher
 	limiter *limit.Limiter
+	browser Browser
 }
 
 func New(fetcher orchestrator.Fetcher, limiter *limit.Limiter) *Service {
 	return &Service{fetcher: fetcher, limiter: limiter}
 }
 
-type run struct {
-	request  Request
-	scope    scope
-	include  globs
-	exclude  globs
-	seen     map[string]bool
-	report   Report
-	pageRead bool
+func (s *Service) WithBrowser(browser Browser) *Service {
+	s.browser = browser
+	return s
 }
 
-// Map lists the page URLs of one site from robots.txt, sitemaps, sitemap indexes, and the start page's links.
+type run struct {
+	request      Request
+	scope        scope
+	include      globs
+	exclude      globs
+	seen         map[string]bool
+	endpointSeen map[string]bool
+	report       Report
+	pageRead     bool
+}
+
 func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 	request, err := request.Validate()
 	if err != nil {
@@ -53,12 +59,13 @@ func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 	deadline, cancel := context.WithTimeout(ctx, time.Duration(request.MaxDurationMS)*time.Millisecond)
 	defer cancel()
 	current := &run{
-		request: request,
-		scope:   newScope(start, request.Subdomains),
-		include: compileGlobs(request.Include),
-		exclude: compileGlobs(request.Exclude),
-		seen:    map[string]bool{},
-		report:  Report{URL: request.URL, Outcome: "ok", URLs: []Entry{}},
+		request:      request,
+		scope:        newScope(start, request.Subdomains),
+		include:      compileGlobs(request.Include),
+		exclude:      compileGlobs(request.Exclude),
+		seen:         map[string]bool{},
+		endpointSeen: map[string]bool{},
+		report:       Report{URL: request.URL, Outcome: "ok", URLs: []Entry{}},
 	}
 
 	origin := url.URL{Scheme: start.Scheme, Host: start.Host}
@@ -75,7 +82,9 @@ func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 	if errors.Is(err, limit.ErrSaturated) {
 		return Report{}, err
 	}
+	var rules robotsRules
 	if err == nil && robots.StatusCode < 400 {
+		rules = parseRobotsRules(robots.Text)
 		for _, location := range robotsSitemaps(robots.Text) {
 			enqueue(location, robotsURL)
 		}
@@ -106,11 +115,9 @@ func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 	}
 
 	if !current.full() && deadline.Err() == nil {
-		document, err := s.load(deadline, request.URL)
-		if errors.Is(err, limit.ErrSaturated) {
+		if err := s.crawl(deadline, current, request.URL, rules); err != nil {
 			return Report{}, err
 		}
-		current.consumePage(document, err, request.URL)
 	}
 
 	if ctx.Err() != nil {
@@ -124,6 +131,7 @@ func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 		current.report.Outcome = "failed"
 	}
 	current.report.Summary.URLsFound = len(current.report.URLs)
+	current.report.Templates = templatesOf(current.report.URLs)
 	current.report.Summary.DurationMS = time.Since(started).Milliseconds()
 	return current.report, nil
 }
@@ -179,15 +187,16 @@ func (r *run) warn(message string) {
 	r.report.Warnings = append(r.report.Warnings, message)
 }
 
-func (r *run) add(normalized, source, lastModified string) {
-	if normalized == "" || r.seen[normalized] {
-		return
-	}
+func (r *run) permitted(normalized string) bool {
 	parsed, err := url.Parse(normalized)
 	if err != nil {
-		return
+		return false
 	}
-	if len(r.include) > 0 && !r.include.match(parsed.Path) || r.exclude.match(parsed.Path) {
+	return (len(r.include) == 0 || r.include.match(parsed.Path)) && !r.exclude.match(parsed.Path)
+}
+
+func (r *run) add(normalized, source, lastModified string) {
+	if normalized == "" || r.seen[normalized] || !r.permitted(normalized) {
 		return
 	}
 	if r.full() {
@@ -225,24 +234,4 @@ func (r *run) consumeSitemap(result loaded) []string {
 		children = append(children, entry.Location)
 	}
 	return children
-}
-
-func (r *run) consumePage(document page.Document, err error, target string) {
-	if err != nil || document.StatusCode >= 400 {
-		r.warn("start page could not be loaded")
-		return
-	}
-	finalURL := document.FinalURL
-	if finalURL == "" {
-		finalURL = target
-	}
-	if r.scope.normalize(finalURL, finalURL) == "" {
-		r.warn("start page redirected outside the mapped site")
-		return
-	}
-	r.pageRead = true
-	r.add(r.scope.normalize(finalURL, finalURL), sourcePage, "")
-	for _, href := range pageLinks(document.HTML) {
-		r.add(r.scope.normalize(href, finalURL), sourcePage, "")
-	}
 }

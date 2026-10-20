@@ -19,6 +19,9 @@ func (a *application) siteMap(configuration config.Config, args []string, stdout
 	limit := flags.Int("limit", 500, "maximum URLs to return (1–5000)")
 	duration := flags.Duration("max-duration", 30*time.Second, "time budget (1s–2m)")
 	subdomains := flags.Bool("subdomains", false, "include subdomains of the site")
+	depth := flags.Int("depth", 0, "link levels to follow from the start page (1–5; default 2, 1 reads only the start page)")
+	render := flags.String("render", "never", "load pages in a browser: never, auto (only pages that need JavaScript), or always")
+	explore := flags.Bool("explore", false, "scroll and click safe controls on the start page in a browser to reveal more links (needs --render auto or always)")
 	jsonOutput := flags.Bool("json", false, "print the complete JSON report")
 	var include, exclude []string
 	flags.Func("include", "only URLs whose path matches this pattern, e.g. /blog/* (repeatable)", func(value string) error {
@@ -43,7 +46,7 @@ func (a *application) siteMap(configuration config.Config, args []string, stdout
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), configuration.RequestTimeout)
 	defer cancel()
-	report, err := a.mapper.Map(ctx, sitemap.Request{URL: flags.Arg(0), Limit: *limit, MaxDurationMS: int(duration.Milliseconds()), Subdomains: *subdomains, Include: include, Exclude: exclude})
+	report, err := a.mapper.Map(ctx, sitemap.Request{URL: flags.Arg(0), Limit: *limit, MaxDurationMS: int(duration.Milliseconds()), Subdomains: *subdomains, Include: include, Exclude: exclude, Depth: *depth, Render: *render, Explore: *explore})
 	if err != nil {
 		return err
 	}
