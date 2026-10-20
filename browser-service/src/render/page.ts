@@ -4,6 +4,7 @@ import { trackActivity } from "./activity.ts";
 import { captureTraffic } from "./capture.ts";
 import { challengeHinted, remainingChallenge, settleChallenge } from "./challenge.ts";
 import { settleDataDome } from "./datadome.ts";
+import { explorePage } from "./explore.ts";
 import { portableCookies, replayHeaders } from "./replay.ts";
 import type { RenderRequest, RenderResult } from "./schema.ts";
 
@@ -20,14 +21,16 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
   };
   signal.addEventListener("abort", closePage, { once: true });
   const captureDeadline = input.capture === undefined ? undefined : setTimeout(closePage, input.timeout_ms);
+  const deadline = Date.now() + input.timeout_ms;
   const activity = trackActivity(page);
   try {
     const capture = input.capture === undefined ? undefined : captureTraffic(page, input.capture);
     let documentStatus = 0;
     let documentHeaders: Record<string, string> = {};
     let documentRequest: Request | undefined;
+    let exploring = false;
     page.on("response", (response) => {
-      if (response.request().resourceType() !== "document" || response.frame() !== page.mainFrame()) return;
+      if (exploring || response.request().resourceType() !== "document" || response.frame() !== page.mainFrame()) return;
       documentStatus = response.status();
       documentHeaders = response.headers();
       documentRequest = response.request();
@@ -41,6 +44,8 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
     const waitForMatched = input.wait_for === undefined ? undefined : await waitForSelector(page, input.wait_for);
     await activity.quiet(input.capture?.wait_ms ?? input.settle_ms);
     const challenge = hinted ? await remainingChallenge(page, documentHeaders) : undefined;
+    exploring = true;
+    const exploredURLs = input.explore === undefined ? undefined : challenge === undefined ? await explorePage(page, input.explore, { deadline, quiet: (maxMs) => activity.quiet(maxMs), log }) : [];
     return {
       status_code: documentStatus || response?.status() || 0,
       final_url: page.url(),
@@ -53,6 +58,7 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
       ...(challenge === undefined ? {} : { challenge }),
       ...(waitForMatched === undefined ? {} : { wait_for_matched: waitForMatched }),
       ...(capture === undefined ? {} : { traffic: await capture.finish() }),
+      ...(exploredURLs === undefined ? {} : { explored_urls: exploredURLs }),
     };
   } finally {
     activity.stop();

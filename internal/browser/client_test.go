@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -126,6 +127,68 @@ func TestRenderRequestBody(t *testing.T) {
 				t.Errorf("profile = %v (present %t), want %q", profile, hasProfile, test.profile)
 			}
 		})
+	}
+}
+
+func TestExploreRequestAndResponse(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		maxClicks int
+		want      float64
+	}{
+		{name: "default", maxClicks: 0, want: 10},
+		{name: "explicit", maxClicks: 7, want: 7},
+		{name: "clamped high", maxClicks: 500, want: 50},
+		{name: "clamped low", maxClicks: -3, want: 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server, requests := fakeService(t, http.StatusOK, `{"status_code":200,"final_url":"https://example.org/","html":"<a href=\"/p2\">2</a>","explored_urls":["https://example.org/tab","https://example.org/p2"]}`)
+			client := newClient(t, server.URL, "", "http://proxy:8080")
+			cookies := []page.Cookie{{Name: "sid", Value: "1", Domain: "example.org", Path: "/"}}
+			document, err := client.Explore(context.Background(), "https://example.org/", page.Session{Cookies: cookies}, page.ExploreOptions{MaxClicks: test.maxClicks})
+			if err != nil {
+				t.Fatal(err)
+			}
+			record := <-requests
+			if record.method != http.MethodPost || record.path != "/v1/render" {
+				t.Errorf("request = %s %s, want POST /v1/render", record.method, record.path)
+			}
+			body := record.body
+			explore, ok := body["explore"].(map[string]any)
+			if !ok || explore["max_clicks"] != test.want {
+				t.Errorf("explore = %v, want max_clicks %v", body["explore"], test.want)
+			}
+			if _, hasCapture := body["capture"]; hasCapture {
+				t.Error("capture present on explore request")
+			}
+			if body["url"] != "https://example.org/" || body["proxy_url"] != "http://proxy:8080" || body["identity"] == nil {
+				t.Errorf("body = %v, want url, proxy and identity", body)
+			}
+			if got, ok := body["cookies"].([]any); !ok || len(got) != 1 {
+				t.Errorf("cookies = %v, want one cookie", body["cookies"])
+			}
+			want := []string{"https://example.org/tab", "https://example.org/p2"}
+			if !slices.Equal(document.ExploredURLs, want) {
+				t.Errorf("ExploredURLs = %v, want %v", document.ExploredURLs, want)
+			}
+			if document.HTML != `<a href="/p2">2</a>` {
+				t.Errorf("HTML = %q", document.HTML)
+			}
+		})
+	}
+}
+
+func TestFetchOmitsExplore(t *testing.T) {
+	server, requests := fakeService(t, http.StatusOK, `{"status_code":200}`)
+	document, err := newClient(t, server.URL, "", "").Fetch(context.Background(), "https://example.org/", page.Session{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, has := (<-requests).body["explore"]; has {
+		t.Error("explore present on fetch request")
+	}
+	if document.ExploredURLs != nil {
+		t.Errorf("ExploredURLs = %v, want nil", document.ExploredURLs)
 	}
 }
 

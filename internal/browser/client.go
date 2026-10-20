@@ -23,6 +23,9 @@ const (
 	defaultTimeout   = 45 * time.Second
 	minimumTimeout   = time.Second
 	rotationTimeout  = 10 * time.Second
+
+	defaultExploreClicks = 10
+	maxExploreClicks     = 50
 )
 
 type Client struct {
@@ -58,11 +61,22 @@ func New(baseURL, token string, settle time.Duration, identities *Identities) (*
 }
 
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
-	return c.render(ctx, targetURL, session, nil)
+	return c.render(ctx, targetURL, session, nil, nil)
 }
 
 func (c *Client) Capture(ctx context.Context, targetURL string, session page.Session, options page.CaptureOptions) (page.Document, error) {
-	return c.render(ctx, targetURL, session, &options)
+	return c.render(ctx, targetURL, session, &options, nil)
+}
+
+func (c *Client) Explore(ctx context.Context, targetURL string, session page.Session, options page.ExploreOptions) (page.Document, error) {
+	return c.render(ctx, targetURL, session, nil, &exploreRequest{MaxClicks: clampClicks(options.MaxClicks)})
+}
+
+func clampClicks(requested int) int {
+	if requested == 0 {
+		requested = defaultExploreClicks
+	}
+	return max(0, min(requested, maxExploreClicks))
 }
 
 func (c *Client) CreateSession(ctx context.Context, request SessionRequest) (Session, error) {
@@ -89,7 +103,7 @@ func (c *Client) CloseSession(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/sessions/"+url.PathEscape(id), nil, nil)
 }
 
-func (c *Client) render(ctx context.Context, targetURL string, session page.Session, capture *page.CaptureOptions) (page.Document, error) {
+func (c *Client) render(ctx context.Context, targetURL string, session page.Session, capture *page.CaptureOptions, explore *exploreRequest) (page.Document, error) {
 	timeout := defaultTimeout
 	if deadline, ok := ctx.Deadline(); ok {
 		remaining := time.Until(deadline)
@@ -105,6 +119,7 @@ func (c *Client) render(ctx context.Context, targetURL string, session page.Sess
 		SettleMS:        c.settle.Milliseconds(),
 		Cookies:         session.Cookies,
 		SettleChallenge: true,
+		Explore:         explore,
 	}
 	if capture != nil {
 		request.Capture = &captureRequest{WaitMS: capture.WaitMS, MaxRequests: page.MaxCaptureRequests, MaxBodyBytes: page.MaxCaptureBodyBytes, MaxTotalBytes: page.MaxCaptureTotalBytes}
@@ -225,16 +240,17 @@ func document(response renderResponse, session page.Session) page.Document {
 	session.ProxyURL = response.Replay.ProxyURL
 	session.Headers = response.Replay.Headers
 	return page.Document{
-		Provider:   page.ProviderPatchright,
-		StatusCode: response.StatusCode,
-		FinalURL:   response.FinalURL,
-		Title:      response.Title,
-		HTML:       response.HTML,
-		Type:       page.ContentHTML,
-		Headers:    response.Headers,
-		Challenge:  response.Challenge,
-		Session:    session,
-		Traffic:    response.Traffic,
+		Provider:     page.ProviderPatchright,
+		StatusCode:   response.StatusCode,
+		FinalURL:     response.FinalURL,
+		Title:        response.Title,
+		HTML:         response.HTML,
+		Type:         page.ContentHTML,
+		Headers:      response.Headers,
+		Challenge:    response.Challenge,
+		Session:      session,
+		Traffic:      response.Traffic,
+		ExploredURLs: response.ExploredURLs,
 	}
 }
 
@@ -247,6 +263,7 @@ type renderRequest struct {
 	ProxyURL        string          `json:"proxy_url,omitempty"`
 	SettleChallenge bool            `json:"settle_challenge"`
 	Capture         *captureRequest `json:"capture,omitempty"`
+	Explore         *exploreRequest `json:"explore,omitempty"`
 	Profile         string          `json:"profile,omitempty"`
 	Identity        string          `json:"identity,omitempty"`
 }
@@ -258,17 +275,22 @@ type captureRequest struct {
 	MaxTotalBytes int `json:"max_total_bytes"`
 }
 
+type exploreRequest struct {
+	MaxClicks int `json:"max_clicks"`
+}
+
 type renderResponse struct {
-	StatusCode int               `json:"status_code"`
-	FinalURL   string            `json:"final_url"`
-	Title      string            `json:"title"`
-	HTML       string            `json:"html"`
-	UserAgent  string            `json:"user_agent"`
-	Headers    map[string]string `json:"headers"`
-	Challenge  *page.Challenge   `json:"challenge,omitempty"`
-	Cookies    []page.Cookie     `json:"cookies"`
-	Traffic    *page.Capture     `json:"traffic,omitempty"`
-	Replay     replay            `json:"replay"`
+	StatusCode   int               `json:"status_code"`
+	FinalURL     string            `json:"final_url"`
+	Title        string            `json:"title"`
+	HTML         string            `json:"html"`
+	UserAgent    string            `json:"user_agent"`
+	Headers      map[string]string `json:"headers"`
+	Challenge    *page.Challenge   `json:"challenge,omitempty"`
+	Cookies      []page.Cookie     `json:"cookies"`
+	Traffic      *page.Capture     `json:"traffic,omitempty"`
+	ExploredURLs []string          `json:"explored_urls,omitempty"`
+	Replay       replay            `json:"replay"`
 }
 
 type replay struct {

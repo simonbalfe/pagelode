@@ -5,6 +5,10 @@ type CaptureOptions struct {
 	Profile string `json:"-"`
 }
 
+type ExploreOptions struct {
+	MaxClicks int
+}
+
 const (
 	MaxCaptureRequests   = 200
 	MaxCaptureBodyBytes  = 256 << 10

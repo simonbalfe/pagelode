@@ -41,17 +41,18 @@ func (s Session) Replayable() bool {
 }
 
 type Document struct {
-	Provider   Provider
-	StatusCode int
-	FinalURL   string
-	Title      string
-	HTML       string
-	Text       string
-	Type       ContentType
-	Headers    map[string]string
-	Challenge  *Challenge
-	Session    Session
-	Traffic    *Capture
+	Provider     Provider
+	StatusCode   int
+	FinalURL     string
+	Title        string
+	HTML         string
+	Text         string
+	Type         ContentType
+	Headers      map[string]string
+	Challenge    *Challenge
+	Session      Session
+	Traffic      *Capture
+	ExploredURLs []string
 }
 
 type ChallengeVendor string

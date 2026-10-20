@@ -18,6 +18,10 @@ const waitForSchema = z.object({
   timeout_ms: z.number().int().min(100).max(30_000).default(10_000),
 });
 
+const exploreSchema = z.object({
+  max_clicks: z.number().int().min(0).max(50).default(10),
+});
+
 export const renderRequestSchema = z.object({
   url: httpUrlSchema,
   timeout_ms: z.number().int().min(1_000).max(120_000).default(45_000),
@@ -29,6 +33,7 @@ export const renderRequestSchema = z.object({
   settle_challenge: z.boolean().default(true),
   solve_captcha: z.boolean().default(true),
   capture: captureSchema.optional(),
+  explore: exploreSchema.optional(),
   profile: optionalField(profileNameSchema),
   identity: optionalField(identityKeySchema),
 });
@@ -36,6 +41,8 @@ export const renderRequestSchema = z.object({
 export type RenderRequest = z.infer<typeof renderRequestSchema>;
 
 export type CaptureLimits = z.infer<typeof captureSchema>;
+
+export type ExploreOptions = z.infer<typeof exploreSchema>;
 
 export type Exchange = {
   id: string;
@@ -78,4 +85,5 @@ export type RenderResult = {
   challenge?: Challenge;
   wait_for_matched?: boolean;
   traffic?: Traffic;
+  explored_urls?: string[];
 };

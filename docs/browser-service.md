@@ -95,14 +95,16 @@ Errors always look like `{"error":{"code","message"}}`.
 | `settle_ms` | `2000` | 0 to 10,000. Longest wait for the page to go quiet after load (see [Waiting for the page](#waiting-for-the-page)); `0` skips it |
 | `wait_for` | none | `{selector, timeout_ms}`; `timeout_ms` 100 to 30,000, default 10,000. After settling, waits for an attached element; a timeout does not fail the render |
 | `capture` | none | `{wait_ms, max_requests, max_body_bytes, max_total_bytes}` adds captured network traffic. `wait_ms` replaces `settle_ms` as the longest quiet wait. Limits: requests 1–200 (default 200), bytes per body 1–262,144 (default 262,144), total body bytes 1–2,097,152 (default 2,097,152) |
+| `explore` | none | `{max_clicks}` (0 to 50, default 10) scrolls the page and clicks safe controls after the load; see [Exploring a page](#exploring-a-page) |
 | `profile` | none | Render inside a saved login profile |
 | `identity` | derived | Which warm browser identity to use (see below) |
 
-The response contains `status_code`, `final_url`, `title`, `html` (the DOM after JavaScript), `user_agent`, `headers`, `cookies`, `replay`, and, when present, `challenge`, `wait_for_matched`, and `traffic`.
+The response contains `status_code`, `final_url`, `title`, `html` (the DOM after JavaScript), `user_agent`, `headers`, `cookies`, `replay`, and, when present, `challenge`, `wait_for_matched`, `traffic`, and `explored_urls`.
 
 - `headers` are the response headers of the last main-frame document.
 - `challenge` is set when a challenge remains after settling: `{vendor, url?, sitekey?, data_s?}` with `vendor` `cloudflare`, `datadome` (with the captcha frame `url`), or `recaptcha` (with `sitekey` and `data_s`). Only pages with a challenge hint are checked, so pages without one never carry `challenge`.
 - `wait_for_matched` is returned only when `wait_for` was sent.
+- `explored_urls` is returned only when `explore` was sent; see [Exploring a page](#exploring-a-page).
 - `replay` holds the identity key, the exact proxy URL, and Chrome's own request headers (`user-agent`, `accept`, `accept-language`, `sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`).
 - Every render has a hard deadline of `timeout_ms` + 15 s. When it expires the identity's browser is discarded and relaunched on the next request, so a crashed Chrome cannot hang the queue.
 - Renders beyond `BROWSER_SERVICE_CONCURRENCY` queue; beyond `BROWSER_SERVICE_MAX_WAITING` they get `429`. This is the only browser limit; Go maps `429 saturated` to `limit.ErrSaturated`.
@@ -132,6 +134,25 @@ Challenge work runs only when the page shows a **hint**, checked once after navi
 | A challenge title such as "Just a moment" | `challenge.titles` |
 
 Without a hint the service skips Cloudflare settling, the DataDome device-check wait, and the final challenge report, so it never copies the page text out of the browser. With a hint it runs the full checks: the signals above plus a body text list and selectors (`#challenge-form`, the challenge-platform form, the orchestrate script). `.cf-turnstile` and the Turnstile iframe are click targets only, not detection signals. DataDome and reCAPTCHA use `captchas.datadome_frame` and `captchas.recaptcha_widget`.
+
+### Exploring a page
+
+`explore: {max_clicks}` (0 to 50, default 10) makes the render scroll and click so lazily loaded and hidden links appear in `html` (`src/render/explore.ts`). It runs after the normal load and settle, and is skipped when a challenge remains.
+
+1. **Scroll.** The page scrolls in steps of 0.9 viewport heights, 250 ms apart, until `scrollHeight` stops growing at the bottom (at most 20 steps).
+2. **Click.** Up to `max_clicks` safe controls are clicked one at a time with real mouse events (move, pause, click), the same way challenge settling clicks. After each click the page gets up to 1 s to go quiet.
+3. **Return.** When a click changes the page URL (a navigation or `history.pushState`), the new URL is recorded and the service goes back, or reloads the start URL, so later clicks run on the start page. Controls that open a popup have the popup closed.
+
+Clicked: `[aria-expanded="false"]`, `summary`, `[role=tab]`, common navigation menu toggles, `a[rel=next]`, and `button`/`a` elements whose label (text or `aria-label`, at most 60 characters) matches `load more|show more|view more|see more|next|more results|older|expand`. Toggles and buttons go first; links that navigate go last, so content revealed by earlier clicks is not lost to a reload. A control that stays visible after a click, such as "Load more", is clicked again only if the DOM grew since the last click.
+
+Never clicked:
+
+- anything inside a `<form>` or `[role=form]`, any `input`, `select`, or `textarea`, and anything that contains one
+- any control whose text, `aria-label`, `title`, `value`, or `href` matches `log ?out|sign ?out|delete|remove|buy|checkout|purchase|pay|subscribe|unsubscribe|cancel|order|submit|confirm|donate`
+- links to another origin, `target` other than `_self`, `download` links, and `mailto:`, `tel:`, or other non-HTTP links (`javascript:` links are allowed)
+- hidden, disabled, `aria-disabled`, `inert`, or covered controls, and tabs already selected
+
+The response gains `explored_urls`: distinct same-origin absolute URLs the page became after a click, excluding the start URL, at most 200. It is always present when `explore` was sent (empty if nothing changed the URL). `html`, `title`, and `final_url` describe the start page after exploration, so `status_code`, `headers`, and `replay` still come from the original document. The work counts against `timeout_ms`; exploration stops 2 s before it. Go's `Client.Explore` sends `explore` and maps `explored_urls` to `Document.ExploredURLs`.
 
 ### Sessions for agents
 
