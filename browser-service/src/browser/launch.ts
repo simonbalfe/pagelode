@@ -6,6 +6,8 @@ import { personaLaunch, resolvePersona, writePreferences, type Persona } from ".
 type PersistentContextOptions = NonNullable<Parameters<typeof chromium.launchPersistentContext>[1]>;
 type ProxySettings = NonNullable<PersistentContextOptions["proxy"]>;
 
+const launchTimeoutMs = 30_000;
+
 export type LaunchRequest = {
   readonly directory: string;
   readonly proxyURL: string | undefined;
@@ -24,6 +26,7 @@ export async function launchBrowser(config: Config, log: Log, request: LaunchReq
   const { env, args } = personaLaunch(persona);
   const options: PersistentContextOptions = {
     headless: request.headless,
+    timeout: launchTimeoutMs,
     viewport: null,
     args: [...config.chromeArgs, ...(request.args ?? []), ...args],
   };

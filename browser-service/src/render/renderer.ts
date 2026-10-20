@@ -11,6 +11,7 @@ import { renderPage } from "./page.ts";
 import type { RenderRequest, RenderResult } from "./schema.ts";
 
 const deadlineGraceMs = 15_000;
+const pageCloseGraceMs = 10_000;
 
 export class Renderer {
   readonly #config: Config;
@@ -42,15 +43,17 @@ export class Renderer {
     const key = input.identity ?? (input.proxy_url === undefined ? "default" : `proxy-${createHash("sha256").update(input.proxy_url).digest("hex").slice(0, 12)}`);
     const lease = this.#identities.acquire(key, input.proxy_url);
     const limitMs = input.timeout_ms + deadlineGraceMs;
-    const deadline = Promise.withResolvers<never>();
-    const timer = setTimeout(() => {
-      lease.discard();
-      deadline.reject(new ServiceError(504, "render_failed", `render exceeded ${limitMs} ms; browser restarted`));
-    }, limitMs);
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(new ServiceError(504, "render_failed", `render exceeded ${limitMs} ms`)), limitMs);
+    const stopped = AbortSignal.any([signal, deadline.signal]);
     try {
-      const result = await Promise.race([lease.context.then((context) => renderPage(context, input, { signal, log: this.#log })), deadline.promise]);
+      const context = await lease.context(stopped);
+      const result = await closedWithin(renderPage(context, input, { signal: stopped, log: this.#log }), stopped, () => lease.retire());
       lease.recordHeaders(result.replay.headers);
       return { ...result, replay: { ...result.replay, identity: key, ...(lease.proxyURL === undefined ? {} : { proxy_url: lease.proxyURL }) } };
+    } catch (error: unknown) {
+      if (stopped.aborted) throw stopped.reason;
+      throw error;
     } finally {
       clearTimeout(timer);
       lease.release();
@@ -70,5 +73,24 @@ export class Renderer {
         await context.close();
       }
     }));
+  }
+}
+
+async function closedWithin<T>(render: Promise<T>, signal: AbortSignal, wedged: () => void): Promise<T> {
+  const { promise: abandoned, reject } = Promise.withResolvers<never>();
+  let timer: Timer | undefined;
+  const abandon = (): void => {
+    timer = setTimeout(() => {
+      wedged();
+      reject(signal.reason);
+    }, pageCloseGraceMs);
+  };
+  if (signal.aborted) abandon();
+  else signal.addEventListener("abort", abandon, { once: true });
+  try {
+    return await Promise.race([render, abandoned]);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", abandon);
   }
 }

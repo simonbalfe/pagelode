@@ -32,7 +32,7 @@ export function trackActivity(page: Page): Activity {
       const startedAt = Date.now();
       const deadline = startedAt + maxMs;
       let mutations = await mutationCount(page);
-      while (Date.now() < deadline) {
+      while (Date.now() < deadline && !page.isClosed()) {
         await Bun.sleep(Math.min(pollMs, deadline - Date.now()));
         const current = await mutationCount(page);
         if (current === undefined || current !== mutations) lastChange = Date.now();
