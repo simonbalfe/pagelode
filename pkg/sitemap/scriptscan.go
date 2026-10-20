@@ -1,4 +1,4 @@
-package scriptscan
+package sitemap
 
 import (
 	"net/url"
@@ -23,7 +23,7 @@ var staticExtensions = map[string]struct{}{
 	"css": {}, "woff": {}, "woff2": {}, "ttf": {}, "map": {}, "mp4": {},
 }
 
-func Endpoints(source string) []string {
+func ScriptEndpoints(source string) []string {
 	var endpoints []string
 	seen := make(map[string]struct{})
 	for _, match := range quoted.FindAllStringSubmatch(source, -1) {

@@ -8,7 +8,7 @@ const environmentSchema = z.object({
   BROWSER_SERVICE_HOST: z.string().min(1).default("127.0.0.1"),
   BROWSER_SERVICE_PORT: z.coerce.number().int().min(1).max(65_535).default(8090),
   BROWSER_SERVICE_TOKEN: z.string().default(""),
-  BROWSER_SERVICE_CONCURRENCY: z.coerce.number().int().min(1).default(4),
+  BROWSER_SERVICE_CONCURRENCY: z.coerce.number().int().min(1).default(16),
   BROWSER_SERVICE_MAX_WAITING: z.coerce.number().int().min(0).default(100),
   BROWSER_SERVICE_MAX_SESSIONS: z.coerce.number().int().min(0).default(4),
   BROWSER_SERVICE_HEADLESS: flag.default(false),

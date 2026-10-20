@@ -1,4 +1,4 @@
-package scriptscan
+package sitemap
 
 import (
 	"fmt"
@@ -49,7 +49,7 @@ func TestEndpoints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Endpoints(tt.source)
+			got := ScriptEndpoints(tt.source)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("Endpoints() = %q, want %q", got, tt.want)
 			}
@@ -62,7 +62,7 @@ func TestEndpointsLimit(t *testing.T) {
 	for i := range 600 {
 		fmt.Fprintf(&b, "a(\"/e/%d\");", i)
 	}
-	got := Endpoints(b.String())
+	got := ScriptEndpoints(b.String())
 	if len(got) != 500 {
 		t.Fatalf("len = %d, want 500", len(got))
 	}

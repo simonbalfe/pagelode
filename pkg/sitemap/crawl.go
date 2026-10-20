@@ -9,12 +9,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/simonbalfe/pagelode/pkg/classify"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/page"
-	"github.com/simonbalfe/pagelode/pkg/scriptscan"
-	"github.com/simonbalfe/pagelode/pkg/similarity"
-	"github.com/simonbalfe/pagelode/pkg/urlshape"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 const (
@@ -40,8 +35,8 @@ const (
 )
 
 type Browser interface {
-	Fetch(context.Context, string, page.Session) (page.Document, error)
-	Explore(context.Context, string, page.Session, page.ExploreOptions) (page.Document, error)
+	Fetch(context.Context, string, fetch.Session) (fetch.Document, error)
+	Explore(context.Context, string, fetch.Session, fetch.ExploreOptions) (fetch.Document, error)
 }
 
 type crawlTarget struct {
@@ -51,7 +46,7 @@ type crawlTarget struct {
 
 type crawled struct {
 	target   crawlTarget
-	document page.Document
+	document fetch.Document
 	rendered bool
 	err      error
 }
@@ -62,8 +57,8 @@ type crawler struct {
 	rules    robotsRules
 	queued   map[string]bool
 	scripts  map[string]bool
-	sampler  *urlshape.Sampler
-	index    *similarity.Index
+	sampler  *Sampler
+	index    *DuplicateIndex
 	renders  atomic.Int32
 	explores atomic.Int32
 }
@@ -75,8 +70,8 @@ func (s *Service) crawl(ctx context.Context, current *run, start string, rules r
 		rules:   rules,
 		queued:  map[string]bool{},
 		scripts: map[string]bool{},
-		sampler: urlshape.NewSampler(shapeSampleLimit),
-		index:   similarity.NewIndex(similarityDistance),
+		sampler: NewSampler(shapeSampleLimit),
+		index:   NewDuplicateIndex(similarityDistance),
 	}
 	if (current.request.Render != renderNever) && s.browser == nil {
 		current.warn("browser rendering is unavailable; pages were loaded over HTTP only")
@@ -97,7 +92,7 @@ func (s *Service) crawl(ctx context.Context, current *run, start string, rules r
 			batch := level[:size]
 			level = level[size:]
 			for _, result := range c.fetchAll(ctx, batch) {
-				if errors.Is(result.err, limit.ErrSaturated) {
+				if errors.Is(result.err, fetch.ErrSaturated) {
 					return result.err
 				}
 				c.consume(result, expand, &next, &scripts)
@@ -130,31 +125,31 @@ func (c *crawler) fetch(ctx context.Context, target crawlTarget) crawled {
 	request := c.run.request
 	browser := c.service.browser
 	if browser != nil && request.Explore && c.explores.Add(1) <= maximumExplores {
-		document, err := c.service.runBrowser(ctx, func(ctx context.Context) (page.Document, error) {
-			return browser.Explore(ctx, target.url, page.Session{}, page.ExploreOptions{})
+		document, err := c.service.runBrowser(ctx, func(ctx context.Context) (fetch.Document, error) {
+			return browser.Explore(ctx, target.url, fetch.Session{}, fetch.ExploreOptions{})
 		})
-		if err == nil || errors.Is(err, limit.ErrSaturated) {
+		if err == nil || errors.Is(err, fetch.ErrSaturated) {
 			return crawled{target: target, document: document, rendered: true, err: err}
 		}
 	} else if browser != nil && request.Render == renderAlways && c.renders.Add(1) <= maximumRenders {
-		document, err := c.service.runBrowser(ctx, func(ctx context.Context) (page.Document, error) {
-			return browser.Fetch(ctx, target.url, page.Session{})
+		document, err := c.service.runBrowser(ctx, func(ctx context.Context) (fetch.Document, error) {
+			return browser.Fetch(ctx, target.url, fetch.Session{})
 		})
-		if err == nil || errors.Is(err, limit.ErrSaturated) {
+		if err == nil || errors.Is(err, fetch.ErrSaturated) {
 			return crawled{target: target, document: document, rendered: true, err: err}
 		}
 	}
 
 	document, err := c.service.load(ctx, target.url)
-	if err == nil && browser != nil && request.Render == renderAuto && document.Type == page.ContentHTML &&
-		classify.Document(document).Kind == classify.NeedsRender && c.renders.Add(1) <= maximumRenders {
-		rendered, renderErr := c.service.runBrowser(ctx, func(ctx context.Context) (page.Document, error) {
-			return browser.Fetch(ctx, target.url, page.Session{})
+	if err == nil && browser != nil && request.Render == renderAuto && document.Type == fetch.ContentHTML &&
+		fetch.Classify(document).Kind == fetch.NeedsRender && c.renders.Add(1) <= maximumRenders {
+		rendered, renderErr := c.service.runBrowser(ctx, func(ctx context.Context) (fetch.Document, error) {
+			return browser.Fetch(ctx, target.url, fetch.Session{})
 		})
 		if renderErr == nil {
 			return crawled{target: target, document: rendered, rendered: true}
 		}
-		if errors.Is(renderErr, limit.ErrSaturated) {
+		if errors.Is(renderErr, fetch.ErrSaturated) {
 			return crawled{target: target, err: renderErr}
 		}
 	}
@@ -196,13 +191,13 @@ func (c *crawler) consume(result crawled, expand bool, next *[]crawlTarget, scri
 		r.pageRead = true
 		r.add(normalized, source, "")
 	}
-	if document.Type != page.ContentHTML {
+	if document.Type != fetch.ContentHTML {
 		return
 	}
 
 	duplicate := false
-	if text := similarity.Text(document.HTML); len(text) >= similarityMinText {
-		duplicate = c.index.Seen(similarity.Fingerprint(text))
+	if text := PageText(document.HTML); len(text) >= similarityMinText {
+		duplicate = c.index.Seen(Fingerprint(text))
 	}
 	for _, href := range pageLinks(document.HTML) {
 		link := r.scope.normalize(href, finalURL)
@@ -220,14 +215,14 @@ func (c *crawler) consume(result crawled, expand bool, next *[]crawlTarget, scri
 	}
 
 	if base, err := url.Parse(finalURL); err == nil {
-		for _, script := range scriptscan.ScriptURLs(document.HTML, base) {
+		for _, script := range ScriptURLs(document.HTML, base) {
 			if !c.scripts[script] && len(c.scripts) < maximumScripts {
 				c.scripts[script] = true
 				*scripts = append(*scripts, script)
 			}
 		}
 	}
-	r.addEndpoints(scriptscan.Endpoints(inlineScripts(document.HTML)), finalURL)
+	r.addEndpoints(ScriptEndpoints(inlineScripts(document.HTML)), finalURL)
 }
 
 func (c *crawler) enqueue(link string, depth int, next *[]crawlTarget) {
@@ -251,7 +246,7 @@ func (c *crawler) readScripts(ctx context.Context, scripts []string) error {
 		return nil
 	}
 	for _, result := range c.service.loadAll(ctx, scripts) {
-		if errors.Is(result.err, limit.ErrSaturated) {
+		if errors.Is(result.err, fetch.ErrSaturated) {
 			return result.err
 		}
 		if result.err != nil || result.document.StatusCode >= 400 {
@@ -261,15 +256,15 @@ func (c *crawler) readScripts(ctx context.Context, scripts []string) error {
 		if source == "" {
 			source = result.document.HTML
 		}
-		c.run.addEndpoints(scriptscan.Endpoints(source), result.finalURL())
+		c.run.addEndpoints(ScriptEndpoints(source), result.finalURL())
 	}
 	return nil
 }
 
-func (s *Service) runBrowser(ctx context.Context, call func(context.Context) (page.Document, error)) (page.Document, error) {
+func (s *Service) runBrowser(ctx context.Context, call func(context.Context) (fetch.Document, error)) (fetch.Document, error) {
 	pageCtx, cancel := context.WithTimeout(ctx, browserTimeout)
 	defer cancel()
-	var document page.Document
+	var document fetch.Document
 	err := s.limiter.Run(pageCtx, func() error {
 		var err error
 		document, err = call(pageCtx)

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,9 +16,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 const (
@@ -112,15 +110,15 @@ func New(baseURLs []string, token string, settle time.Duration, nodeSlots int, i
 	}, nil
 }
 
-func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
+func (c *Client) Fetch(ctx context.Context, targetURL string, session fetch.Session) (fetch.Document, error) {
 	return c.render(ctx, targetURL, session, nil, nil)
 }
 
-func (c *Client) Capture(ctx context.Context, targetURL string, session page.Session, options page.CaptureOptions) (page.Document, error) {
+func (c *Client) Capture(ctx context.Context, targetURL string, session fetch.Session, options fetch.CaptureOptions) (fetch.Document, error) {
 	return c.render(ctx, targetURL, session, &options, nil)
 }
 
-func (c *Client) Explore(ctx context.Context, targetURL string, session page.Session, options page.ExploreOptions) (page.Document, error) {
+func (c *Client) Explore(ctx context.Context, targetURL string, session fetch.Session, options fetch.ExploreOptions) (fetch.Document, error) {
 	return c.render(ctx, targetURL, session, nil, &exploreRequest{MaxClicks: clampClicks(options.MaxClicks)})
 }
 
@@ -142,7 +140,7 @@ func (c *Client) CreateSession(ctx context.Context, request SessionRequest) (Ses
 	}
 	target, ok := c.healthyFrom(preferred)
 	if !ok {
-		return Session{}, fmt.Errorf("patchright: every browser service node is unavailable: %w", limit.ErrUnavailable)
+		return Session{}, fmt.Errorf("patchright: every browser service node is unavailable: %w", fetch.ErrUnavailable)
 	}
 	body := sessionRequest{
 		ProxyURL:      proxyURL,
@@ -186,9 +184,9 @@ func (c *Client) CloseSession(ctx context.Context, id string) error {
 	return err
 }
 
-func (c *Client) render(ctx context.Context, targetURL string, session page.Session, capture *page.CaptureOptions, explore *exploreRequest) (page.Document, error) {
+func (c *Client) render(ctx context.Context, targetURL string, session fetch.Session, capture *fetch.CaptureOptions, explore *exploreRequest) (fetch.Document, error) {
 	if _, err := renderTimeout(ctx); err != nil {
-		return page.Document{}, err
+		return fetch.Document{}, err
 	}
 	request := renderRequest{
 		URL:             targetURL,
@@ -196,10 +194,11 @@ func (c *Client) render(ctx context.Context, targetURL string, session page.Sess
 		SettleMS:        c.settle.Milliseconds(),
 		Cookies:         session.Cookies,
 		SettleChallenge: true,
+		BlockResources:  capture == nil && explore == nil,
 		Explore:         explore,
 	}
 	if capture != nil {
-		request.Capture = &captureRequest{WaitMS: capture.WaitMS, MaxRequests: page.MaxCaptureRequests, MaxBodyBytes: page.MaxCaptureBodyBytes, MaxTotalBytes: page.MaxCaptureTotalBytes}
+		request.Capture = &captureRequest{WaitMS: capture.WaitMS, MaxRequests: fetch.MaxCaptureRequests, MaxBodyBytes: fetch.MaxCaptureBodyBytes, MaxTotalBytes: fetch.MaxCaptureTotalBytes}
 		request.Profile = capture.Profile
 	}
 	host := hostname(targetURL)
@@ -218,7 +217,7 @@ func (c *Client) render(ctx context.Context, targetURL string, session page.Sess
 	var response renderResponse
 	served, err := c.renderAnywhere(ctx, preferred, request, &response)
 	if err != nil {
-		return page.Document{}, err
+		return fetch.Document{}, err
 	}
 	document := document(response, session)
 	if request.Identity != "" {
@@ -230,7 +229,7 @@ func (c *Client) render(ctx context.Context, targetURL string, session page.Sess
 func (c *Client) renderAnywhere(ctx context.Context, preferred int, request renderRequest, response *renderResponse) (*node, error) {
 	first, ok := c.healthyFrom(preferred)
 	if !ok {
-		return nil, fmt.Errorf("patchright: every browser service node is unavailable: %w", limit.ErrUnavailable)
+		return nil, fmt.Errorf("patchright: every browser service node is unavailable: %w", fetch.ErrUnavailable)
 	}
 	err := c.renderOn(ctx, c.nodes[first], request, response)
 	var transport *transportError
@@ -239,11 +238,11 @@ func (c *Client) renderAnywhere(ctx context.Context, preferred int, request rend
 	}
 	second, ok := c.healthyFrom(first + 1)
 	if !ok {
-		return nil, fmt.Errorf("%w: %w", err, limit.ErrUnavailable)
+		return nil, fmt.Errorf("%w: %w", err, fetch.ErrUnavailable)
 	}
 	err = c.renderOn(ctx, c.nodes[second], request, response)
 	if errors.As(err, &transport) {
-		return nil, fmt.Errorf("%w: %w", err, limit.ErrUnavailable)
+		return nil, fmt.Errorf("%w: %w", err, fetch.ErrUnavailable)
 	}
 	return c.nodes[second], err
 }
@@ -286,7 +285,7 @@ func (c *Client) healthyFrom(start int) (int, bool) {
 	return 0, false
 }
 
-func (c *Client) observe(ctx context.Context, served *node, key string, host string, document page.Document) {
+func (c *Client) observe(ctx context.Context, served *node, key string, host string, document fetch.Document) {
 	if host == "" {
 		return
 	}
@@ -403,25 +402,25 @@ func serviceError(status int, data []byte) error {
 	}
 	err := fmt.Errorf("patchright: %s: %s", envelope.Error.Code, envelope.Error.Message)
 	if status == http.StatusTooManyRequests {
-		return fmt.Errorf("%w: %w", err, limit.ErrSaturated)
+		return fmt.Errorf("%w: %w", err, fetch.ErrSaturated)
 	}
 	return err
 }
 
-func document(response renderResponse, session page.Session) page.Document {
+func document(response renderResponse, session fetch.Session) fetch.Document {
 	if response.UserAgent != "" {
 		session.UserAgent = response.UserAgent
 	}
 	session.Cookies = response.Cookies
 	session.ProxyURL = response.Replay.ProxyURL
 	session.Headers = response.Replay.Headers
-	return page.Document{
-		Provider:     page.ProviderPatchright,
+	return fetch.Document{
+		Provider:     fetch.ProviderPatchright,
 		StatusCode:   response.StatusCode,
 		FinalURL:     response.FinalURL,
 		Title:        response.Title,
 		HTML:         response.HTML,
-		Type:         page.ContentHTML,
+		Type:         fetch.ContentHTML,
 		Headers:      response.Headers,
 		Challenge:    response.Challenge,
 		Session:      session,
@@ -435,9 +434,10 @@ type renderRequest struct {
 	TimeoutMS       int64           `json:"timeout_ms"`
 	WaitUntil       string          `json:"wait_until"`
 	SettleMS        int64           `json:"settle_ms"`
-	Cookies         []page.Cookie   `json:"cookies,omitempty"`
+	Cookies         []fetch.Cookie  `json:"cookies,omitempty"`
 	ProxyURL        string          `json:"proxy_url,omitempty"`
 	SettleChallenge bool            `json:"settle_challenge"`
+	BlockResources  bool            `json:"block_resources,omitempty"`
 	Capture         *captureRequest `json:"capture,omitempty"`
 	Explore         *exploreRequest `json:"explore,omitempty"`
 	Profile         string          `json:"profile,omitempty"`
@@ -462,9 +462,9 @@ type renderResponse struct {
 	HTML         string            `json:"html"`
 	UserAgent    string            `json:"user_agent"`
 	Headers      map[string]string `json:"headers"`
-	Challenge    *page.Challenge   `json:"challenge,omitempty"`
-	Cookies      []page.Cookie     `json:"cookies"`
-	Traffic      *page.Capture     `json:"traffic,omitempty"`
+	Challenge    *fetch.Challenge  `json:"challenge,omitempty"`
+	Cookies      []fetch.Cookie    `json:"cookies"`
+	Traffic      *fetch.Capture    `json:"traffic,omitempty"`
 	ExploredURLs []string          `json:"explored_urls,omitempty"`
 	Replay       replay            `json:"replay"`
 }

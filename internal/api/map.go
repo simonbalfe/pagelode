@@ -6,7 +6,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/simonbalfe/pagelode/pkg/limit"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"github.com/simonbalfe/pagelode/pkg/sitemap"
 )
 
@@ -42,7 +42,7 @@ func (s *Server) siteMap(response http.ResponseWriter, request *http.Request) {
 	report, err := s.mapper.Map(ctx, input)
 	if err != nil {
 		switch {
-		case errors.Is(err, limit.ErrSaturated):
+		case errors.Is(err, fetch.ErrSaturated):
 			response.Header().Set("Retry-After", "1")
 			writeJSON(response, http.StatusTooManyRequests, map[string]string{"error": "PageLode queue is full"})
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):

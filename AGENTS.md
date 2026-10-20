@@ -14,7 +14,8 @@ PageLode is the Go-first successor experiment for OpenExtract.
 ## Layout
 
 - Importable packages live under `pkg/` and must not depend on `internal/`.
-- App-only wiring lives in `internal/`: CLI (`internal/cli`), HTTP API (`internal/api`), env config (`internal/config`), and SQLite stores (`internal/state`, `internal/emailstore`).
+- Group small related code into the package that uses it instead of a new single-file package; split a package only when it grows a separate job.
+- App-only wiring lives in `internal/`: CLI and env config (`internal/cli`), HTTP API (`internal/api`), and the sqlc-generated Postgres store (`internal/store`; edit `schema.sql`/`queries.sql`, then `make generate`).
 - `cmd/pagelode` holds only `main`, which calls `internal/cli`.
 - Promote a package from `internal/` to `pkg/` only when another project needs to import it.
 - Keep one command per job; variants are flags (`emails --input`) or subcommands (`extract batch`, `map endpoints`), not new top-level commands.

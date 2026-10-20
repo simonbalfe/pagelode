@@ -1,4 +1,4 @@
-package signatures
+package fetch
 
 import (
 	_ "embed"
@@ -22,7 +22,7 @@ type Header struct {
 	Value string
 }
 
-type Set struct {
+type Signatures struct {
 	Blocks           []Pattern
 	ShortBlocks      []Pattern
 	ChallengeHeaders []Header
@@ -50,7 +50,7 @@ type headerFile struct {
 	Value string `json:"value"`
 }
 
-func MustLoad() Set {
+func MustLoadSignatures() Signatures {
 	set, err := parse(raw)
 	if err != nil {
 		panic(err)
@@ -58,24 +58,24 @@ func MustLoad() Set {
 	return set
 }
 
-func parse(data []byte) (Set, error) {
+func parse(data []byte) (Signatures, error) {
 	var decoded file
 	if err := json.Unmarshal(data, &decoded); err != nil {
-		return Set{}, fmt.Errorf("signatures: decode: %w", err)
+		return Signatures{}, fmt.Errorf("signatures: decode: %w", err)
 	}
 	blocks, err := compile(decoded.Blocks)
 	if err != nil {
-		return Set{}, err
+		return Signatures{}, err
 	}
 	shortBlocks, err := compile(decoded.ShortBlocks)
 	if err != nil {
-		return Set{}, err
+		return Signatures{}, err
 	}
 	headers := make([]Header, 0, len(decoded.Challenge.Headers))
 	for _, header := range decoded.Challenge.Headers {
 		headers = append(headers, Header{Label: header.Label, Name: strings.ToLower(header.Name), Value: strings.ToLower(header.Value)})
 	}
-	return Set{Blocks: blocks, ShortBlocks: shortBlocks, ChallengeHeaders: headers, ChallengeURLs: decoded.Challenge.URLContains}, nil
+	return Signatures{Blocks: blocks, ShortBlocks: shortBlocks, ChallengeHeaders: headers, ChallengeURLs: decoded.Challenge.URLContains}, nil
 }
 
 func compile(patterns []patternFile) ([]Pattern, error) {

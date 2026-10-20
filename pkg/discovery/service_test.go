@@ -8,24 +8,24 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type captureStub struct {
-	document page.Document
+	document fetch.Document
 	err      error
 	calls    int
-	options  page.CaptureOptions
+	options  fetch.CaptureOptions
 }
 
-func (s *captureStub) Capture(_ context.Context, _ string, _ page.Session, options page.CaptureOptions) (page.Document, error) {
+func (s *captureStub) Capture(_ context.Context, _ string, _ fetch.Session, options fetch.CaptureOptions) (fetch.Document, error) {
 	s.calls++
 	s.options = options
 	return s.document, s.err
 }
 
 func TestDiscoverReportsPageStillBlockedInBrowser(t *testing.T) {
-	browser := &captureStub{document: page.Document{Provider: page.ProviderPatchright, StatusCode: 403, HTML: `<title>Just a moment</title><form id="challenge-form"></form>`, Type: page.ContentHTML, Traffic: &page.Capture{}}}
+	browser := &captureStub{document: fetch.Document{Provider: fetch.ProviderPatchright, StatusCode: 403, HTML: `<title>Just a moment</title><form id="challenge-form"></form>`, Type: fetch.ContentHTML, Traffic: &fetch.Capture{}}}
 	report, err := New(browser).Discover(context.Background(), Request{URL: "example.com", Verbose: true})
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestDiscoveryVerbosity(t *testing.T) {
 }
 
 func TestDiscoveryPassesProfile(t *testing.T) {
-	browser := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
+	browser := &captureStub{document: fetch.Document{Provider: fetch.ProviderPatchright, Traffic: &fetch.Capture{}}}
 	if _, err := New(browser).Discover(context.Background(), Request{URL: "example.com", Profile: "account"}); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestDiscoveryPassesProfile(t *testing.T) {
 }
 
 func TestDiscoveryStealthRequiresProxy(t *testing.T) {
-	browser := &captureStub{document: page.Document{Provider: page.ProviderPatchright, Traffic: &page.Capture{}}}
+	browser := &captureStub{document: fetch.Document{Provider: fetch.ProviderPatchright, Traffic: &fetch.Capture{}}}
 	service := New(browser)
 	if _, err := service.Discover(context.Background(), Request{URL: "example.com", Stealth: true}); !errors.Is(err, ErrStealthProxy) {
 		t.Fatalf("without proxy error = %v, want ErrStealthProxy", err)

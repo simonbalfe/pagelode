@@ -16,9 +16,9 @@ flowchart LR
 
 | Concern | Owner |
 |---|---|
-| HTTP tier (tls-client Chrome fingerprint), classification, extraction, route memory and clearances (persisted in SQLite), escalation order, identity keys, proxy sessions, when to rotate an identity, every CapSolver task (Cloudflare, Google `/sorry`, DataDome slider) | Go core |
+| HTTP tier (tls-client Chrome fingerprint), classification, extraction, route memory and clearances (persisted in Postgres), escalation order, identity keys, proxy sessions, when to rotate an identity, every CapSolver task (Cloudflare, Google `/sorry`, DataDome slider) | Go core |
 | Chrome processes, identities bound to a proxy, challenge settling, DataDome device-check wait, challenge facts, profiles, CDP sessions, concurrency limit, cleanup | Browser service |
-| Block patterns and challenge signals | Shared: [`pkg/signatures/signatures.json`](../pkg/signatures/signatures.json), read by both |
+| Block patterns and challenge signals | Shared: [`pkg/fetch/signatures.json`](../pkg/fetch/signatures.json), read by both |
 
 The service holds no CapSolver key. A render that ends on a captcha returns that page with a `challenge` fact; Go solves it (see [Captchas](#captchas)) and renders again with the solved cookie.
 
@@ -106,10 +106,10 @@ The response contains `status_code`, `final_url`, `title`, `html` (the DOM after
 - `wait_for_matched` is returned only when `wait_for` was sent.
 - `explored_urls` is returned only when `explore` was sent; see [Exploring a page](#exploring-a-page).
 - `replay` holds the identity key, the exact proxy URL, and Chrome's own request headers (`user-agent`, `accept`, `accept-language`, `sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`).
-- Every render has a hard deadline of `timeout_ms` + 15 s. When it expires the identity's browser is discarded and relaunched on the next request, so a crashed Chrome cannot hang the queue.
-- Renders beyond `BROWSER_SERVICE_CONCURRENCY` queue; beyond `BROWSER_SERVICE_MAX_WAITING` they get `429`. This is the only browser limit; Go maps `429 saturated` to `limit.ErrSaturated`.
+- Every render has a hard deadline of `timeout_ms` + 15 s. When it expires only that render's page is closed and the render fails with `504`; other renders on the identity carry on. If the page does not close within 10 s the browser counts as wedged: it takes no new renders, closes once its other renders finish, and the next render relaunches it.
+- Renders beyond `BROWSER_SERVICE_CONCURRENCY` queue; beyond `BROWSER_SERVICE_MAX_WAITING` they get `429`. This is the only browser limit; Go maps `429 saturated` to `fetch.ErrSaturated`.
 
-Go always sends `settle_ms` (from `PAGELODE_BROWSER_SETTLE_MS`) and its capture limits (`page.MaxCapture*`: 200 requests, 256 KiB, 2 MiB). Anonymous Go renders also send an `identity` key and a concrete `proxy_url`.
+Go always sends `settle_ms` (from `PAGELODE_BROWSER_SETTLE_MS`) and its capture limits (`fetch.MaxCapture*`: 200 requests, 256 KiB, 2 MiB). Anonymous Go renders also send an `identity` key and a concrete `proxy_url`.
 
 ### Waiting for the page
 
@@ -198,12 +198,13 @@ flowchart TD
 ```
 
 - **Key in the service.** `identity` from the request; otherwise `default` without a proxy, or `proxy-<hash of the proxy URL>`. `acquire(key, proxy)` binds a key to its proxy; a different proxy for the same key returns `409`. The profile directory is `identity-<hash of key>`. There are no generations in the service.
-- **Key in Go** (`pkg/browser/identity.go`). `PAGELODE_BROWSER_IDENTITIES` slots; a host belongs to slot `fnv(lowercased hostname) % slots`. Slot 0's key is `pl-<hash of PAGELODE_PROXY_URL template>-g<generation>` and slot `n` ≥ 1's is `pl-<hash>-s<n>-g<generation>`, so one slot keeps the single-identity keys and stored state. The proxy session id is derived from the key, so it is stable across runs. Each slot's generation is stored in the SQLite state file. With several `PAGELODE_BROWSER_URL` nodes, slot `n` renders on node `n % nodes`, and profile renders and sessions on node `fnv(profile) % nodes`.
-- **Proxy session.** Go fills `{session}` (raw or URL-encoded) or a provider password token (`_session-`, `_hardsession-`, `_lockedsession-`) in the template (`proxy`). Profiles use a session derived from `profile:<name>`; ad-hoc sessions get a random one. Plain HTTP for a host uses the proxy of the identity that owns the host, so HTTP and the browser share one exit IP per host.
+- **Key in Go** (`pkg/browser/identity.go`). `PAGELODE_BROWSER_IDENTITIES` slots; a host belongs to slot `fnv(lowercased hostname) % slots`. Slot 0's key is `pl-<hash of PAGELODE_PROXY_URL template>-g<generation>` and slot `n` ≥ 1's is `pl-<hash>-s<n>-g<generation>`, so one slot keeps the single-identity keys and stored state. The proxy session id is derived from the key, so it is stable across runs. Each slot's generation is stored in Postgres (`PAGELODE_DATABASE_URL`); without a database it restarts at 0 in every process. With several `PAGELODE_BROWSER_URL` nodes, slot `n` renders on node `n % nodes`, and profile renders and sessions on node `fnv(profile) % nodes`.
+- **Proxy session.** Go fills `{session}` (raw or URL-encoded) or a provider password token (`_session-`, `_hardsession-`, `_lockedsession-`) in the template (`browser.ProxyWithSession`). Profiles use a session derived from `profile:<name>`; ad-hoc sessions get a random one. Plain HTTP for a host uses the proxy of the identity that owns the host, so HTTP and the browser share one exit IP per host.
 - **Rotation.** When one host blocks its identity on 2 consecutive renders (status 401, 403, or 429, or a `challenge` fact) and the proxy has a changeable session, Go moves that host's slot to its next generation, persists it, and best-effort deletes the old identity on the node that served the render. Other slots keep their identities. A delete that fails (for example `409` while renders are in progress) is retried on later rotations. Without a changeable session there is no rotation.
 - **Persona.** With an HTTP(S) proxy the service looks up the exit IP through that proxy. The country selects languages (for example GB gives `en-GB, en-US, en`) and the timezone comes from the lookup. They are applied natively: `TZ` and `LANG` in Chrome's environment, `--lang`, and `intl.accept_languages` in the profile. Nothing is emulated with JavaScript, because Cloudflare detects emulated values.
 - **WebRTC.** With a proxy, the profile sets `webrtc.ip_handling_policy` to `disable_non_proxied_udp`, so WebRTC cannot reveal the server's real IP.
 - **Pool.** Up to `BROWSER_SERVICE_MAX_IDENTITIES` browsers stay warm; the least recently used idle one is closed when a new identity is needed. Its profile stays on disk, so cookies such as `cf_clearance` survive.
+- **Launches.** One launch at a time per identity; concurrent renders wait for it. A profile directory never has two Chromes: a relaunch waits until the previous browser has exited, and a browser is only closed when no render is using it. A launch is bounded at 30 s and a close at 15 s, after which the browser's process group is killed (pid from the profile's `SingletonLock`). A failed launch fails every render waiting on it at once with `502 render_failed` (`browser launch for identity "<key>" failed: …`); the next render starts a fresh launch.
 
 ## Clearance replay
 
@@ -217,7 +218,7 @@ flowchart LR
     Replay -- blocked --> Forget[forget clearance]
     Known -- no --> Waterfall[normal waterfall]
     Forget --> Waterfall
-    Waterfall -- browser success --> Record[remember clearance for PAGELODE_ROUTE_TTL, in SQLite]
+    Waterfall -- browser success --> Record[remember clearance for PAGELODE_ROUTE_TTL, in Postgres]
     Record --> Done
 ```
 
@@ -229,7 +230,7 @@ flowchart LR
 | Header order | Chrome's navigation order, including `sec-fetch-*` and `priority` |
 | TLS handshake | tls-client's newest Chrome profile (`Chrome_152`) |
 
-- PageLode keeps clearances per host (`pkg/memory/clearances.go`) for `PAGELODE_ROUTE_TTL` and tries replay before the waterfall. They are written through to the SQLite state file, so they survive restarts and separate CLI runs. They contain cookies, browser headers, and the proxy URL, so the file is private (mode `0600`).
+- PageLode keeps clearances per host (`pkg/fetch/clearances.go`) for `PAGELODE_ROUTE_TTL` and tries replay before the waterfall. With `PAGELODE_DATABASE_URL` set they are written through to Postgres, so they survive restarts and separate CLI runs. They contain cookies, browser headers, and the proxy URL, so restrict access to the database.
 - A blocked replay forgets the clearance and runs the normal waterfall, which harvests a fresh one.
 - Replayed results report provider `replay`.
 - Other tools can read the same data from `GET /v1/identities/:key/clearance`.
@@ -257,7 +258,7 @@ Some values are the same for every identity in one container: canvas and audio h
 | `BROWSER_SERVICE_HOST` | `127.0.0.1` | Listen address (`0.0.0.0` in Docker) |
 | `BROWSER_SERVICE_PORT` | `8090` | Listen port |
 | `BROWSER_SERVICE_TOKEN` | empty | Required unless the host is loopback |
-| `BROWSER_SERVICE_CONCURRENCY` | `4` | Renders at once |
+| `BROWSER_SERVICE_CONCURRENCY` | `16` | Renders at once. 16 used about half of a 12-core M4 Pro |
 | `BROWSER_SERVICE_MAX_WAITING` | `100` | Queued renders before `429` |
 | `BROWSER_SERVICE_MAX_SESSIONS` | `4` | Open CDP sessions |
 | `BROWSER_SERVICE_MAX_IDENTITIES` | `8` | Warm render identities |
@@ -274,7 +275,7 @@ PageLode reaches the service through `PAGELODE_BROWSER_URL` and `PAGELODE_BROWSE
 
 ## Captchas
 
-`captcha` in Go wraps the browser client for extraction, discovery, and email finding. It runs only when `CAPSOLVER_API_KEY` is set in the PageLode process, and acts only on the service's `challenge` facts.
+`browser.Solver` in Go wraps the browser client for extraction, discovery, and email finding. It runs only when `CAPSOLVER_API_KEY` is set in the PageLode process, and acts only on the service's `challenge` facts.
 
 | `challenge` fact | Go action | Then |
 |---|---|---|
@@ -373,7 +374,7 @@ PageLode with the container service, Evomi mobile proxies, and the former Go Jav
 | Next 47 searches, one session | `replay` | 45 with results, 2 blocked and re-harvested by the browser | 1.1–1.9 s each |
 | Reproducibility run, rounds 1–3 (GB, GB, US), fresh identity and PageLode restart per round | 1 harvest + 15 replays per round | 46 of 48 searches returned results; every search after a successful harvest replayed | replays 1.1–1.9 s |
 
-- Plain tls-client always receives Google's JavaScript wall (`emsg=SG_REL`); `classify` now treats it as blocked.
+- Plain tls-client always receives Google's JavaScript wall (`emsg=SG_REL`); `fetch.Classify` now treats it as blocked.
 - US T-Mobile IPs (`172.56.*`) received `/sorry` on every query; GB, IE, and AU IPs often did not.
 - Result links are opaque `google.com/goto?url=` tokens. The `cite` element shows the host and a shortened path; the real URL needs one extra request per result.
 
@@ -433,14 +434,16 @@ One laptop-sized container, `BROWSER_SERVICE_CONCURRENCY=10`, Evomi mobile IPs i
 | nowsecure.nl | No longer a challenge page; a Turnstile-like element triggered a false positive and 45 s of clicking | Fixed on 19 October 2026: `.cf-turnstile` and the Turnstile iframe are no longer detection signals. Drop it from the stealth suite |
 | DataDome captchas | Device checks pass; the slider captcha only appears for distrusted IPs or non-browser clients. CapSolver accepts only Windows or Mac user agents | Go now rotates the identity to a fresh IP after 2 blocks; exercise the CapSolver fallback on a Mac or Windows service |
 | Late verdicts | Some pages fill in content after the page goes quiet or after the `settle_ms` cap | The quiet wait catches content loaded by requests and DOM changes; `wait_for` exists on renders; Go does not yet expose it per request |
-| Signatures in two places | The service's challenge check was a weaker copy of Go's `classify` patterns | Resolved: one `pkg/signatures/signatures.json` read by both; documents carry response headers and Go checks challenge signals before HTML patterns |
+| Signatures in two places | The service's challenge check was a weaker copy of Go's `fetch.Classify` patterns | Resolved: one `pkg/fetch/signatures.json` read by both; documents carry response headers and Go checks challenge signals before HTML patterns |
 | Browser closed at startup | A freshly launched identity occasionally died on its first page (`Target page, context or browser has been closed`) | Discard and retry once on a fresh browser within the same deadline |
-| Identity rotation can hang | During the reproducibility run a `DELETE /v1/identities/:key` never returned, stalling the run after round 3 | Bound `context.close()` with a timeout and kill the browser process if it does not exit |
+| Identity rotation can hang | During the reproducibility run a `DELETE /v1/identities/:key` never returned, stalling the run after round 3 | Fixed on 21 October 2026: closing a browser is bounded at 15 s, then its process group is killed. Not re-measured on the Google run |
 | One identity per PageLode proxy | PageLode sent no `identity`, so all its renders shared one browser and IP, and Go never rotated | Resolved: Go sends `pl-<hash>-g<generation>` keys and rotates after repeated blocks. A pool of identities per country remains future work |
+| Identity browser relaunched under load | One render passing its hard deadline (for example a challenge page that never clears) closed the identity's shared Chrome under every other render, then relaunched it on the same profile while the old one was still closing: `ProcessSingleton` launch failures, `Target page, context or browser has been closed`, and renders stuck behind a failed launch | Fixed on 21 October 2026 (see the **Launches** bullet under [Identities and rotation](#identities-and-rotation)). 240 renders at once, concurrency 16, one identity, local fixture with 20 never-clearing challenge pages and 10 never-answering pages, `timeout_ms` 15,000, two runs before and one after: 169–173 succeeded before, 210 after; `ProcessSingleton` 11–21 → 0; closed context 15–17 → 0; Chrome launches 3 → 1; normal pages failed 34–37 of 190 → 0 |
+| Service exits on a browser dying under open pages | When a Chrome dies under open pages, Patchright can reject internally (`Network.setCacheDisabled: … session closed`) and Bun exits on the unhandled rejection. Seen once while the deadline still closed shared browsers | Open: the service no longer closes a browser that renders are using, but a real Chrome crash can still take the service down |
 
 ## Next steps
 
-1. Fix the startup retry and bounded rotation; repeat the 10-round Google reproducibility run, which also exercises Go's `/sorry` solver and identity rotation.
+1. Re-check the startup failure now that relaunches are serialised; repeat the 10-round Google reproducibility run, which also exercises Go's `/sorry` solver and identity rotation.
 2. Expose `wait_for` and `settle_ms` per extraction request.
 3. A Google search endpoint: identity pool per country, result parsing, `/goto` link resolution.
 4. Re-measure the CapSolver Cloudflare fallback now that it fetches the solved page over tls-client.

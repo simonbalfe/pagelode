@@ -1,4 +1,4 @@
-package orchestrator
+package fetch
 
 import (
 	"context"
@@ -6,19 +6,15 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 type stubFetcher struct {
-	document page.Document
+	document Document
 	err      error
 	calls    int
 }
 
-func (s *stubFetcher) Fetch(context.Context, string, page.Session) (page.Document, error) {
+func (s *stubFetcher) Fetch(context.Context, string, Session) (Document, error) {
 	s.calls++
 	return s.document, s.err
 }
@@ -34,19 +30,19 @@ func TestHTTPResultsNeedingABrowserUseTheBrowserService(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			httpFetcher := &stubFetcher{document: page.Document{Provider: page.ProviderTLS, StatusCode: 200, FinalURL: "https://example.com", Type: page.ContentHTML, HTML: test.html}}
-			browserFetcher := &stubFetcher{document: usableDocument(page.ProviderPatchright)}
-			routes := memory.NewRoutes(time.Hour, nil)
-			service := New(httpFetcher, browserFetcher, nil, routes, memory.NewClearances(time.Hour))
+			httpFetcher := &stubFetcher{document: Document{Provider: ProviderTLS, StatusCode: 200, FinalURL: "https://example.com", Type: ContentHTML, HTML: test.html}}
+			browserFetcher := &stubFetcher{document: usableDocument(ProviderPatchright)}
+			routes := NewRoutes(time.Hour, nil)
+			service := NewService(httpFetcher, browserFetcher, nil, routes, NewClearances(time.Hour))
 
 			result, err := service.Extract(context.Background(), "https://example.com")
 			if err != nil {
 				t.Fatalf("Extract() error = %v", err)
 			}
-			if result.Provider != page.ProviderPatchright || browserFetcher.calls != 1 {
+			if result.Provider != ProviderPatchright || browserFetcher.calls != 1 {
 				t.Errorf("Extract() provider = %q with %d browser calls, want patchright once", result.Provider, browserFetcher.calls)
 			}
-			if got, ok := routes.Preferred("example.com"); !ok || got != page.ProviderPatchright {
+			if got, ok := routes.Preferred("example.com"); !ok || got != ProviderPatchright {
 				t.Errorf("route after browser success = %q, %v; want patchright remembered", got, ok)
 			}
 		})
@@ -56,15 +52,15 @@ func TestHTTPResultsNeedingABrowserUseTheBrowserService(t *testing.T) {
 func TestProtectedDomainStartsWithTheBrowser(t *testing.T) {
 	t.Parallel()
 
-	httpFetcher := &stubFetcher{document: usableDocument(page.ProviderTLS)}
-	browserFetcher := &stubFetcher{document: usableDocument(page.ProviderPatchright)}
+	httpFetcher := &stubFetcher{document: usableDocument(ProviderTLS)}
+	browserFetcher := &stubFetcher{document: usableDocument(ProviderPatchright)}
 	service := testService(httpFetcher, browserFetcher, nil, []string{"crunchbase.com"})
 
 	result, err := service.Extract(context.Background(), "https://www.crunchbase.com/organization/example")
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
-	if result.Provider != page.ProviderPatchright {
+	if result.Provider != ProviderPatchright {
 		t.Errorf("Extract() provider = %q, want patchright", result.Provider)
 	}
 	if httpFetcher.calls != 0 {
@@ -75,19 +71,19 @@ func TestProtectedDomainStartsWithTheBrowser(t *testing.T) {
 func TestBlockedBrowserEscalatesToCapSolver(t *testing.T) {
 	t.Parallel()
 
-	httpFetcher := &stubFetcher{document: usableDocument(page.ProviderTLS)}
-	browserFetcher := &stubFetcher{document: page.Document{
-		Provider: page.ProviderPatchright, StatusCode: 403, FinalURL: "https://example.com", Type: page.ContentHTML,
+	httpFetcher := &stubFetcher{document: usableDocument(ProviderTLS)}
+	browserFetcher := &stubFetcher{document: Document{
+		Provider: ProviderPatchright, StatusCode: 403, FinalURL: "https://example.com", Type: ContentHTML,
 		HTML: `<html><title>Just a moment</title><body><form id="challenge-form"></form></body></html>`,
 	}}
-	capSolverFetcher := &stubFetcher{document: usableDocument(page.ProviderCapSolver)}
+	capSolverFetcher := &stubFetcher{document: usableDocument(ProviderCapSolver)}
 	service := testService(httpFetcher, browserFetcher, capSolverFetcher, []string{"example.com"})
 
 	result, err := service.Extract(context.Background(), "https://example.com")
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
-	if result.Provider != page.ProviderCapSolver {
+	if result.Provider != ProviderCapSolver {
 		t.Errorf("provider = %q, want capsolver", result.Provider)
 	}
 	if httpFetcher.calls != 0 {
@@ -100,25 +96,26 @@ func TestBlockedBrowserEscalatesToCapSolver(t *testing.T) {
 
 func TestExtractHTTPHandsBrowserWorkToTheBrowserStage(t *testing.T) {
 	t.Parallel()
-	shell := page.Document{Provider: page.ProviderTLS, StatusCode: 200, FinalURL: "https://example.com", Type: page.ContentHTML,
+	shell := Document{Provider: ProviderTLS, StatusCode: 200, FinalURL: "https://example.com", Type: ContentHTML,
 		HTML: `<html><body><div id="root"></div><script src="/1.js"></script><script src="/2.js"></script><script src="/3.js"></script><script src="/4.js"></script></body></html>`}
 	for _, test := range []struct {
 		name        string
-		http        page.Document
+		http        Document
 		protected   []string
 		wantOutcome string
 		wantHTTP    int
 	}{
-		{name: "usable over HTTP", http: usableDocument(page.ProviderTLS), wantOutcome: "ok", wantHTTP: 1},
+		{name: "usable over HTTP", http: usableDocument(ProviderTLS), wantOutcome: "ok", wantHTTP: 1},
 		{name: "javascript shell", http: shell, wantOutcome: OutcomeNeedsBrowser, wantHTTP: 1},
-		{name: "dead page", http: page.Document{Provider: page.ProviderTLS, StatusCode: 404, FinalURL: "https://example.com", Type: page.ContentHTML}, wantOutcome: "dead", wantHTTP: 1},
-		{name: "browser route remembered", http: usableDocument(page.ProviderTLS), protected: []string{"example.com"}, wantOutcome: OutcomeNeedsBrowser, wantHTTP: 0},
+		{name: "dead page", http: Document{Provider: ProviderTLS, StatusCode: 404, FinalURL: "https://example.com", Type: ContentHTML}, wantOutcome: "dead", wantHTTP: 1},
+		{name: "non-HTML response the browser cannot extract", http: Document{Provider: ProviderTLS, StatusCode: 200, FinalURL: "https://example.com/report.pdf", Type: ContentPDF}, wantOutcome: "failed", wantHTTP: 1},
+		{name: "browser route remembered", http: usableDocument(ProviderTLS), protected: []string{"example.com"}, wantOutcome: OutcomeNeedsBrowser, wantHTTP: 0},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			httpFetcher := &stubFetcher{document: test.http}
-			browserFetcher := &stubFetcher{document: usableDocument(page.ProviderPatchright)}
-			capSolverFetcher := &stubFetcher{document: usableDocument(page.ProviderCapSolver)}
+			browserFetcher := &stubFetcher{document: usableDocument(ProviderPatchright)}
+			capSolverFetcher := &stubFetcher{document: usableDocument(ProviderCapSolver)}
 			service := testService(httpFetcher, browserFetcher, capSolverFetcher, test.protected)
 
 			result, err := service.ExtractHTTP(context.Background(), "https://example.com")
@@ -141,15 +138,15 @@ func TestExtractBrowserReturnsCapacityErrorsInsteadOfFailing(t *testing.T) {
 		name string
 		err  error
 	}{
-		{name: "saturated", err: fmt.Errorf("patchright: saturated: %w", limit.ErrSaturated)},
-		{name: "unreachable", err: fmt.Errorf("patchright: connection refused: %w", limit.ErrUnavailable)},
+		{name: "saturated", err: fmt.Errorf("patchright: saturated: %w", ErrSaturated)},
+		{name: "unreachable", err: fmt.Errorf("patchright: connection refused: %w", ErrUnavailable)},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			browserFetcher := &stubFetcher{err: test.err}
-			capSolverFetcher := &stubFetcher{document: usableDocument(page.ProviderCapSolver)}
-			routes := memory.NewRoutes(time.Hour, nil)
-			service := New(&stubFetcher{}, browserFetcher, capSolverFetcher, routes, memory.NewClearances(time.Hour))
+			capSolverFetcher := &stubFetcher{document: usableDocument(ProviderCapSolver)}
+			routes := NewRoutes(time.Hour, nil)
+			service := NewService(&stubFetcher{}, browserFetcher, capSolverFetcher, routes, NewClearances(time.Hour))
 
 			_, err := service.ExtractBrowser(context.Background(), "https://example.com")
 			if !errors.Is(err, test.err) {
@@ -167,31 +164,31 @@ func TestExtractBrowserReturnsCapacityErrorsInsteadOfFailing(t *testing.T) {
 
 func TestExtractStillFallsBackToCapSolverWhenTheBrowserIsFull(t *testing.T) {
 	t.Parallel()
-	shell := page.Document{Provider: page.ProviderTLS, StatusCode: 403, FinalURL: "https://example.com", Type: page.ContentHTML,
+	shell := Document{Provider: ProviderTLS, StatusCode: 403, FinalURL: "https://example.com", Type: ContentHTML,
 		HTML: `<html><title>Just a moment</title><body><form id="challenge-form"></form></body></html>`}
-	capSolverFetcher := &stubFetcher{document: usableDocument(page.ProviderCapSolver)}
-	service := testService(&stubFetcher{document: shell}, &stubFetcher{err: limit.ErrSaturated}, capSolverFetcher, nil)
+	capSolverFetcher := &stubFetcher{document: usableDocument(ProviderCapSolver)}
+	service := testService(&stubFetcher{document: shell}, &stubFetcher{err: ErrSaturated}, capSolverFetcher, nil)
 
 	result, err := service.Extract(context.Background(), "https://example.com")
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
-	if result.Provider != page.ProviderCapSolver || capSolverFetcher.calls != 1 {
+	if result.Provider != ProviderCapSolver || capSolverFetcher.calls != 1 {
 		t.Errorf("Extract() provider = %q with %d CapSolver calls, want CapSolver once", result.Provider, capSolverFetcher.calls)
 	}
 }
 
 func testService(httpFetcher Fetcher, browserFetcher Fetcher, capSolverFetcher Fetcher, protected []string) *Service {
-	return New(httpFetcher, browserFetcher, capSolverFetcher, memory.NewRoutes(time.Hour, protected), memory.NewClearances(time.Hour))
+	return NewService(httpFetcher, browserFetcher, capSolverFetcher, NewRoutes(time.Hour, protected), NewClearances(time.Hour))
 }
 
-func usableDocument(provider page.Provider) page.Document {
-	return page.Document{
+func usableDocument(provider Provider) Document {
+	return Document{
 		Provider:   provider,
 		StatusCode: 200,
 		FinalURL:   "https://example.com/",
 		Title:      "Example",
-		Type:       page.ContentHTML,
+		Type:       ContentHTML,
 		HTML:       `<html><head><title>Example</title></head><body><main><h1>Example</h1><p>This page contains enough readable content for the extraction pipeline to accept it successfully without another browser escalation.</p></main></body></html>`,
 	}
 }

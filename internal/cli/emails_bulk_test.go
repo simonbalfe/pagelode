@@ -7,8 +7,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/simonbalfe/pagelode/internal/config"
 )
 
 func TestEmailsRejectsFlagsFromTheOtherMode(t *testing.T) {
@@ -16,14 +14,15 @@ func TestEmailsRejectsFlagsFromTheOtherMode(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"--db", "out.sqlite", "example.com"}, "--db and --workers apply only with --input"},
-		{[]string{"--workers", "8", "example.com"}, "--db and --workers apply only with --input"},
+		{[]string{"--database", "postgres://localhost/pagelode", "example.com"}, "--database and --workers apply only with --input"},
+		{[]string{"--workers", "8", "example.com"}, "--database and --workers apply only with --input"},
 		{[]string{"--input", "sites.txt", "--profile", "account"}, "--profile and --verbose do not apply with --input"},
 		{[]string{"--input", "sites.txt", "--verbose"}, "--profile and --verbose do not apply with --input"},
 		{[]string{"--input", "sites.txt", "example.com"}, "do not also pass a URL"},
+		{[]string{"--input", "sites.txt"}, "PAGELODE_DATABASE_URL"},
 	} {
 		var output bytes.Buffer
-		err := emailsCommand(config.Config{}, test.args, &output, &output)
+		err := emailsCommand(Config{}, test.args, &output, &output)
 		if err == nil || !strings.Contains(err.Error(), test.want) {
 			t.Errorf("emails %v: error = %v, want %q", test.args, err, test.want)
 		}

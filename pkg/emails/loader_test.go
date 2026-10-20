@@ -2,22 +2,20 @@ package emails
 
 import (
 	"context"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"testing"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
-type fetchFunc func(context.Context, string, page.Session) (page.Document, error)
+type fetchFunc func(context.Context, string, fetch.Session) (fetch.Document, error)
 
-func (f fetchFunc) Fetch(ctx context.Context, target string, session page.Session) (page.Document, error) {
+func (f fetchFunc) Fetch(ctx context.Context, target string, session fetch.Session) (fetch.Document, error) {
 	return f(ctx, target, session)
 }
 
-type captureFunc func(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error)
+type captureFunc func(context.Context, string, fetch.Session, fetch.CaptureOptions) (fetch.Document, error)
 
-func (f captureFunc) Capture(ctx context.Context, target string, session page.Session, options page.CaptureOptions) (page.Document, error) {
+func (f captureFunc) Capture(ctx context.Context, target string, session fetch.Session, options fetch.CaptureOptions) (fetch.Document, error) {
 	return f(ctx, target, session, options)
 }
 
@@ -36,22 +34,22 @@ func TestLoaderRouting(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var calls []string
-			http := fetchFunc(func(context.Context, string, page.Session) (page.Document, error) {
+			http := fetchFunc(func(context.Context, string, fetch.Session) (fetch.Document, error) {
 				calls = append(calls, "http")
-				return page.Document{HTML: test.body, Type: page.ContentHTML, FinalURL: "https://example.org/", StatusCode: test.status}, nil
+				return fetch.Document{HTML: test.body, Type: fetch.ContentHTML, FinalURL: "https://example.org/", StatusCode: test.status}, nil
 			})
-			browser := captureFunc(func(_ context.Context, target string, _ page.Session, options page.CaptureOptions) (page.Document, error) {
+			browser := captureFunc(func(_ context.Context, target string, _ fetch.Session, options fetch.CaptureOptions) (fetch.Document, error) {
 				calls = append(calls, "browser")
 				if options.Profile != test.profile {
 					t.Errorf("profile %q", options.Profile)
 				}
-				return page.Document{HTML: `<p>rendered@example.org</p>`, FinalURL: target, StatusCode: 200, Type: page.ContentHTML}, nil
+				return fetch.Document{HTML: `<p>rendered@example.org</p>`, FinalURL: target, StatusCode: 200, Type: fetch.ContentHTML}, nil
 			})
 			var protected []string
 			if test.protected {
 				protected = []string{"example.org"}
 			}
-			loader := NewLoader(http, browser, nil, memory.NewRoutes(time.Hour, protected))
+			loader := NewLoader(http, browser, nil, fetch.NewRoutes(time.Hour, protected))
 			_, err := loader.Load(context.Background(), "https://example.org/", Options{Render: "auto", Profile: test.profile})
 			if err != nil {
 				t.Fatal(err)

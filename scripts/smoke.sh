@@ -9,6 +9,7 @@ work_dir="$(mktemp -d)"
 api_pid=""
 browser_pid=""
 fixture_pid=""
+postgres_container=""
 
 cleanup() {
 	for pid in "$api_pid" "$browser_pid" "$fixture_pid"; do
@@ -17,6 +18,9 @@ cleanup() {
       wait "$pid" 2>/dev/null || true
     fi
   done
+  if [ -n "$postgres_container" ]; then
+    docker rm -f "$postgres_container" >/dev/null 2>&1 || true
+  fi
   rm -rf "$work_dir"
 }
 
@@ -45,8 +49,24 @@ BROWSER_SERVICE_PORT="$browser_port" BROWSER_SERVICE_TOKEN="$browser_token" BROW
 browser_pid="$!"
 wait_healthy "http://127.0.0.1:$browser_port" "$work_dir/browser.log"
 
+if [ -z "${PAGELODE_DATABASE_URL:-}" ]; then
+  postgres_port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+  postgres_container="pagelode-smoke-pg-$$"
+  docker run -d --rm --name "$postgres_container" -e POSTGRES_PASSWORD=smoke -p "127.0.0.1:$postgres_port:5432" postgres:17 >/dev/null
+  attempt=0
+  until docker exec "$postgres_container" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 120 ]; then
+      docker logs "$postgres_container"
+      exit 1
+    fi
+    sleep 0.25
+  done
+  PAGELODE_DATABASE_URL="postgres://postgres:smoke@127.0.0.1:$postgres_port/postgres?sslmode=disable"
+fi
+
 go build -o "$work_dir/pagelode" ./cmd/pagelode
-export PAGELODE_BROWSER_URL="http://127.0.0.1:$browser_port" PAGELODE_BROWSER_TOKEN="$browser_token" PAGELODE_PROTECTED_DOMAINS="localhost" PAGELODE_STATE_PATH="$work_dir/state.sqlite"
+export PAGELODE_BROWSER_URL="http://127.0.0.1:$browser_port" PAGELODE_BROWSER_TOKEN="$browser_token" PAGELODE_PROTECTED_DOMAINS="localhost" PAGELODE_DATABASE_URL
 PORT="$api_port" "$work_dir/pagelode" serve >"$work_dir/api.log" 2>&1 &
 api_pid="$!"
 wait_healthy "http://127.0.0.1:$api_port" "$work_dir/api.log"
@@ -91,8 +111,11 @@ for fixture_host in 127.0.0.1 localhost; do
 done
 "$work_dir/pagelode" emails --max-pages 1 --render never "http://127.0.0.1:$fixture_port/emails.html" > "$work_dir/emails-cli.txt"
 grep -qx 'footer@example.org' "$work_dir/emails-cli.txt"
-printf 'http://127.0.0.1:%s/emails.html\n' "$fixture_port" | "$work_dir/pagelode" emails --input - --max-pages 1 --workers 1 --db "$work_dir/emails.sqlite" > "$work_dir/emails-input.txt" 2>/dev/null
+email_site="http://127.0.0.1:$fixture_port/emails.html?run=$$-$(date +%s)"
+printf '%s\n' "$email_site" | "$work_dir/pagelode" emails --input - --max-pages 1 --workers 1 > "$work_dir/emails-input.txt" 2>/dev/null
 grep -q '^1 sites crawled, 1 with emails' "$work_dir/emails-input.txt"
+printf '%s\n' "$email_site" | "$work_dir/pagelode" emails --input - --max-pages 1 --workers 1 2> "$work_dir/emails-resume.txt" >/dev/null
+grep -q '1 sites, 1 already done, 0 to crawl' "$work_dir/emails-resume.txt"
 "$work_dir/pagelode" map endpoints --wait-ms 100 "http://127.0.0.1:$fixture_port/discover.html" > "$work_dir/discovery-cli.json"
 grep -q '"path": "/data.json"' "$work_dir/discovery-cli.json"
 printf '%s\n' 'PageLode smoke test passed: extraction, persisted routes, discovery, and email finding through the browser service'

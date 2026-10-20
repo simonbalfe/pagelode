@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/simonbalfe/pagelode/pkg/urlshape"
 )
 
 const maximumPageLinks = 5000
@@ -152,7 +151,7 @@ func (g globs) match(value string) bool {
 	return false
 }
 
-func templatesOf(entries []Entry) []urlshape.Template {
+func templatesOf(entries []Entry) []Template {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -160,7 +159,7 @@ func templatesOf(entries []Entry) []urlshape.Template {
 	for i, entry := range entries {
 		urls[i] = entry.URL
 	}
-	return urlshape.Templates(urls, templateThreshold)
+	return Templates(urls, templateThreshold)
 }
 
 const maximumRobotsRules = 200

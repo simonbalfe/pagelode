@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type fixtureSite struct {
@@ -240,15 +240,15 @@ type fakeBrowser struct {
 	exploring []string
 }
 
-func (b *fakeBrowser) Fetch(_ context.Context, target string, _ page.Session) (page.Document, error) {
+func (b *fakeBrowser) Fetch(_ context.Context, target string, _ fetch.Session) (fetch.Document, error) {
 	b.fetched = append(b.fetched, strings.TrimPrefix(target, b.site.server.URL))
-	return page.Document{Provider: page.ProviderPatchright, StatusCode: 200, FinalURL: target, Type: page.ContentHTML,
+	return fetch.Document{Provider: fetch.ProviderPatchright, StatusCode: 200, FinalURL: target, Type: fetch.ContentHTML,
 		HTML: `<html><body><h1>Rendered</h1><a href="/spa/page1">One</a></body></html>`}, nil
 }
 
-func (b *fakeBrowser) Explore(_ context.Context, target string, _ page.Session, _ page.ExploreOptions) (page.Document, error) {
+func (b *fakeBrowser) Explore(_ context.Context, target string, _ fetch.Session, _ fetch.ExploreOptions) (fetch.Document, error) {
 	b.explored = append(b.explored, strings.TrimPrefix(target, b.site.server.URL))
-	return page.Document{Provider: page.ProviderPatchright, StatusCode: 200, FinalURL: target, Type: page.ContentHTML,
+	return fetch.Document{Provider: fetch.ProviderPatchright, StatusCode: 200, FinalURL: target, Type: fetch.ContentHTML,
 		HTML:         `<html><body><h1>Home</h1><a href="/revealed">Revealed</a></body></html>`,
 		ExploredURLs: []string{b.site.server.URL + "/tab-two"}}, nil
 }

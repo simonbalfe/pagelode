@@ -5,18 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/browser"
+	"github.com/simonbalfe/pagelode/pkg/discovery"
 	"io"
 	"os"
 	"time"
-
-	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/pkg/browser"
-	"github.com/simonbalfe/pagelode/pkg/discovery"
 )
 
 const profileRequestTimeout = 2 * time.Minute
 
-func profileCommand(configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func profileCommand(configuration Config, args []string, stdout, stderr io.Writer) error {
 	if len(args) != 3 || args[0] != "login" {
 		return errors.New("usage: pagelode profile login <name> <URL>")
 	}

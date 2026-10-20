@@ -12,20 +12,18 @@ import (
 	"time"
 
 	"github.com/simonbalfe/pagelode/pkg/discovery"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type apiCapturer struct{ calls int }
 
-func (c *apiCapturer) Capture(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error) {
+func (c *apiCapturer) Capture(context.Context, string, fetch.Session, fetch.CaptureOptions) (fetch.Document, error) {
 	c.calls++
-	return page.Document{Provider: page.ProviderPatchright, Type: page.ContentHTML, Traffic: &page.Capture{Entries: []page.Exchange{{URL: "https://example.com/api/listings", Method: "GET", MIMEType: "application/json", ResponseBody: `{"items":[{"id":1}]}`}}}}, nil
+	return fetch.Document{Provider: fetch.ProviderPatchright, Type: fetch.ContentHTML, Traffic: &fetch.Capture{Entries: []fetch.Exchange{{URL: "https://example.com/api/listings", Method: "GET", MIMEType: "application/json", ResponseBody: `{"items":[{"id":1}]}`}}}}, nil
 }
 
 func discoveryServer(capturer discovery.Capturer) *Server {
-	return New(nil, discovery.New(capturer), limit.New(2, 2), memory.NewRoutes(time.Hour, nil), time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return New(nil, discovery.New(capturer), fetch.NewLimiter(2, 2), fetch.NewRoutes(time.Hour, nil), time.Second, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 func TestDiscoveryEndpoint(t *testing.T) {

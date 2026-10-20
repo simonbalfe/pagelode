@@ -145,14 +145,14 @@ Header values and raw request/response bodies are private capture inputs. Public
 
 | Module | Responsibility |
 |---|---|
-| `pkg/page/capture.go` | Portable browser traffic values and capture limits |
+| `pkg/fetch/capture.go` | Portable browser traffic values and capture limits |
 | `browser-service/src/render/capture.ts` | Patchright network collection |
 | `browser-service/src/profiles/` | Profile directories, saved cookies (`store.ts`), and per-profile locks (`locks.ts`) |
 | `pkg/browser/client.go` | Render and capture requests to the browser service over HTTP |
 | `pkg/discovery/service.go` | Input validation, the single browser capture, and outcome mapping |
 | `pkg/discovery/classifier.go` | Ported Printing Press scoring and path matching |
 | `pkg/discovery/view.go` | Report verbosity |
-| `pkg/profile/store.go` | Named profile name validation |
+| `pkg/fetch/profile.go` | Named profile name validation |
 | `internal/cli/profile.go` | Interactive profile login |
 | `pkg/discovery/analyze.go` | Endpoint grouping, public evidence, and coverage reporting |
 | `pkg/discovery/schema.go` | Observed JSON/form/query shapes |

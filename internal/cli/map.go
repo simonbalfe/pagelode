@@ -6,12 +6,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/sitemap"
 	"io"
 	"strings"
 	"time"
-
-	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/pkg/sitemap"
 )
 
 type stringList []string
@@ -51,7 +49,7 @@ func defineMapFlags(flags *flag.FlagSet) mapFlags {
 	return options
 }
 
-func (a *application) siteMap(configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func (a *application) siteMap(configuration Config, args []string, stdout, stderr io.Writer) error {
 	flags := newFlagSet("map", stderr)
 	options := defineMapFlags(flags)
 	if err := flags.Parse(args); err != nil {

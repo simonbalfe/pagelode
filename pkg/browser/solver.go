@@ -1,4 +1,4 @@
-package captcha
+package browser
 
 import (
 	"context"
@@ -9,25 +9,23 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/simonbalfe/pagelode/pkg/capsolver"
-	"github.com/simonbalfe/pagelode/pkg/httpfetch"
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 const googleExemption = "GOOGLE_ABUSE_EXEMPTION"
 
 type Renderer interface {
-	Fetch(context.Context, string, page.Session) (page.Document, error)
-	Capture(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error)
+	Fetch(context.Context, string, fetch.Session) (fetch.Document, error)
+	Capture(context.Context, string, fetch.Session, fetch.CaptureOptions) (fetch.Document, error)
 }
 
 type Tasks interface {
-	Recaptcha(context.Context, capsolver.RecaptchaTask) (string, error)
-	DataDome(context.Context, capsolver.DataDomeTask) (string, error)
+	Recaptcha(context.Context, RecaptchaTask) (string, error)
+	DataDome(context.Context, DataDomeTask) (string, error)
 }
 
 type Submitter interface {
-	Submit(context.Context, httpfetch.Form, page.Session) (page.Document, error)
+	Submit(context.Context, fetch.Form, fetch.Session) (fetch.Document, error)
 }
 
 type Solver struct {
@@ -36,30 +34,30 @@ type Solver struct {
 	submitter Submitter
 }
 
-func New(renderer Renderer, tasks Tasks, submitter Submitter) *Solver {
+func NewSolver(renderer Renderer, tasks Tasks, submitter Submitter) *Solver {
 	return &Solver{renderer: renderer, tasks: tasks, submitter: submitter}
 }
 
-func (s *Solver) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
-	return s.render(ctx, session, func(session page.Session) (page.Document, error) {
+func (s *Solver) Fetch(ctx context.Context, targetURL string, session fetch.Session) (fetch.Document, error) {
+	return s.render(ctx, session, func(session fetch.Session) (fetch.Document, error) {
 		return s.renderer.Fetch(ctx, targetURL, session)
 	})
 }
 
-func (s *Solver) Capture(ctx context.Context, targetURL string, session page.Session, options page.CaptureOptions) (page.Document, error) {
-	return s.render(ctx, session, func(session page.Session) (page.Document, error) {
+func (s *Solver) Capture(ctx context.Context, targetURL string, session fetch.Session, options fetch.CaptureOptions) (fetch.Document, error) {
+	return s.render(ctx, session, func(session fetch.Session) (fetch.Document, error) {
 		return s.renderer.Capture(ctx, targetURL, session, options)
 	})
 }
 
-func (s *Solver) render(ctx context.Context, session page.Session, load func(page.Session) (page.Document, error)) (page.Document, error) {
+func (s *Solver) render(ctx context.Context, session fetch.Session, load func(fetch.Session) (fetch.Document, error)) (fetch.Document, error) {
 	document, err := load(session)
 	if err != nil || s.tasks == nil {
 		return document, err
 	}
 	cookies, err := s.solve(ctx, document)
 	if err != nil {
-		return page.Document{}, err
+		return fetch.Document{}, err
 	}
 	if len(cookies) == 0 {
 		return document, nil
@@ -68,7 +66,7 @@ func (s *Solver) render(ctx context.Context, session page.Session, load func(pag
 	return load(session)
 }
 
-func (s *Solver) solve(ctx context.Context, document page.Document) ([]page.Cookie, error) {
+func (s *Solver) solve(ctx context.Context, document fetch.Document) ([]fetch.Cookie, error) {
 	challenge := document.Challenge
 	if challenge == nil {
 		return nil, nil
@@ -78,16 +76,16 @@ func (s *Solver) solve(ctx context.Context, document page.Document) ([]page.Cook
 		return nil, fmt.Errorf("captcha: parse final URL: %w", err)
 	}
 	switch {
-	case challenge.Vendor == page.ChallengeRecaptcha && strings.HasPrefix(location.Hostname(), "www.google.") && strings.HasPrefix(location.Path, "/sorry"):
+	case challenge.Vendor == fetch.ChallengeRecaptcha && strings.HasPrefix(location.Hostname(), "www.google.") && strings.HasPrefix(location.Path, "/sorry"):
 		return s.solveGoogle(ctx, document, *challenge, location)
-	case challenge.Vendor == page.ChallengeDataDome:
+	case challenge.Vendor == fetch.ChallengeDataDome:
 		return s.solveDataDome(ctx, document, *challenge, location)
 	default:
 		return nil, nil
 	}
 }
 
-func (s *Solver) solveGoogle(ctx context.Context, document page.Document, challenge page.Challenge, location *url.URL) ([]page.Cookie, error) {
+func (s *Solver) solveGoogle(ctx context.Context, document fetch.Document, challenge fetch.Challenge, location *url.URL) ([]fetch.Cookie, error) {
 	if challenge.SiteKey == "" {
 		return nil, nil
 	}
@@ -106,7 +104,7 @@ func (s *Solver) solveGoogle(ctx context.Context, document page.Document, challe
 	if err != nil {
 		return nil, fmt.Errorf("google captcha: parse form action: %w", err)
 	}
-	token, err := s.tasks.Recaptcha(ctx, capsolver.RecaptchaTask{
+	token, err := s.tasks.Recaptcha(ctx, RecaptchaTask{
 		WebsiteURL: document.FinalURL,
 		WebsiteKey: challenge.SiteKey,
 		DataS:      challenge.DataS,
@@ -117,7 +115,7 @@ func (s *Solver) solveGoogle(ctx context.Context, document page.Document, challe
 	}
 	values := formValues(form)
 	values.Set("g-recaptcha-response", token)
-	submitted, err := s.submitter.Submit(ctx, httpfetch.Form{
+	submitted, err := s.submitter.Submit(ctx, fetch.Form{
 		Method:  form.AttrOr("method", ""),
 		Action:  action.String(),
 		Values:  values,
@@ -133,7 +131,7 @@ func (s *Solver) solveGoogle(ctx context.Context, document page.Document, challe
 	return granted, nil
 }
 
-func (s *Solver) solveDataDome(ctx context.Context, document page.Document, challenge page.Challenge, location *url.URL) ([]page.Cookie, error) {
+func (s *Solver) solveDataDome(ctx context.Context, document fetch.Document, challenge fetch.Challenge, location *url.URL) ([]fetch.Cookie, error) {
 	captchaURL := challenge.URL
 	if captchaURL == "" || document.Session.ProxyURL == "" {
 		return nil, nil
@@ -145,7 +143,7 @@ func (s *Solver) solveDataDome(ctx context.Context, document page.Document, chal
 	if captcha.Query().Get("t") == "bv" {
 		return nil, nil
 	}
-	solved, err := s.tasks.DataDome(ctx, capsolver.DataDomeTask{
+	solved, err := s.tasks.DataDome(ctx, DataDomeTask{
 		CaptchaURL: captchaURL,
 		UserAgent:  document.Session.UserAgent,
 		ProxyURL:   document.Session.ProxyURL,
@@ -157,7 +155,7 @@ func (s *Solver) solveDataDome(ctx context.Context, document page.Document, chal
 	if err != nil {
 		return nil, fmt.Errorf("datadome captcha: parse solved cookie: %w", err)
 	}
-	return []page.Cookie{{Name: cookie.Name, Value: cookie.Value, Domain: location.Hostname(), Path: "/"}}, nil
+	return []fetch.Cookie{{Name: cookie.Name, Value: cookie.Value, Domain: location.Hostname(), Path: "/"}}, nil
 }
 
 func formValues(form *goquery.Selection) url.Values {
@@ -171,12 +169,12 @@ func formValues(form *goquery.Selection) url.Values {
 	return values
 }
 
-func changedCookies(before []page.Cookie, after []page.Cookie) []page.Cookie {
+func changedCookies(before []fetch.Cookie, after []fetch.Cookie) []fetch.Cookie {
 	known := make(map[string]string, len(before))
 	for _, cookie := range before {
 		known[cookie.Name] = cookie.Value
 	}
-	var changed []page.Cookie
+	var changed []fetch.Cookie
 	for _, cookie := range after {
 		if value, ok := known[cookie.Name]; !ok || value != cookie.Value {
 			changed = append(changed, cookie)
@@ -185,8 +183,8 @@ func changedCookies(before []page.Cookie, after []page.Cookie) []page.Cookie {
 	return changed
 }
 
-func merge(base []page.Cookie, solved []page.Cookie) []page.Cookie {
-	merged := append([]page.Cookie(nil), base...)
+func merge(base []fetch.Cookie, solved []fetch.Cookie) []fetch.Cookie {
+	merged := append([]fetch.Cookie(nil), base...)
 	indexes := make(map[string]int, len(merged))
 	for index, cookie := range merged {
 		indexes[cookie.Name] = index
@@ -202,7 +200,7 @@ func merge(base []page.Cookie, solved []page.Cookie) []page.Cookie {
 	return merged
 }
 
-func hasCookie(cookies []page.Cookie, name string) bool {
+func hasCookie(cookies []fetch.Cookie, name string) bool {
 	for _, cookie := range cookies {
 		if cookie.Name == name {
 			return true

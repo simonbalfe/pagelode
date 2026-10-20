@@ -12,7 +12,7 @@ Implemented today:
 - Printing Press endpoint classification and grouping.
 - Named authenticated Patchright profiles, including session-cookie persistence.
 - Compact discovery reports with optional verbose request evidence.
-- HTTP and Patchright browser-service loading with shared limits, escalation, and route memory and clearances persisted in SQLite.
+- HTTP and Patchright browser-service loading with shared limits, escalation, and route memory and clearances persisted in Postgres.
 
 All features below are planned. Proposed routes and commands are not available yet. Keep the existing Markdown `/extract` and network-analysis `/discover` contracts. Go owns orchestration, analysis, limits, jobs, and reports; Patchright owns browser interactions. External model and proxy credentials remain caller-owned.
 

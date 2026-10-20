@@ -1,4 +1,4 @@
-package capsolver
+package browser
 
 import (
 	"bytes"
@@ -14,9 +14,9 @@ import (
 	"time"
 )
 
-const maxResponseBytes = 1 << 20
+const maxCapSolverResponseBytes = 1 << 20
 
-type API struct {
+type CapSolverAPI struct {
 	key      string
 	url      string
 	http     *http.Client
@@ -73,11 +73,11 @@ type solution struct {
 	GRecaptchaResponse string            `json:"gRecaptchaResponse"`
 }
 
-func NewAPI(apiKey string, apiURL string) *API {
+func NewCapSolverAPI(apiKey string, apiURL string) *CapSolverAPI {
 	if apiKey == "" {
 		return nil
 	}
-	return &API{
+	return &CapSolverAPI{
 		key:      apiKey,
 		url:      strings.TrimRight(apiURL, "/"),
 		http:     &http.Client{Timeout: 30 * time.Second},
@@ -85,7 +85,7 @@ func NewAPI(apiKey string, apiURL string) *API {
 	}
 }
 
-func (a *API) Recaptcha(ctx context.Context, request RecaptchaTask) (string, error) {
+func (a *CapSolverAPI) Recaptcha(ctx context.Context, request RecaptchaTask) (string, error) {
 	solverTask := task{Type: "ReCaptchaV2TaskProxyLess", WebsiteURL: request.WebsiteURL, WebsiteKey: request.WebsiteKey, DataS: request.DataS}
 	if request.ProxyURL != "" {
 		proxy, err := taskProxy(request.ProxyURL)
@@ -105,7 +105,7 @@ func (a *API) Recaptcha(ctx context.Context, request RecaptchaTask) (string, err
 	return solved.GRecaptchaResponse, nil
 }
 
-func (a *API) DataDome(ctx context.Context, request DataDomeTask) (string, error) {
+func (a *CapSolverAPI) DataDome(ctx context.Context, request DataDomeTask) (string, error) {
 	proxy, err := taskProxy(request.ProxyURL)
 	if err != nil {
 		return "", fmt.Errorf("capsolver: DataDome proxy: %w", err)
@@ -120,7 +120,7 @@ func (a *API) DataDome(ctx context.Context, request DataDomeTask) (string, error
 	return solved.Cookie, nil
 }
 
-func (a *API) solve(ctx context.Context, solverTask task) (solution, error) {
+func (a *CapSolverAPI) solve(ctx context.Context, solverTask task) (solution, error) {
 	started := time.Now()
 	created, err := a.call(ctx, "/createTask", taskRequest{ClientKey: a.key, Task: solverTask}, solverTask.Proxy)
 	if err != nil {
@@ -137,7 +137,7 @@ func (a *API) solve(ctx context.Context, solverTask task) (solution, error) {
 	return result.Solution, nil
 }
 
-func (a *API) wait(ctx context.Context, taskID string, proxy string) (response, error) {
+func (a *CapSolverAPI) wait(ctx context.Context, taskID string, proxy string) (response, error) {
 	ticker := time.NewTicker(a.pollWait)
 	defer ticker.Stop()
 	for {
@@ -160,7 +160,7 @@ func (a *API) wait(ctx context.Context, taskID string, proxy string) (response, 
 	}
 }
 
-func (a *API) call(ctx context.Context, path string, payload any, proxy string) (response, error) {
+func (a *CapSolverAPI) call(ctx context.Context, path string, payload any, proxy string) (response, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return response{}, fmt.Errorf("capsolver: encode request: %w", err)
@@ -175,11 +175,11 @@ func (a *API) call(ctx context.Context, path string, payload any, proxy string) 
 		return response{}, fmt.Errorf("capsolver: request: %w", err)
 	}
 	defer httpResponse.Body.Close()
-	responseBody, err := io.ReadAll(io.LimitReader(httpResponse.Body, maxResponseBytes+1))
+	responseBody, err := io.ReadAll(io.LimitReader(httpResponse.Body, maxCapSolverResponseBytes+1))
 	if err != nil {
 		return response{}, fmt.Errorf("capsolver: read response: %w", err)
 	}
-	if len(responseBody) > maxResponseBytes {
+	if len(responseBody) > maxCapSolverResponseBytes {
 		return response{}, errors.New("capsolver: response too large")
 	}
 	var result response
@@ -205,7 +205,7 @@ func (a *API) call(ctx context.Context, path string, payload any, proxy string) 
 	return result, nil
 }
 
-func (a *API) redact(description string, proxy string) string {
+func (a *CapSolverAPI) redact(description string, proxy string) string {
 	description = strings.ReplaceAll(description, a.key, "[redacted]")
 	parts := strings.Split(proxy, ":")
 	if len(parts) >= 5 {

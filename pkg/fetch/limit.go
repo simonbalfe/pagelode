@@ -1,4 +1,4 @@
-package limit
+package fetch
 
 import (
 	"context"
@@ -24,7 +24,7 @@ type Limiter struct {
 	waiting    atomic.Int64
 }
 
-func New(concurrency int, maxWaiting int) *Limiter {
+func NewLimiter(concurrency int, maxWaiting int) *Limiter {
 	return &Limiter{slots: make(chan struct{}, concurrency), maxWaiting: int64(maxWaiting)}
 }
 

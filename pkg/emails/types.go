@@ -5,8 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
-	"github.com/simonbalfe/pagelode/pkg/profile"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type Request struct {
@@ -56,7 +55,7 @@ func (r Request) Validate() (Request, error) {
 		return Request{}, errors.New("render must be auto, never, or always")
 	}
 	if r.Profile != "" {
-		if err := profile.Validate(r.Profile); err != nil {
+		if err := fetch.ValidateProfile(r.Profile); err != nil {
 			return Request{}, err
 		}
 		if r.Render == "never" {
@@ -86,11 +85,11 @@ type Source struct {
 }
 
 type Page struct {
-	URL      string        `json:"url"`
-	FinalURL string        `json:"finalUrl,omitempty"`
-	Provider page.Provider `json:"provider,omitempty"`
-	Status   int           `json:"status"`
-	Outcome  string        `json:"outcome"`
+	URL      string         `json:"url"`
+	FinalURL string         `json:"finalUrl,omitempty"`
+	Provider fetch.Provider `json:"provider,omitempty"`
+	Status   int            `json:"status"`
+	Outcome  string         `json:"outcome"`
 }
 
 type Summary struct {

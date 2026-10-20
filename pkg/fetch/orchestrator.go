@@ -1,4 +1,4 @@
-package orchestrator
+package fetch
 
 import (
 	"context"
@@ -7,12 +7,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/classify"
-	"github.com/simonbalfe/pagelode/pkg/extract"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 const maximumContentCharacters = 12_000
@@ -20,40 +14,40 @@ const maximumContentCharacters = 12_000
 const OutcomeNeedsBrowser = "needs_browser"
 
 type Fetcher interface {
-	Fetch(context.Context, string, page.Session) (page.Document, error)
+	Fetch(context.Context, string, Session) (Document, error)
 }
 
 type Attempt struct {
-	Provider       page.Provider `json:"provider"`
-	Outcome        string        `json:"outcome"`
-	Status         int           `json:"status,omitempty"`
-	DurationMS     int64         `json:"durationMs"`
-	Detail         string        `json:"detail,omitempty"`
-	Classification string        `json:"classification,omitempty"`
-	RenderScore    int           `json:"renderScore,omitempty"`
+	Provider       Provider `json:"provider"`
+	Outcome        string   `json:"outcome"`
+	Status         int      `json:"status,omitempty"`
+	DurationMS     int64    `json:"durationMs"`
+	Detail         string   `json:"detail,omitempty"`
+	Classification string   `json:"classification,omitempty"`
+	RenderScore    int      `json:"renderScore,omitempty"`
 }
 
 type Result struct {
-	URL         string           `json:"url"`
-	FinalURL    string           `json:"finalUrl,omitempty"`
-	Title       string           `json:"title,omitempty"`
-	Content     string           `json:"content"`
-	ContentType page.ContentType `json:"contentType"`
-	Provider    page.Provider    `json:"provider"`
-	Outcome     string           `json:"outcome"`
-	Links       []string         `json:"links"`
-	Attempts    []Attempt        `json:"attempts"`
+	URL         string      `json:"url"`
+	FinalURL    string      `json:"finalUrl,omitempty"`
+	Title       string      `json:"title,omitempty"`
+	Content     string      `json:"content"`
+	ContentType ContentType `json:"contentType"`
+	Provider    Provider    `json:"provider"`
+	Outcome     string      `json:"outcome"`
+	Links       []string    `json:"links"`
+	Attempts    []Attempt   `json:"attempts"`
 }
 
 type Service struct {
 	http       Fetcher
 	browser    Fetcher
 	capsolver  Fetcher
-	routes     *memory.Routes
-	clearances *memory.Clearances
+	routes     *Routes
+	clearances *Clearances
 }
 
-func New(httpFetcher Fetcher, browserFetcher Fetcher, capSolverFetcher Fetcher, routes *memory.Routes, clearances *memory.Clearances) *Service {
+func NewService(httpFetcher Fetcher, browserFetcher Fetcher, capSolverFetcher Fetcher, routes *Routes, clearances *Clearances) *Service {
 	return &Service{
 		http:       httpFetcher,
 		browser:    browserFetcher,
@@ -93,32 +87,37 @@ func (s *Service) ExtractBrowser(ctx context.Context, input string) (Result, err
 		return Result{}, err
 	}
 	state.deferOnCapacity = true
-	return s.tryPatchright(ctx, &state, page.Session{})
+	return s.tryPatchright(ctx, &state, Session{})
 }
 
-func (s *Service) httpStage(ctx context.Context, state *runState) (Result, page.Session, bool, error) {
+func (s *Service) httpStage(ctx context.Context, state *runState) (Result, Session, bool, error) {
 	if result, done := s.tryReplay(ctx, state); done {
-		return result, page.Session{}, true, nil
+		return result, Session{}, true, nil
 	}
-	if preferred, ok := s.routes.Preferred(state.host); ok && preferred == page.ProviderPatchright && s.browser != nil {
-		return Result{}, page.Session{}, false, nil
+	if preferred, ok := s.routes.Preferred(state.host); ok && preferred == ProviderPatchright && s.browser != nil {
+		return Result{}, Session{}, false, nil
 	}
 
-	document, classification, ok := s.attempt(ctx, state, page.ProviderTLS, s.http, page.Session{})
+	document, classification, ok := s.attempt(ctx, state, ProviderTLS, s.http, Session{})
 	if !ok {
-		return Result{}, page.Session{}, false, nil
+		return Result{}, Session{}, false, nil
 	}
 	if result, done := s.resolveDocument(state, document, classification); done {
-		return result, page.Session{}, true, nil
+		return result, Session{}, true, nil
 	}
 
 	switch classification.Kind {
-	case classify.Dead:
-		return failedResult(*state, document, "dead"), page.Session{}, true, nil
-	case classify.Blocked, classify.NeedsRender, classify.Retryable, classify.Accept:
+	case Dead:
+		return failedResult(*state, document, "dead"), Session{}, true, nil
+	case Accept:
+		if document.Type != ContentHTML {
+			return failedResult(*state, document, "failed"), Session{}, true, nil
+		}
+		return Result{}, document.Session, false, nil
+	case Blocked, NeedsRender, Retryable:
 		return Result{}, document.Session, false, nil
 	default:
-		return Result{}, page.Session{}, true, fmt.Errorf("extract: unsupported classification %q", classification.Kind)
+		return Result{}, Session{}, true, fmt.Errorf("extract: unsupported classification %q", classification.Kind)
 	}
 }
 
@@ -127,13 +126,13 @@ func (s *Service) tryReplay(ctx context.Context, state *runState) (Result, bool)
 	if !ok {
 		return Result{}, false
 	}
-	document, classification, ok := s.attempt(ctx, state, page.ProviderReplay, s.http, session)
+	document, classification, ok := s.attempt(ctx, state, ProviderReplay, s.http, session)
 	if ok {
-		document.Provider = page.ProviderReplay
+		document.Provider = ProviderReplay
 		if result, done := s.resolveDocument(state, document, classification); done {
 			return result, true
 		}
-		if classification.Kind == classify.Dead {
+		if classification.Kind == Dead {
 			return failedResult(*state, document, "dead"), true
 		}
 	}
@@ -141,11 +140,11 @@ func (s *Service) tryReplay(ctx context.Context, state *runState) (Result, bool)
 	return Result{}, false
 }
 
-func (s *Service) tryPatchright(ctx context.Context, state *runState, session page.Session) (Result, error) {
-	if s.browser == nil || state.tried[page.ProviderPatchright] {
+func (s *Service) tryPatchright(ctx context.Context, state *runState, session Session) (Result, error) {
+	if s.browser == nil || state.tried[ProviderPatchright] {
 		return s.tryCapSolver(ctx, state, session)
 	}
-	document, classification, ok := s.attempt(ctx, state, page.ProviderPatchright, s.browser, session)
+	document, classification, ok := s.attempt(ctx, state, ProviderPatchright, s.browser, session)
 	if !ok {
 		if state.capacityErr != nil {
 			return Result{}, state.capacityErr
@@ -153,49 +152,49 @@ func (s *Service) tryPatchright(ctx context.Context, state *runState, session pa
 		return s.tryCapSolver(ctx, state, session)
 	}
 	if result, done := s.resolveDocument(state, document, classification); done {
-		s.routes.Record(state.host, page.ProviderPatchright)
+		s.routes.Record(state.host, ProviderPatchright)
 		s.clearances.Record(state.host, document.Session)
 		return result, nil
 	}
-	if classification.Kind == classify.Dead {
+	if classification.Kind == Dead {
 		return failedResult(*state, document, "dead"), nil
 	}
 	return s.tryCapSolver(ctx, state, document.Session)
 }
 
-func (s *Service) tryCapSolver(ctx context.Context, state *runState, session page.Session) (Result, error) {
-	if s.capsolver == nil || state.tried[page.ProviderCapSolver] {
-		return failedResult(*state, page.Document{Provider: page.ProviderCapSolver, Type: page.ContentUnknown}, "failed"), nil
+func (s *Service) tryCapSolver(ctx context.Context, state *runState, session Session) (Result, error) {
+	if s.capsolver == nil || state.tried[ProviderCapSolver] {
+		return failedResult(*state, Document{Provider: ProviderCapSolver, Type: ContentUnknown}, "failed"), nil
 	}
-	document, classification, ok := s.attempt(ctx, state, page.ProviderCapSolver, s.capsolver, session)
+	document, classification, ok := s.attempt(ctx, state, ProviderCapSolver, s.capsolver, session)
 	if !ok {
-		return failedResult(*state, page.Document{Provider: page.ProviderCapSolver, Type: page.ContentUnknown}, "failed"), nil
+		return failedResult(*state, Document{Provider: ProviderCapSolver, Type: ContentUnknown}, "failed"), nil
 	}
 	if result, done := s.resolveDocument(state, document, classification); done {
 		return result, nil
 	}
-	if classification.Kind == classify.Dead {
+	if classification.Kind == Dead {
 		return failedResult(*state, document, "dead"), nil
 	}
 	return failedResult(*state, document, "failed"), nil
 }
 
-func (s *Service) attempt(ctx context.Context, state *runState, provider page.Provider, fetcher Fetcher, session page.Session) (page.Document, classify.Result, bool) {
+func (s *Service) attempt(ctx context.Context, state *runState, provider Provider, fetcher Fetcher, session Session) (Document, Verdict, bool) {
 	state.tried[provider] = true
 	started := time.Now()
 	document, err := fetcher.Fetch(ctx, state.target, session)
 	duration := time.Since(started).Milliseconds()
 	if err != nil {
 		state.attempts = append(state.attempts, Attempt{Provider: provider, Outcome: "error", DurationMS: duration, Detail: concise(err)})
-		if state.deferOnCapacity && provider == page.ProviderPatchright && (errors.Is(err, limit.ErrSaturated) || errors.Is(err, limit.ErrUnavailable)) {
+		if state.deferOnCapacity && provider == ProviderPatchright && (errors.Is(err, ErrSaturated) || errors.Is(err, ErrUnavailable)) {
 			state.capacityErr = fmt.Errorf("extract: browser capacity: %w", err)
 		}
-		return page.Document{}, classify.Result{}, false
+		return Document{}, Verdict{}, false
 	}
 
-	classification := classify.Document(document)
+	classification := Classify(document)
 	outcome := string(classification.Kind)
-	if classification.Kind == classify.Accept {
+	if classification.Kind == Accept {
 		outcome = "ok"
 	}
 	state.attempts = append(state.attempts, Attempt{
@@ -210,20 +209,24 @@ func (s *Service) attempt(ctx context.Context, state *runState, provider page.Pr
 	return document, classification, true
 }
 
-func (s *Service) resolveDocument(state *runState, document page.Document, classification classify.Result) (Result, bool) {
-	if classification.Kind != classify.Accept {
+func (s *Service) resolveDocument(state *runState, document Document, classification Verdict) (Result, bool) {
+	if classification.Kind != Accept {
 		return Result{}, false
 	}
 
 	switch document.Type {
-	case page.ContentText:
+	case ContentText:
 		if strings.TrimSpace(document.Text) == "" {
 			return Result{}, false
 		}
 		return successResult(*state, document, bounded(document.Text), nil, document.Title), true
-	case page.ContentHTML:
-		extracted, err := extract.HTML(document.HTML, document.FinalURL)
+	case ContentHTML:
+		extracted, err := ExtractHTML(document.HTML, document.FinalURL)
 		if err != nil || strings.TrimSpace(extracted.Content) == "" {
+			if last := len(state.attempts) - 1; last >= 0 {
+				state.attempts[last].Outcome = "empty"
+				state.attempts[last].Detail = "no readable content"
+			}
 			return Result{}, false
 		}
 		title := document.Title
@@ -239,7 +242,7 @@ func (s *Service) resolveDocument(state *runState, document page.Document, class
 type runState struct {
 	target          string
 	host            string
-	tried           map[page.Provider]bool
+	tried           map[Provider]bool
 	attempts        []Attempt
 	deferOnCapacity bool
 	capacityErr     error
@@ -250,20 +253,20 @@ func newRunState(input string) (runState, error) {
 	if err != nil {
 		return runState{}, err
 	}
-	return runState{target: target.String(), host: target.Hostname(), tried: make(map[page.Provider]bool)}, nil
+	return runState{target: target.String(), host: target.Hostname(), tried: make(map[Provider]bool)}, nil
 }
 
 func needsBrowserResult(state runState) Result {
 	return Result{
 		URL:         state.target,
-		ContentType: page.ContentUnknown,
+		ContentType: ContentUnknown,
 		Outcome:     OutcomeNeedsBrowser,
 		Links:       []string{},
 		Attempts:    state.attempts,
 	}
 }
 
-func successResult(state runState, document page.Document, content string, links []string, title string) Result {
+func successResult(state runState, document Document, content string, links []string, title string) Result {
 	if links == nil {
 		links = []string{}
 	}
@@ -280,7 +283,7 @@ func successResult(state runState, document page.Document, content string, links
 	}
 }
 
-func failedResult(state runState, document page.Document, outcome string) Result {
+func failedResult(state runState, document Document, outcome string) Result {
 	return Result{
 		URL:         state.target,
 		FinalURL:    document.FinalURL,

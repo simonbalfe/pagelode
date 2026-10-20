@@ -1,4 +1,4 @@
-package signatures
+package fetch
 
 import "testing"
 

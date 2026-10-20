@@ -1,4 +1,4 @@
-package extract
+package fetch
 
 import (
 	"strings"
@@ -9,7 +9,7 @@ func TestHTML(t *testing.T) {
 	t.Parallel()
 
 	raw := `<html><head><title>Example</title><meta name="description" content="A useful page"></head><body><nav>Skip me</nav><main><h1>Example heading</h1><p>` + strings.Repeat("Readable article sentence. ", 20) + `</p><a href="/about">About</a><a href="https://other.example/path">Other</a></main></body></html>`
-	result, err := HTML(raw, "https://example.com/page")
+	result, err := ExtractHTML(raw, "https://example.com/page")
 	if err != nil {
 		t.Fatalf("HTML() error = %v", err)
 	}

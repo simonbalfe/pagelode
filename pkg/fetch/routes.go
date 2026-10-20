@@ -1,4 +1,4 @@
-package memory
+package fetch
 
 import (
 	"fmt"
@@ -6,13 +6,11 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 type Route struct {
 	Host     string
-	Provider page.Provider
+	Provider Provider
 	Expires  time.Time
 }
 
@@ -22,7 +20,7 @@ type RouteStore interface {
 }
 
 type entry struct {
-	provider page.Provider
+	provider Provider
 	expires  time.Time
 }
 
@@ -58,11 +56,11 @@ func (r *Routes) Restore(store RouteStore) error {
 	return nil
 }
 
-func (r *Routes) Preferred(host string) (page.Provider, bool) {
+func (r *Routes) Preferred(host string) (Provider, bool) {
 	host = normalizeHost(host)
 	for _, suffix := range r.protected {
 		if host == suffix || strings.HasSuffix(host, "."+suffix) {
-			return page.ProviderPatchright, true
+			return ProviderPatchright, true
 		}
 	}
 	r.mu.Lock()
@@ -78,8 +76,8 @@ func (r *Routes) Preferred(host string) (page.Provider, bool) {
 	return value.provider, true
 }
 
-func (r *Routes) Record(host string, provider page.Provider) {
-	if provider == page.ProviderTLS {
+func (r *Routes) Record(host string, provider Provider) {
+	if provider == ProviderTLS {
 		return
 	}
 	route := Route{Host: normalizeHost(host), Provider: provider, Expires: r.now().Add(r.ttl)}

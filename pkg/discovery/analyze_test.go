@@ -5,17 +5,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 func TestAnalyzeTraffic(t *testing.T) {
-	entries := []page.Exchange{
+	entries := []fetch.Exchange{
 		{URL: "https://example.com/api/listings/12?page=1&token=private-token", Method: "GET", ResourceType: "Fetch", Status: 200, MIMEType: "application/json", RequestHeaders: map[string]string{"Authorization": "Bearer private-token", "Cookie": "session=private-cookie"}, ResponseBody: `{"items":[{"id":12,"price":125000,"password":"private-password"}],"nextCursor":"private-cursor"}`},
 		{URL: "https://example.com/api/listings/13?page=2", Method: "GET", ResourceType: "Fetch", Status: 200, MIMEType: "application/json", ResponseBody: `{"items":[{"id":13,"price":null}]}`},
 		{URL: "https://example.com/graphql", Method: "POST", ResourceType: "Fetch", Status: 200, MIMEType: "application/json", RequestBody: `{"operationName":"GetListings","query":"query GetListings { listings { id } }","variables":{"after":"private-cursor"}}`, ResponseBody: `{"data":{"listings":[{"id":12}]}}`},
 		{URL: "https://www.google-analytics.com/collect?token=private-token", Method: "POST", ResourceType: "Fetch", Status: 200, MIMEType: "application/json"},
 	}
-	report := Analyze("https://example.com/?token=private-token", page.Document{FinalURL: "https://example.com/", Provider: page.ProviderPatchright, Traffic: &page.Capture{Entries: entries}, HTML: `<script type="application/ld+json">{"name":"Example"}</script>`})
+	report := Analyze("https://example.com/?token=private-token", fetch.Document{FinalURL: "https://example.com/", Provider: fetch.ProviderPatchright, Traffic: &fetch.Capture{Entries: entries}, HTML: `<script type="application/ld+json">{"name":"Example"}</script>`})
 	if report.Summary.EndpointCount != 2 || report.Summary.DataRequests != 3 || report.Summary.NoiseRequests != 1 {
 		t.Fatalf("summary = %+v, want 2 endpoints, 3 data, 1 noise", report.Summary)
 	}
@@ -47,7 +47,7 @@ func TestAnalyzeTraffic(t *testing.T) {
 }
 
 func TestAnalyzeCoverageWarnings(t *testing.T) {
-	report := Analyze("https://example.com", page.Document{Traffic: &page.Capture{Dropped: 2, Entries: []page.Exchange{{URL: "https://example.com/api", Method: "GET", ResourceType: "Fetch", Truncated: true, Error: "response body unavailable"}}}})
+	report := Analyze("https://example.com", fetch.Document{Traffic: &fetch.Capture{Dropped: 2, Entries: []fetch.Exchange{{URL: "https://example.com/api", Method: "GET", ResourceType: "Fetch", Truncated: true, Error: "response body unavailable"}}}})
 	if report.Summary.Truncated != 1 || report.Summary.Incomplete != 1 || report.Summary.Dropped != 2 {
 		t.Errorf("summary = %+v", report.Summary)
 	}
@@ -78,7 +78,7 @@ func hasPagination(signals []Signal, location, name string) bool {
 }
 
 func TestGoogleAnalyticsRegionalHostIsNoise(t *testing.T) {
-	report := Analyze("https://example.com", page.Document{Traffic: &page.Capture{Entries: []page.Exchange{
+	report := Analyze("https://example.com", fetch.Document{Traffic: &fetch.Capture{Entries: []fetch.Exchange{
 		{URL: "https://region1.analytics.google.com/g/collect", Method: "POST", ResourceType: "Fetch", Status: 204},
 	}}})
 	if report.Summary.DataRequests != 0 || report.Summary.NoiseRequests != 1 || len(report.Endpoints) != 0 {

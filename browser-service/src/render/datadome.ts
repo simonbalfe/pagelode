@@ -1,5 +1,5 @@
 import type { Page } from "patchright";
-import signatures from "../../../pkg/signatures/signatures.json" with { type: "json" };
+import signatures from "../../../pkg/fetch/signatures.json" with { type: "json" };
 import type { Log } from "../shared/log.ts";
 
 const deviceCheckWaitMs = 15_000;

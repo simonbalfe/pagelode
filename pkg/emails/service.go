@@ -3,25 +3,23 @@ package emails
 import (
 	"context"
 	"errors"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"net/url"
 	"sync"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 type PageLoader interface {
-	Load(context.Context, string, Options) (page.Document, error)
+	Load(context.Context, string, Options) (fetch.Document, error)
 }
 
 type Service struct {
 	loader      PageLoader
-	limiter     *limit.Limiter
+	limiter     *fetch.Limiter
 	concurrency int
 }
 
-func New(loader PageLoader, limiter *limit.Limiter, concurrency int) *Service {
+func New(loader PageLoader, limiter *fetch.Limiter, concurrency int) *Service {
 	if concurrency < 1 {
 		concurrency = 1
 	}
@@ -63,7 +61,7 @@ func (s *Service) Find(ctx context.Context, request Request) (Report, error) {
 			break
 		}
 		for _, result := range s.loadBatch(deadline, batch, options) {
-			if errors.Is(result.err, limit.ErrSaturated) {
+			if errors.Is(result.err, fetch.ErrSaturated) {
 				return Report{}, result.err
 			}
 			run.consume(result)
@@ -80,7 +78,7 @@ func (s *Service) Find(ctx context.Context, request Request) (Report, error) {
 
 type loaded struct {
 	target   target
-	document page.Document
+	document fetch.Document
 	err      error
 }
 

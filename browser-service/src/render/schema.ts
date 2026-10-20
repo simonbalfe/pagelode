@@ -34,6 +34,7 @@ export const renderRequestSchema = z.object({
   solve_captcha: z.boolean().default(true),
   capture: captureSchema.optional(),
   explore: exploreSchema.optional(),
+  block_resources: z.boolean().default(false),
   profile: optionalField(profileNameSchema),
   identity: optionalField(identityKeySchema),
 });

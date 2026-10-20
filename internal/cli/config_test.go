@@ -1,8 +1,7 @@
-package config
+package cli
 
 import (
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"testing"
 )
@@ -12,9 +11,9 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("PAGELODE_BROWSER_URL", "")
 	t.Setenv("PAGELODE_BROWSER_SETTLE_MS", "")
 	t.Setenv("PAGELODE_MAX_CONCURRENCY", "")
-	t.Setenv("PAGELODE_STATE_PATH", "")
+	t.Setenv("PAGELODE_DATABASE_URL", "")
 
-	got, err := Load()
+	got, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -24,14 +23,21 @@ func TestLoadDefaults(t *testing.T) {
 	if len(got.BrowserURLs) != 1 || got.BrowserURLs[0] != "http://127.0.0.1:8090" {
 		t.Errorf("Load().BrowserURLs = %q, want [http://127.0.0.1:8090]", got.BrowserURLs)
 	}
-	if filepath.Base(got.StatePath) != "state.sqlite" || filepath.Base(filepath.Dir(got.StatePath)) != "pagelode" {
-		t.Errorf("Load().StatePath = %q, want <config dir>/pagelode/state.sqlite", got.StatePath)
+	if got.DatabaseURL != "" {
+		t.Errorf("Load().DatabaseURL = %q, want empty so state stays in memory", got.DatabaseURL)
+	}
+}
+
+func TestLoadRejectsNonPostgresDatabaseURL(t *testing.T) {
+	t.Setenv("PAGELODE_DATABASE_URL", "mysql://user@host/db")
+	if _, err := LoadConfig(); err == nil {
+		t.Fatal("Load(PAGELODE_DATABASE_URL=mysql://...) error = nil, want scheme error")
 	}
 }
 
 func TestLoadRejectsSettleOutOfRange(t *testing.T) {
 	t.Setenv("PAGELODE_BROWSER_SETTLE_MS", "10001")
-	if _, err := Load(); err == nil {
+	if _, err := LoadConfig(); err == nil {
 		t.Fatal("Load(PAGELODE_BROWSER_SETTLE_MS=10001) error = nil, want range error")
 	}
 }
@@ -44,7 +50,7 @@ func TestLoadKeepsProxyTemplateAndPinsCapSolverSession(t *testing.T) {
 
 	seen := make(map[string]bool)
 	for range 3 {
-		got, err := Load()
+		got, err := LoadConfig()
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
 		}
@@ -71,7 +77,7 @@ func TestLoadAcceptsSessionPlaceholder(t *testing.T) {
 	t.Setenv("PAGELODE_PROXY_URL", template)
 	t.Setenv("PAGELODE_CAPSOLVER_PROXY_URL", "")
 
-	got, err := Load()
+	got, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -88,7 +94,7 @@ func TestLoadKeepsProxyWithoutSession(t *testing.T) {
 	t.Setenv("PAGELODE_PROXY_URL", proxy)
 	t.Setenv("PAGELODE_CAPSOLVER_PROXY_URL", "")
 
-	got, err := Load()
+	got, err := LoadConfig()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}

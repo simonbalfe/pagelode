@@ -3,20 +3,15 @@ package discovery
 import (
 	"context"
 	"errors"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/classify"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/orchestrator"
-	"github.com/simonbalfe/pagelode/pkg/page"
-	"github.com/simonbalfe/pagelode/pkg/profile"
 )
 
 type Capturer interface {
-	Capture(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error)
+	Capture(context.Context, string, fetch.Session, fetch.CaptureOptions) (fetch.Document, error)
 }
 
 type Service struct {
@@ -41,7 +36,7 @@ type Request struct {
 
 func (r Request) Validate() (Request, error) {
 	if r.Profile != "" {
-		if err := profile.Validate(r.Profile); err != nil {
+		if err := fetch.ValidateProfile(r.Profile); err != nil {
 			return Request{}, err
 		}
 		if r.HAR != nil {
@@ -91,27 +86,27 @@ func (s *Service) Discover(ctx context.Context, request Request) (Report, error)
 		return Report{}, errors.New("discovery failed: no browser capture available")
 	}
 	started := time.Now()
-	document, err := s.browser.Capture(ctx, request.URL, page.Session{}, page.CaptureOptions{WaitMS: request.WaitMS, Profile: request.Profile})
+	document, err := s.browser.Capture(ctx, request.URL, fetch.Session{}, fetch.CaptureOptions{WaitMS: request.WaitMS, Profile: request.Profile})
 	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, limit.ErrSaturated) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, fetch.ErrSaturated) {
 			return Report{}, err
 		}
-		return Report{}, errors.New("discovery failed: " + string(page.ProviderPatchright) + ": " + captureError(err))
+		return Report{}, errors.New("discovery failed: " + string(fetch.ProviderPatchright) + ": " + captureError(err))
 	}
-	classification := classify.Document(document)
+	classification := fetch.Classify(document)
 	outcome := string(classification.Kind)
-	if classification.Kind == classify.Accept {
+	if classification.Kind == fetch.Accept {
 		outcome = "ok"
 	}
-	attempt := orchestrator.Attempt{Provider: page.ProviderPatchright, Outcome: outcome, Status: document.StatusCode, DurationMS: time.Since(started).Milliseconds(), Classification: string(classification.Kind), Detail: classification.Reason}
-	blocked := classification.Kind == classify.Blocked || classification.Kind == classify.Retryable
+	attempt := fetch.Attempt{Provider: fetch.ProviderPatchright, Outcome: outcome, Status: document.StatusCode, DurationMS: time.Since(started).Milliseconds(), Classification: string(classification.Kind), Detail: classification.Reason}
+	blocked := classification.Kind == fetch.Blocked || classification.Kind == fetch.Retryable
 	if blocked && document.Traffic == nil {
-		return Report{}, errors.New("discovery failed: " + string(page.ProviderPatchright) + ": " + classification.Reason)
+		return Report{}, errors.New("discovery failed: " + string(fetch.ProviderPatchright) + ": " + classification.Reason)
 	}
 	report := Analyze(request.URL, document)
-	report.Attempts = []orchestrator.Attempt{attempt}
+	report.Attempts = []fetch.Attempt{attempt}
 	switch {
-	case classification.Kind == classify.Dead:
+	case classification.Kind == fetch.Dead:
 		report.Outcome = "dead"
 	case blocked:
 		report.Outcome = "blocked"

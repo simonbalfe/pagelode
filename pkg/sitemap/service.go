@@ -4,14 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/orchestrator"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 const (
@@ -21,12 +18,12 @@ const (
 )
 
 type Service struct {
-	fetcher orchestrator.Fetcher
-	limiter *limit.Limiter
+	fetcher fetch.Fetcher
+	limiter *fetch.Limiter
 	browser Browser
 }
 
-func New(fetcher orchestrator.Fetcher, limiter *limit.Limiter) *Service {
+func New(fetcher fetch.Fetcher, limiter *fetch.Limiter) *Service {
 	return &Service{fetcher: fetcher, limiter: limiter}
 }
 
@@ -79,7 +76,7 @@ func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 	}
 	robotsURL := origin.String() + "/robots.txt"
 	robots, err := s.load(deadline, robotsURL)
-	if errors.Is(err, limit.ErrSaturated) {
+	if errors.Is(err, fetch.ErrSaturated) {
 		return Report{}, err
 	}
 	var rules robotsRules
@@ -105,7 +102,7 @@ func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 		queue = queue[size:]
 		fetched += size
 		for _, result := range s.loadAll(deadline, batch) {
-			if errors.Is(result.err, limit.ErrSaturated) {
+			if errors.Is(result.err, fetch.ErrSaturated) {
 				return Report{}, result.err
 			}
 			for _, child := range current.consumeSitemap(result) {
@@ -138,7 +135,7 @@ func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 
 type loaded struct {
 	target   string
-	document page.Document
+	document fetch.Document
 	err      error
 }
 
@@ -149,13 +146,13 @@ func (l loaded) finalURL() string {
 	return l.target
 }
 
-func (s *Service) load(ctx context.Context, target string) (page.Document, error) {
+func (s *Service) load(ctx context.Context, target string) (fetch.Document, error) {
 	pageCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
-	var document page.Document
+	var document fetch.Document
 	err := s.limiter.Run(pageCtx, func() error {
 		var err error
-		document, err = s.fetcher.Fetch(pageCtx, target, page.Session{})
+		document, err = s.fetcher.Fetch(pageCtx, target, fetch.Session{})
 		return err
 	})
 	return document, err
@@ -218,7 +215,7 @@ func (r *run) consumeSitemap(result loaded) []string {
 	}
 	parsed, ok := parseSitemap(body)
 	if !ok {
-		if document.Type == page.ContentUnknown && strings.HasSuffix(strings.ToLower(result.target), ".gz") {
+		if document.Type == fetch.ContentUnknown && strings.HasSuffix(strings.ToLower(result.target), ".gz") {
 			r.warn(fmt.Sprintf("compressed sitemap skipped: %s", result.target))
 		}
 		return nil

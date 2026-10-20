@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 func TestExtractAddresses(t *testing.T) {
@@ -13,7 +13,7 @@ func TestExtractAddresses(t *testing.T) {
 	for _, b := range []byte("cloud@example.org") {
 		encoded = append(encoded, b^42)
 	}
-	document := page.Document{FinalURL: "https://example.org/contact", HTML: `<html><body><footer>FOOTER@example.org.</footer><a href="mailto:First%40example.org,second@example.org?subject=ignore@example.org">Email us</a><p>person [at] example [dot] org</p><p><span>split</span><span>@example.org</span></p><span data-cfemail="` + hex.EncodeToString(encoded) + `">hidden</span><script type="application/ld+json">{"email":"schema@example.org","token":"secret@example.org"}</script><script>const sample="script@example.org";</script><div hidden>hidden@example.org</div></body></html>`, Traffic: &page.Capture{Entries: []page.Exchange{{URL: "https://example.org/api/people?token=private", Status: 200, ResponseBody: `{"people":[{"email":"network@example.org"}],"token":"secret@example.org"}`}, {Status: 403, ResponseBody: `{"email":"blocked@example.org"}`}}}}
+	document := fetch.Document{FinalURL: "https://example.org/contact", HTML: `<html><body><footer>FOOTER@example.org.</footer><a href="mailto:First%40example.org,second@example.org?subject=ignore@example.org">Email us</a><p>person [at] example [dot] org</p><p><span>split</span><span>@example.org</span></p><span data-cfemail="` + hex.EncodeToString(encoded) + `">hidden</span><script type="application/ld+json">{"email":"schema@example.org","token":"secret@example.org"}</script><script>const sample="script@example.org";</script><div hidden>hidden@example.org</div></body></html>`, Traffic: &fetch.Capture{Entries: []fetch.Exchange{{URL: "https://example.org/api/people?token=private", Status: 200, ResponseBody: `{"people":[{"email":"network@example.org"}],"token":"secret@example.org"}`}, {Status: 403, ResponseBody: `{"email":"blocked@example.org"}`}}}}
 	found := extractAddresses(document)
 	addresses := map[string]bool{}
 	for _, item := range found {
@@ -43,7 +43,7 @@ func TestJSONAndTextAddresses(t *testing.T) {
 		{`{"contacts":{"emailAddresses":["a@example.com","A@example.com"]},"password":"secret@example.com"}`, "a@example.com"},
 		{"Contact: simple@example.com.", "simple@example.com"},
 	} {
-		found := extractAddresses(page.Document{Text: test.text})
+		found := extractAddresses(fetch.Document{Text: test.text})
 		if len(found) != 1 || found[0].address != test.want {
 			t.Errorf("%q: %#v", test.text, found)
 		}

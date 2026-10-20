@@ -12,20 +12,18 @@ import (
 	"time"
 
 	"github.com/simonbalfe/pagelode/pkg/emails"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type emailLoader struct{}
 
-func (emailLoader) Load(_ context.Context, target string, _ emails.Options) (page.Document, error) {
-	return page.Document{FinalURL: target, HTML: `<footer>hello@example.org</footer>`, StatusCode: 200}, nil
+func (emailLoader) Load(_ context.Context, target string, _ emails.Options) (fetch.Document, error) {
+	return fetch.Document{FinalURL: target, HTML: `<footer>hello@example.org</footer>`, StatusCode: 200}, nil
 }
 
 func TestEmailsEndpoint(t *testing.T) {
-	limiter := limit.New(1, 0)
-	server := New(nil, nil, limiter, memory.NewRoutes(time.Hour, nil), time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))).WithEmails(emails.New(emailLoader{}, limiter, 1))
+	limiter := fetch.NewLimiter(1, 0)
+	server := New(nil, nil, limiter, fetch.NewRoutes(time.Hour, nil), time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))).WithEmails(emails.New(emailLoader{}, limiter, 1))
 	for _, test := range []struct {
 		body   string
 		status int

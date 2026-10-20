@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"golang.org/x/net/html"
 )
 
@@ -24,7 +24,7 @@ type match struct {
 	source  string
 }
 
-func extractAddresses(document page.Document) []match {
+func extractAddresses(document fetch.Document) []match {
 	found := map[match]bool{}
 	source := document.FinalURL
 	add := func(text, kind string) {

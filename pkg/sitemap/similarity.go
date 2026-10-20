@@ -1,4 +1,4 @@
-package similarity
+package sitemap
 
 import (
 	"hash/fnv"
@@ -14,7 +14,7 @@ const shingleSize = 3
 
 const blockElements = "title, p, div, br, li, tr, td, th, h1, h2, h3, h4, h5, h6, section, article, header, footer, nav, main, aside, blockquote, pre, ul, ol, dl, dt, dd, table, form, hr"
 
-func Text(html string) string {
+func PageText(html string) string {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return ""
@@ -62,25 +62,25 @@ func Fingerprint(text string) uint64 {
 	return fingerprint
 }
 
-func Distance(a, b uint64) int {
+func SimhashDistance(a, b uint64) int {
 	return bits.OnesCount64(a ^ b)
 }
 
-type Index struct {
+type DuplicateIndex struct {
 	mu           sync.Mutex
 	maxDistance  int
 	fingerprints []uint64
 }
 
-func NewIndex(maxDistance int) *Index {
-	return &Index{maxDistance: maxDistance}
+func NewDuplicateIndex(maxDistance int) *DuplicateIndex {
+	return &DuplicateIndex{maxDistance: maxDistance}
 }
 
-func (i *Index) Seen(fingerprint uint64) bool {
+func (i *DuplicateIndex) Seen(fingerprint uint64) bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	for _, known := range i.fingerprints {
-		if Distance(known, fingerprint) <= i.maxDistance {
+		if SimhashDistance(known, fingerprint) <= i.maxDistance {
 			return true
 		}
 	}

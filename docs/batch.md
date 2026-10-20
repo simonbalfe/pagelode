@@ -1,38 +1,57 @@
 # Batch scraping
 
-`pagelode extract batch` scrapes millions of URLs from one shared Postgres queue. Any number of `extract batch run` processes, on any number of machines, can work on the same queue at once.
+`pagelode extract batch` scrapes millions of URLs through a [River](https://riverqueue.com) job queue in Postgres. Any number of `extract batch run` processes, on any number of machines, can work on the same queue at once.
 
 ```sh
-export PAGELODE_QUEUE_URL=postgres://user:pass@host/db
+export PAGELODE_DATABASE_URL=postgres://user:pass@host/db
 pagelode extract batch import urls.txt
 PAGELODE_BROWSER_URL=http://b1:8090,http://b2:8090 PAGELODE_BROWSER_IDENTITIES=8 \
   pagelode extract batch run --http-workers 400 --out /data/pages --until-empty
 pagelode extract batch status
-pagelode extract batch retry --state failed --to pending
+pagelode extract batch retry --state failed
 ```
 
 ## Flow
 
 ```mermaid
 flowchart LR
-    Import[batch import] --> Pending[(pending)]
-    Pending -->|claim + lease| HTTP[HTTP stage: replay, tls-client]
+    Import[batch import] --> HTTPJob[(extract_http job, queue http)]
+    HTTPJob --> HTTP[HTTP stage: replay, tls-client]
     HTTP -->|usable| Writer[JSONL.gz writer]
-    HTTP -->|404/410| Dead[(dead)]
-    HTTP -->|JS shell, blocked, remembered browser route| NeedsBrowser[(needs_browser)]
-    NeedsBrowser -->|claim + lease| Browser[Browser stage: Patchright, then CapSolver]
+    HTTP -->|404/410| Dead[(dead: cancelled)]
+    HTTP -->|other failure| Failed[(failed: discarded)]
+    HTTP -->|JS shell, blocked, remembered browser route| BrowserJob[(extract_browser job, queue browser)]
+    BrowserJob --> Browser[Browser stage: Patchright, then CapSolver]
     Browser -->|usable| Writer
-    Browser -->|no capacity| NeedsBrowser
-    Browser -->|failed, attempts left| NeedsBrowser
-    Browser -->|failed, no attempts left| Failed[(failed)]
-    Writer -->|file closed and renamed| Done[(done)]
+    Browser -->|no capacity, host busy| BrowserJob
+    Browser -->|404/410| Dead
+    Browser -->|failed| Failed
+    Writer -->|file closed and renamed| Done[(done: completed)]
 ```
 
-- **Queue.** Table `pagelode.urls`, created on first use. `import` normalises each line (adds `https://` to bare domains, lowercases the host, drops the fragment) and ignores URLs already queued. `Claim` uses `FOR UPDATE SKIP LOCKED` and leases rows by moving `next_at` forward, so an expired lease makes a URL claimable again without any cleanup job.
-- **HTTP stage.** `orchestrator.ExtractHTTP` runs clearance replay and tls-client only. Pages that need a browser are written back as `needs_browser`, not held in memory.
-- **Browser stage.** `orchestrator.ExtractBrowser` runs Patchright, then CapSolver. When every browser node is full (`429`) or unreachable, the URL is put back after about 5 s without using an attempt. Other failures use an attempt and retry with exponential backoff from 1 minute until `--max-attempts`.
-- **Output.** Successful pages are appended to `<out>/pages-<owner>-<time>-<seq>.jsonl.gz`, one `batch.Record` per line (the `/extract` result plus `id` and `fetchedAt`). A file is written as `.part`, synced, and renamed after 5,000 pages, 30 s, or when a stage runs out of work. Only then are its URLs marked `done`, with `content_ref` = `<file>:<line>`. A crash loses at most the open file; its URLs are scraped again once their leases expire.
-- **Shutdown.** `SIGINT`/`SIGTERM` stops claiming, cancels pages in flight, and puts them back as claimable immediately without using an attempt.
+- **Queue.** River's tables live in the `pagelode` schema. Every `extract batch` command creates or upgrades them on start with River's own migrations. Each URL becomes an `extract_http` job on the `http` queue. Pages that need a browser get an `extract_browser` job on the `browser` queue. Jobs are unique per kind by URL in every state, so `import` skips URLs that are already queued or finished and counts them as duplicates.
+- **HTTP stage.** `fetch.Service.ExtractHTTP` runs clearance replay and tls-client only. A page that needs a browser gets its browser job in the same transaction that completes the HTTP job. A non-HTML response that cannot be extracted (a PDF or download) fails here instead, because a browser cannot extract it either. HTTP jobs get one attempt: a failure other than 404/410 discards the job straight away.
+- **Browser stage.** `fetch.Service.ExtractBrowser` runs Patchright, then CapSolver. Only capacity is retried: when every browser node is full (`429`) or unreachable, the job is snoozed for about 5 s, which does not use an attempt. A failed render, including one that passes `--page-timeout`, is `failed` at once with no retry; `retry --state failed` queues those again.
+- **Hosts.** A process loads at most `--host-concurrency` pages of one host at once. A job whose host is busy is snoozed for about 1 s without using an attempt.
+- **Output.** Successful pages are appended to `<out>/pages-<owner>-<time>-<seq>.jsonl.gz`, one `batch.Record` per line (the `/extract` result plus the River job `id` and `fetchedAt`). A file is written as `.part`, synced, and renamed after 5,000 pages, after 2 s, or once no page has arrived for 100 ms. A job completes only after its file has been renamed. The job's `output` (River metadata) then holds `contentRef` = `<file>:<line>` with the provider and status.
+- **Crashes.** A crash loses at most the open file. Its jobs stay `running` until River's rescuer finds them after `--lease`. A rescued job counts the lost run as its one attempt, so it is discarded and shows as `failed`. `retry --state failed` queues them again.
+- **Retention.** Finished jobs are never deleted (`CompletedJobRetentionPeriod`, `CancelledJobRetentionPeriod`, and `DiscardedJobRetentionPeriod` are `-1`). They back deduplication, `status`, and `retry`.
+- **Shutdown.** `SIGINT`/`SIGTERM` stops fetching jobs and cancels pages in flight. The running jobs are snoozed so they can be picked up again immediately, without using an attempt.
+
+## Status and retry
+
+`status` prints the number of URLs per stage (`http`, `browser`) and state:
+
+| State | River state |
+|---|---|
+| `pending` | `available`, `scheduled` (including snoozed jobs), `pending` |
+| `running` | `running` |
+| `retrying` | `retryable` |
+| `done` | `completed`. In the `http` stage this includes URLs passed to the browser stage |
+| `dead` | `cancelled` (404 or 410) |
+| `failed` | `discarded` |
+
+`retry --state failed` (the default) or `retry --state dead` makes every job in that state available again in its own stage through River's `JobRetry`. A job that had used all its attempts gets one more.
 
 ## Browser capacity
 
@@ -42,15 +61,14 @@ flowchart LR
 
 | Flag | Default | Effect |
 |---|---|---|
-| `--queue` | `PAGELODE_QUEUE_URL` | Postgres URL of the queue |
+| `--database` | `PAGELODE_DATABASE_URL` | Postgres URL of the queue; every subcommand fails without it |
 | `--out` | `data/pages` | Directory for page files |
-| `--http-workers` | `100` | URLs loaded over HTTP at once |
-| `--browser-workers` | `-1` (all slots) | URLs rendered at once; `0` skips the browser stage |
-| `--until-empty` | off | Exit when no `pending` or `needs_browser` URL is left |
-| `--max-attempts` | `3` | Browser failures before a URL is `failed` |
+| `--http-workers` | `1000` | River workers on the `http` queue. On an M4 Pro laptop, 1,000 workers loaded ~130 URLs/s against ~40 URLs/s with 100; past that the CPU (TLS handshakes and extraction) is the limit, so scale out with more processes or machines on the same queue |
+| `--browser-workers` | `-1` (all slots) | River workers on the `browser` queue; `0` skips the browser stage |
+| `--until-empty` | off | Exit when no job of a worked stage is pending, running, or retrying |
 | `--host-concurrency` | `4` | Pages of one host loaded at once by this process |
-| `--lease` | `10m` | How long a claimed URL stays reserved; must exceed `--page-timeout` + 30 s |
-| `--page-timeout` | `90s` | Time budget for one stage of one URL |
+| `--lease` | `10m` | River's `RescueStuckJobsAfter`: how long a job may stay `running` before any process works it again; must exceed `--page-timeout` + 4 s |
+| `--page-timeout` | `10s` | Time budget for loading one URL in one stage; a page that takes longer fails without a retry. On the Common Crawl sample successful renders took 2.3 s median, 6.2 s at p95, and 11.4 s at p99, while renders that hit a 20 s timeout used more browser time than every successful render combined. River's job timeout is this plus 4 s for writing the page |
 
 ## Reading results
 
@@ -63,10 +81,13 @@ duckdb -c "select url, title, provider, length(content) from read_json_auto('/da
 ## Limits
 
 - Per-host limits apply per process; several processes can each load `--host-concurrency` pages of one host.
-- Learned routes and clearances stay in each machine's `PAGELODE_STATE_PATH`, so each machine learns a protected host once.
+- A worker waits up to 2 s after loading a page until the page's file is renamed, so each worker loads fewer pages per second than it could. Add workers to compensate.
+- Learned routes and clearances are stored in `PAGELODE_DATABASE_URL` and loaded when a process starts, so a process learns a protected host once and later processes reuse it.
 - HTTP uses the proxy session of the host's identity slot, so HTTP and browser renders of one host share an exit IP.
 
 ## Measured
+
+These numbers were measured on the previous hand-written queue (`pagelode.urls`, replaced by River). They have not been remeasured on River.
 
 20 October 2026, Apple M4 Pro behind a VPN (exit IP in Oslo on AS9009 M247, a datacenter range), no proxy, Postgres 17 in Docker, two headless browser nodes with 3 slots each, 4 identities:
 

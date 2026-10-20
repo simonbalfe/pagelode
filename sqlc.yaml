@@ -1,0 +1,15 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema:
+      - internal/store/schema.sql
+      - internal/store/river.sql
+    queries: internal/store/queries.sql
+    gen:
+      go:
+        package: store
+        out: internal/store
+        sql_package: pgx/v5
+        overrides:
+          - db_type: timestamptz
+            go_type: time.Time

@@ -1,4 +1,4 @@
-package similarity
+package sitemap
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ func TestText(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Text(tt.html); got != tt.want {
+			if got := PageText(tt.html); got != tt.want {
 				t.Fatalf("Text() = %q, want %q", got, tt.want)
 			}
 		})
@@ -74,10 +74,10 @@ func TestDistance(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Distance(tt.a, tt.b); got != tt.want {
+			if got := SimhashDistance(tt.a, tt.b); got != tt.want {
 				t.Fatalf("Distance() = %d, want %d", got, tt.want)
 			}
-			if got := Distance(tt.b, tt.a); got != tt.want {
+			if got := SimhashDistance(tt.b, tt.a); got != tt.want {
 				t.Fatalf("Distance() reversed = %d, want %d", got, tt.want)
 			}
 		})
@@ -85,8 +85,8 @@ func TestDistance(t *testing.T) {
 }
 
 func TestFingerprintSimilarity(t *testing.T) {
-	near := Distance(Fingerprint(articleA), Fingerprint(articleB))
-	far := Distance(Fingerprint(articleA), Fingerprint(articleC))
+	near := SimhashDistance(Fingerprint(articleA), Fingerprint(articleB))
+	far := SimhashDistance(Fingerprint(articleA), Fingerprint(articleC))
 	t.Logf("near=%d far=%d", near, far)
 	if near > 12 {
 		t.Fatalf("near-identical pages distance = %d, want <= 12", near)
@@ -102,7 +102,7 @@ func TestFingerprintSimilarity(t *testing.T) {
 func TestFingerprintFromHTML(t *testing.T) {
 	a := `<html><head><script>track(1)</script></head><body><main>` + articleA + `</main></body></html>`
 	b := `<html><head><script>track(2); more()</script><style>x{}</style></head><body><main>` + articleA + `</main></body></html>`
-	if d := Distance(Fingerprint(Text(a)), Fingerprint(Text(b))); d != 0 {
+	if d := SimhashDistance(Fingerprint(PageText(a)), Fingerprint(PageText(b))); d != 0 {
 		t.Fatalf("pages differing only in scripts/styles distance = %d, want 0", d)
 	}
 }
@@ -118,13 +118,13 @@ func TestIndexSeen(t *testing.T) {
 		{"exact duplicates", 0, []uint64{a, a, c}, []bool{false, true, false}},
 		{"near duplicate within distance", 64, []uint64{a, c}, []bool{false, true}},
 		{"near duplicate outside distance", 0, []uint64{a, b}, []bool{false, false}},
-		{"near duplicate matched", Distance(a, b), []uint64{a, b, c}, []bool{false, true, false}},
+		{"near duplicate matched", SimhashDistance(a, b), []uint64{a, b, c}, []bool{false, true, false}},
 		{"negative distance never matches", -1, []uint64{a, a}, []bool{false, false}},
 		{"empty index", 3, nil, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			idx := NewIndex(tt.max)
+			idx := NewDuplicateIndex(tt.max)
 			for i, fp := range tt.seq {
 				if got := idx.Seen(fp); got != tt.want[i] {
 					t.Fatalf("Seen #%d = %v, want %v", i, got, tt.want[i])
@@ -135,7 +135,7 @@ func TestIndexSeen(t *testing.T) {
 }
 
 func TestIndexConcurrent(t *testing.T) {
-	idx := NewIndex(0)
+	idx := NewDuplicateIndex(0)
 	var fresh atomic.Int64
 	var wg sync.WaitGroup
 	for i := range 40 {

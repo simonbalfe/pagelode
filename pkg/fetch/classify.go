@@ -1,4 +1,4 @@
-package classify
+package fetch
 
 import (
 	"fmt"
@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/simonbalfe/pagelode/pkg/page"
-	"github.com/simonbalfe/pagelode/pkg/signatures"
 )
 
 type Kind string
@@ -20,7 +18,7 @@ const (
 	Dead        Kind = "dead"
 )
 
-type Result struct {
+type Verdict struct {
 	Kind        Kind
 	Reason      string
 	RenderScore int
@@ -28,51 +26,51 @@ type Result struct {
 }
 
 var (
-	patterns           = signatures.MustLoad()
+	patterns           = MustLoadSignatures()
 	javascriptRequired = regexp.MustCompile(`(?i)enable javascript|javascript (?:is )?required|requires javascript|javascript to run`)
 	domMutation        = regexp.MustCompile(`(?i)(?:appendChild|replaceChildren|insertAdjacentHTML|createElement|document\.write)\s*\(`)
 )
 
-func Document(document page.Document) Result {
+func Classify(document Document) Verdict {
 	if document.StatusCode == 404 || document.StatusCode == 410 {
-		return Result{Kind: Dead, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
+		return Verdict{Kind: Dead, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
 	}
 	if reason, ok := challengeSignal(document); ok {
-		return Result{Kind: Blocked, Reason: reason}
+		return Verdict{Kind: Blocked, Reason: reason}
 	}
-	if document.Type != page.ContentHTML {
+	if document.Type != ContentHTML {
 		if document.StatusCode >= 500 {
-			return Result{Kind: Retryable, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
+			return Verdict{Kind: Retryable, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
 		}
-		return Result{Kind: Accept, Reason: "non-HTML response"}
+		return Verdict{Kind: Accept, Reason: "non-HTML response"}
 	}
 
 	html := document.HTML
 	for _, candidate := range patterns.Blocks {
 		if candidate.Value.MatchString(first(html, 500_000)) {
-			return Result{Kind: Blocked, Reason: candidate.Label}
+			return Verdict{Kind: Blocked, Reason: candidate.Label}
 		}
 	}
 	if document.StatusCode == 401 || document.StatusCode == 403 || document.StatusCode == 429 || document.StatusCode == 503 || document.StatusCode >= 520 && document.StatusCode <= 530 {
-		return Result{Kind: Blocked, Reason: fmt.Sprintf("HTTP %d with HTML content", document.StatusCode)}
+		return Verdict{Kind: Blocked, Reason: fmt.Sprintf("HTTP %d with HTML content", document.StatusCode)}
 	}
 	if document.StatusCode >= 500 {
-		return Result{Kind: Retryable, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
+		return Verdict{Kind: Retryable, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
 	}
 	if document.StatusCode >= 400 {
-		return Result{Kind: Retryable, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
+		return Verdict{Kind: Retryable, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}
 	}
 	if strings.TrimSpace(html) == "" {
-		return Result{Kind: NeedsRender, Reason: "empty HTML response", RenderScore: 10}
+		return Verdict{Kind: NeedsRender, Reason: "empty HTML response", RenderScore: 10}
 	}
 
 	parsed, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		return Result{Kind: Retryable, Reason: "invalid HTML"}
+		return Verdict{Kind: Retryable, Reason: "invalid HTML"}
 	}
 	body := parsed.Find("body").First()
 	if body.Length() == 0 {
-		return Result{Kind: NeedsRender, Reason: "HTML has no body", RenderScore: 10}
+		return Verdict{Kind: NeedsRender, Reason: "HTML has no body", RenderScore: 10}
 	}
 
 	visibleTree := body.Clone()
@@ -83,9 +81,12 @@ func Document(document page.Document) Result {
 	if visibleLength < 2_500 {
 		for _, candidate := range patterns.ShortBlocks {
 			if candidate.Value.MatchString(signalText) {
-				return Result{Kind: Blocked, Reason: candidate.Label, VisibleText: visibleLength}
+				return Verdict{Kind: Blocked, Reason: candidate.Label, VisibleText: visibleLength}
 			}
 		}
+	}
+	if document.Provider == ProviderPatchright {
+		return Verdict{Kind: Accept, Reason: "rendered HTML", VisibleText: visibleLength}
 	}
 
 	score := 0
@@ -122,12 +123,12 @@ func Document(document page.Document) Result {
 	}
 
 	if score >= 10 {
-		return Result{Kind: NeedsRender, Reason: strings.Join(reasons, "; "), RenderScore: score, VisibleText: visibleLength}
+		return Verdict{Kind: NeedsRender, Reason: strings.Join(reasons, "; "), RenderScore: score, VisibleText: visibleLength}
 	}
-	return Result{Kind: Accept, Reason: "usable HTML", RenderScore: score, VisibleText: visibleLength}
+	return Verdict{Kind: Accept, Reason: "usable HTML", RenderScore: score, VisibleText: visibleLength}
 }
 
-func challengeSignal(document page.Document) (string, bool) {
+func challengeSignal(document Document) (string, bool) {
 	if document.Challenge != nil {
 		return fmt.Sprintf("%s challenge remained after browser settling", document.Challenge.Vendor), true
 	}

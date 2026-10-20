@@ -14,9 +14,7 @@ import (
 
 	"github.com/simonbalfe/pagelode/pkg/discovery"
 	"github.com/simonbalfe/pagelode/pkg/emails"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/orchestrator"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"github.com/simonbalfe/pagelode/pkg/sitemap"
 )
 
@@ -25,15 +23,15 @@ const maximumRequestBytes = 16 << 10
 type Server struct {
 	emailFinder    *emails.Service
 	mapper         *sitemap.Service
-	extractor      *orchestrator.Service
+	extractor      *fetch.Service
 	discoverer     *discovery.Service
-	extractLimiter *limit.Limiter
-	routes         *memory.Routes
+	extractLimiter *fetch.Limiter
+	routes         *fetch.Routes
 	timeout        time.Duration
 	logger         *slog.Logger
 }
 
-func New(extractor *orchestrator.Service, discoverer *discovery.Service, extractLimiter *limit.Limiter, routes *memory.Routes, timeout time.Duration, logger *slog.Logger) *Server {
+func New(extractor *fetch.Service, discoverer *discovery.Service, extractLimiter *fetch.Limiter, routes *fetch.Routes, timeout time.Duration, logger *slog.Logger) *Server {
 	return &Server{
 		extractor:      extractor,
 		discoverer:     discoverer,
@@ -85,7 +83,7 @@ func (s *Server) extract(response http.ResponseWriter, request *http.Request) {
 	ctx, cancel := context.WithTimeout(request.Context(), s.timeout)
 	defer cancel()
 	var (
-		result orchestrator.Result
+		result fetch.Result
 		err    error
 	)
 	started := time.Now()
@@ -95,7 +93,7 @@ func (s *Server) extract(response http.ResponseWriter, request *http.Request) {
 	})
 	if limitErr != nil {
 		switch {
-		case errors.Is(limitErr, limit.ErrSaturated):
+		case errors.Is(limitErr, fetch.ErrSaturated):
 			response.Header().Set("Retry-After", "1")
 			writeJSON(response, http.StatusTooManyRequests, map[string]string{"error": "PageLode queue is full"})
 		case errors.Is(limitErr, context.Canceled), errors.Is(limitErr, context.DeadlineExceeded):

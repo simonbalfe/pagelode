@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/simonbalfe/pagelode/internal/config"
 )
 
 const rootDescription = "PageLode extracts Markdown, maps sites, discovers page data endpoints, and finds emails."
@@ -28,29 +26,30 @@ func commandSpecs() []commandSpec {
 	return []commandSpec{
 		{
 			name:    "extract batch",
-			summary: "Scrape millions of URLs from a shared Postgres queue",
-			long: `Queues URLs in Postgres and scrapes them with any number of processes on any number of
-machines. "run" loads each URL over HTTP first and sends only the pages that need a
-browser to the browser stage, which spreads renders over every PAGELODE_BROWSER_URL
-node. A full or unreachable browser puts the URL back for later instead of failing it.
-Pages go to rolling gzipped JSONL files in --out; the queue records where each one is.
+			summary: "Scrape millions of URLs through a River job queue in Postgres",
+			long: `Queues URLs as River jobs in Postgres and scrapes them with any number of processes on
+any number of machines. "run" loads each URL over HTTP first and sends only the pages
+that need a browser to the browser stage, which spreads renders over every
+PAGELODE_BROWSER_URL node. A full or unreachable browser snoozes the job instead of
+failing it. Pages go to rolling gzipped JSONL files in --out; each finished job records
+where its page is.
 
 Subcommands:
-  import <file|->   add URLs or domains, one per line; duplicates are ignored
+  import <file|->   add URLs or domains, one per line; queued or finished URLs are skipped
   run               scrape until interrupted, or until empty with --until-empty
-  status            count URLs per state
-  retry             move URLs back, by default from failed to pending
+  status            count URLs per stage and state
+  retry             queue failed (default) or dead URLs again in their stage
 
-The queue URL comes from --queue or PAGELODE_QUEUE_URL. The flags below are for run.`,
-			usage: []string{"pagelode extract batch import [--queue URL] <file|->", "pagelode extract batch run [flags]", "pagelode extract batch status [--queue URL]", "pagelode extract batch retry [--state failed] [--to pending]"},
+The database URL comes from --database or PAGELODE_DATABASE_URL. The flags below are for run.`,
+			usage: []string{"pagelode extract batch import [--database URL] <file|->", "pagelode extract batch run [flags]", "pagelode extract batch status [--database URL]", "pagelode extract batch retry [--state failed|dead] [--database URL]"},
 			examples: []string{
-				"export PAGELODE_QUEUE_URL=postgres://user:pass@host/db",
+				"export PAGELODE_DATABASE_URL=postgres://user:pass@host/db",
 				"pagelode extract batch import urls.txt",
 				"pagelode extract batch run --http-workers 400 --out /data/pages",
 				"PAGELODE_BROWSER_URL=http://b1:8090,http://b2:8090 pagelode extract batch run --until-empty",
 				"pagelode extract batch status",
 			},
-			flags: func(flags *flag.FlagSet) { defineBatchRunFlags(flags, config.Config{}) },
+			flags: func(flags *flag.FlagSet) { defineBatchRunFlags(flags, Config{}) },
 		},
 		{
 			name:    "map endpoints",
@@ -76,9 +75,10 @@ email address per line. It reads full HTML and captured JSON, and decodes common
 obfuscation. Addresses are syntax-checked, not verified for deliverability.
 
 With --input it reads one URL or domain per line from a file, or from standard input
-with -, crawls the sites in parallel, and writes the results to the --db SQLite
-database. Sites already in the database are skipped, so an interrupted run resumes
-when you run it again. --input lowers the per-site defaults to suit large lists.`,
+with -, crawls the sites in parallel, and writes the results to the Postgres database
+at --database or PAGELODE_DATABASE_URL. Sites already in the database are skipped, so an
+interrupted run resumes when you run it again. --input lowers the per-site defaults to
+suit large lists.`,
 			usage: []string{"pagelode emails [flags] <URL>", "pagelode emails --input <file|-> [flags]"},
 			examples: []string{
 				"pagelode emails example.com",
@@ -86,9 +86,9 @@ when you run it again. --input lowers the per-site defaults to suit large lists.
 				"pagelode emails --verbose example.com",
 				"pagelode emails --profile account https://app.example.com",
 				"pagelode emails --input sites.txt",
-				"cat sites.txt | pagelode emails --input - --workers 64 --db out/emails.sqlite",
+				"cat sites.txt | pagelode emails --input - --workers 64 --database postgres://user:pass@host/db",
 			},
-			flags: func(flags *flag.FlagSet) { defineEmailsFlags(flags) },
+			flags: func(flags *flag.FlagSet) { defineEmailsFlags(flags, Config{}) },
 		},
 		{
 			name:    "extract",

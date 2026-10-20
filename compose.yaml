@@ -8,12 +8,29 @@ services:
       PAGELODE_PROXY_URL: ${PAGELODE_PROXY_URL:-}
       PAGELODE_PROTECTED_DOMAINS: ${PAGELODE_PROTECTED_DOMAINS:-crunchbase.com}
       CAPSOLVER_API_KEY: ${CAPSOLVER_API_KEY:-}
+      PAGELODE_DATABASE_URL: postgres://pagelode:${POSTGRES_PASSWORD:-pagelode}@postgres:5432/pagelode?sslmode=disable
     ports:
       - "8083:8083"
-    volumes:
-      - pagelode-data:/data
     depends_on:
-      - browser
+      postgres:
+        condition: service_healthy
+      browser:
+        condition: service_started
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: pagelode
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pagelode}
+      POSTGRES_DB: pagelode
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pagelode -d pagelode"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
     restart: unless-stopped
 
   browser:
@@ -22,7 +39,7 @@ services:
       dockerfile: browser-service/Dockerfile
     environment:
       BROWSER_SERVICE_TOKEN: ${BROWSER_SERVICE_TOKEN:?set BROWSER_SERVICE_TOKEN}
-      BROWSER_SERVICE_CONCURRENCY: ${BROWSER_SERVICE_CONCURRENCY:-4}
+      BROWSER_SERVICE_CONCURRENCY: ${BROWSER_SERVICE_CONCURRENCY:-16}
       BROWSER_SERVICE_MAX_SESSIONS: ${BROWSER_SERVICE_MAX_SESSIONS:-4}
       TZ: ${BROWSER_TZ:-Etc/UTC}
     ports:
@@ -34,5 +51,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  pagelode-data:
+  postgres-data:
   browser-data:

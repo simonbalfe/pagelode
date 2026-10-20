@@ -1,4 +1,4 @@
-package proxy
+package browser
 
 import (
 	"net/url"
@@ -11,7 +11,7 @@ var (
 	passwordSession = regexp.MustCompile(`(_(?:hard|locked)?session-)[A-Za-z0-9]+`)
 )
 
-func Sticky(raw string) bool {
+func StickyProxy(raw string) bool {
 	for _, placeholder := range placeholders {
 		if strings.Contains(raw, placeholder) {
 			return true
@@ -21,7 +21,7 @@ func Sticky(raw string) bool {
 	return ok && passwordSession.MatchString(password)
 }
 
-func WithSession(raw string, id string) string {
+func ProxyWithSession(raw string, id string) string {
 	for _, placeholder := range placeholders {
 		if strings.Contains(raw, placeholder) {
 			return replacePlaceholders(raw, id)

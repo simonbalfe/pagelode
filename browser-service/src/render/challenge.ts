@@ -1,5 +1,5 @@
 import type { Locator, Page } from "patchright";
-import signatures from "../../../pkg/signatures/signatures.json" with { type: "json" };
+import signatures from "../../../pkg/fetch/signatures.json" with { type: "json" };
 import type { Log } from "../shared/log.ts";
 import { findDataDome } from "./datadome.ts";
 import type { Challenge } from "./schema.ts";

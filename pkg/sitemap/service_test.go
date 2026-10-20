@@ -3,18 +3,16 @@ package sitemap
 import (
 	"context"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
-
-	"github.com/simonbalfe/pagelode/pkg/httpfetch"
-	"github.com/simonbalfe/pagelode/pkg/limit"
 )
 
 func newService() *Service {
-	return New(httpfetch.New(""), limit.New(2, 10))
+	return New(fetch.NewHTTPClient(""), fetch.NewLimiter(2, 10))
 }
 
 func urls(report Report) []string {

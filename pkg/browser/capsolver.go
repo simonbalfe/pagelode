@@ -1,4 +1,4 @@
-package capsolver
+package browser
 
 import (
 	"context"
@@ -8,21 +8,21 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
-type Fetcher interface {
-	Fetch(context.Context, string, page.Session) (page.Document, error)
+type CapSolverFetcher interface {
+	Fetch(context.Context, string, fetch.Session) (fetch.Document, error)
 }
 
-type Client struct {
-	api              *API
+type CapSolver struct {
+	api              *CapSolverAPI
 	proxy            string
-	challengeFetcher Fetcher
-	solvedFetcher    Fetcher
+	challengeFetcher CapSolverFetcher
+	solvedFetcher    CapSolverFetcher
 }
 
-func New(api *API, proxyURL string, challengeFetcher Fetcher, solvedFetcher Fetcher) (*Client, error) {
+func NewCapSolver(api *CapSolverAPI, proxyURL string, challengeFetcher CapSolverFetcher, solvedFetcher CapSolverFetcher) (*CapSolver, error) {
 	if api == nil || proxyURL == "" {
 		return nil, nil
 	}
@@ -30,7 +30,7 @@ func New(api *API, proxyURL string, challengeFetcher Fetcher, solvedFetcher Fetc
 	if err != nil {
 		return nil, fmt.Errorf("capsolver: configure proxy: %w", err)
 	}
-	return &Client{
+	return &CapSolver{
 		api:              api,
 		proxy:            proxy,
 		challengeFetcher: challengeFetcher,
@@ -69,10 +69,10 @@ func ResolveProxy(ctx context.Context, raw string) (string, error) {
 	return "", errors.New("capsolver: proxy host has no IPv4 address")
 }
 
-func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
+func (c *CapSolver) Fetch(ctx context.Context, targetURL string, session fetch.Session) (fetch.Document, error) {
 	bootstrap, err := c.challengeFetcher.Fetch(ctx, targetURL, session)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("capsolver: fetch challenge page: %w", err)
+		return fetch.Document{}, fmt.Errorf("capsolver: fetch challenge page: %w", err)
 	}
 	debug("challenge_fetched", map[string]any{"status": bootstrap.StatusCode, "user_agent_major": chromeMajor(bootstrap.Session.UserAgent), "cookies": len(bootstrap.Session.Cookies)})
 	solved, err := c.api.solve(ctx, task{
@@ -83,15 +83,15 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		HTML:       bootstrap.HTML,
 	})
 	if err != nil {
-		return page.Document{}, err
+		return fetch.Document{}, err
 	}
 	if solved.UserAgent == "" || len(solved.Cookies) == 0 {
-		return page.Document{}, errors.New("capsolver: solution omitted browser session")
+		return fetch.Document{}, errors.New("capsolver: solution omitted browser session")
 	}
 	debug("challenge_solved", map[string]any{"user_agent_major": chromeMajor(solved.UserAgent), "cookies": len(solved.Cookies)})
 	parsed, err := url.Parse(targetURL)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("capsolver: parse target URL: %w", err)
+		return fetch.Document{}, fmt.Errorf("capsolver: parse target URL: %w", err)
 	}
 	session = bootstrap.Session
 	session.UserAgent = solved.UserAgent
@@ -100,7 +100,7 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 		cookieIndexes[cookie.Name] = index
 	}
 	for name, value := range solved.Cookies {
-		cookie := page.Cookie{
+		cookie := fetch.Cookie{
 			Name:   name,
 			Value:  value,
 			Domain: parsed.Hostname(),
@@ -114,9 +114,9 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 	}
 	document, err := c.solvedFetcher.Fetch(ctx, targetURL, session)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("capsolver: fetch solved page: %w", err)
+		return fetch.Document{}, fmt.Errorf("capsolver: fetch solved page: %w", err)
 	}
-	document.Provider = page.ProviderCapSolver
+	document.Provider = fetch.ProviderCapSolver
 	return document, nil
 }
 

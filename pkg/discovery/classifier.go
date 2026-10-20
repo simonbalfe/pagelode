@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 var (
@@ -56,7 +56,7 @@ func defaultBlocklist() []string {
 	}
 }
 
-func scoreEntry(entry page.Exchange, blocklist []string) int {
+func scoreEntry(entry fetch.Exchange, blocklist []string) int {
 	score := 0
 	responseType := strings.ToLower(entry.MIMEType)
 	requestType := strings.ToLower(getHeaderValue(entry.RequestHeaders, "Content-Type"))
@@ -106,7 +106,7 @@ func scoreEntry(entry page.Exchange, blocklist []string) int {
 	return score
 }
 
-func structuredAPIBonus(entry page.Exchange, requestType, responseType, path string) int {
+func structuredAPIBonus(entry fetch.Exchange, requestType, responseType, path string) int {
 	if isSOAP(entry, requestType, responseType) ||
 		strings.Contains(requestType, "application/grpc") || strings.Contains(responseType, "application/grpc") ||
 		strings.Contains(requestType, "application/graphql") || strings.Contains(responseType, "application/graphql") {
@@ -124,7 +124,7 @@ func structuredAPIBonus(entry page.Exchange, requestType, responseType, path str
 	return 0
 }
 
-func isSOAP(entry page.Exchange, requestType, responseType string) bool {
+func isSOAP(entry fetch.Exchange, requestType, responseType string) bool {
 	if hasHeader(entry.RequestHeaders, "SOAPAction") ||
 		strings.Contains(requestType, "soap+xml") || strings.Contains(responseType, "soap+xml") {
 		return true

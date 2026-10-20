@@ -13,7 +13,7 @@ import (
 	"github.com/simonbalfe/pagelode/pkg/browser"
 	"github.com/simonbalfe/pagelode/pkg/browser/browsertest"
 	"github.com/simonbalfe/pagelode/pkg/discovery"
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 func startClient(t *testing.T) *browser.Client {
@@ -47,7 +47,7 @@ func TestServiceCapture(t *testing.T) {
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	document, err := client.Capture(ctx, server.URL, page.Session{}, page.CaptureOptions{WaitMS: 200})
+	document, err := client.Capture(ctx, server.URL, fetch.Session{}, fetch.CaptureOptions{WaitMS: 200})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestAuthenticatedProfilePersistsAndIsolatesStorage(t *testing.T) {
 		profile       string
 		authenticated bool
 	}{{"member", true}, {"other", false}} {
-		document, err := client.Capture(ctx, server.URL, page.Session{}, page.CaptureOptions{WaitMS: 200, Profile: test.profile})
+		document, err := client.Capture(ctx, server.URL, fetch.Session{}, fetch.CaptureOptions{WaitMS: 200, Profile: test.profile})
 		if err != nil {
 			t.Fatal(err)
 		}

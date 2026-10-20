@@ -10,9 +10,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/pagelode /usr/local/bin/pagelode
-ENV PAGELODE_BROWSER_URL=http://browser:8090 \
-    PAGELODE_STATE_PATH=/data/state.sqlite
-VOLUME /data
+ENV PAGELODE_BROWSER_URL=http://browser:8090
 EXPOSE 8083
 ENTRYPOINT ["pagelode"]
 CMD ["serve"]

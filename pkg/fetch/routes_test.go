@@ -1,10 +1,8 @@
-package memory
+package fetch
 
 import (
 	"testing"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 func TestRoutes(t *testing.T) {
@@ -14,11 +12,11 @@ func TestRoutes(t *testing.T) {
 	routes := NewRoutes(time.Minute, []string{"crunchbase.com"})
 	routes.now = func() time.Time { return now }
 
-	if got, ok := routes.Preferred("www.crunchbase.com"); !ok || got != page.ProviderPatchright {
+	if got, ok := routes.Preferred("www.crunchbase.com"); !ok || got != ProviderPatchright {
 		t.Fatalf("Preferred(protected) = %q, %v; want patchright, true", got, ok)
 	}
-	routes.Record("example.com", page.ProviderPatchright)
-	if got, ok := routes.Preferred("example.com"); !ok || got != page.ProviderPatchright {
+	routes.Record("example.com", ProviderPatchright)
+	if got, ok := routes.Preferred("example.com"); !ok || got != ProviderPatchright {
 		t.Fatalf("Preferred(learned) = %q, %v; want patchright, true", got, ok)
 	}
 

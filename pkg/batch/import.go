@@ -9,37 +9,47 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/simonbalfe/pagelode/pkg/queue"
+	"github.com/riverqueue/river"
 )
 
-type Importer interface {
-	Import(ctx context.Context, entries []queue.Entry) (int64, error)
+type Entry struct {
+	URL  string
+	Host string
 }
 
 type ImportStats struct {
-	Lines    int64
-	Invalid  int64
-	Inserted int64
+	Lines      int64
+	Invalid    int64
+	Inserted   int64
+	Duplicates int64
 }
 
 const maxLineBytes = 64 << 10
 
-func Import(ctx context.Context, q Importer, input io.Reader, batchSize int) (ImportStats, error) {
+func (q *Queue) Import(ctx context.Context, input io.Reader, batchSize int) (ImportStats, error) {
 	if batchSize < 1 {
 		return ImportStats{}, errors.New("batch: import batch size must be positive")
 	}
 	var stats ImportStats
-	entries := make([]queue.Entry, 0, batchSize)
+	params := make([]river.InsertManyParams, 0, batchSize)
+	inBatch := make(map[string]bool, batchSize)
 	flush := func() error {
-		if len(entries) == 0 {
+		if len(params) == 0 {
 			return nil
 		}
-		inserted, err := q.Import(ctx, entries)
+		results, err := q.client.InsertMany(ctx, params)
 		if err != nil {
 			return fmt.Errorf("batch: import: %w", err)
 		}
-		stats.Inserted += inserted
-		entries = entries[:0]
+		for _, result := range results {
+			if result.UniqueSkippedAsDuplicate {
+				stats.Duplicates++
+			} else {
+				stats.Inserted++
+			}
+		}
+		params = params[:0]
+		clear(inBatch)
 		return nil
 	}
 
@@ -56,8 +66,13 @@ func Import(ctx context.Context, q Importer, input io.Reader, batchSize int) (Im
 			stats.Invalid++
 			continue
 		}
-		entries = append(entries, entry)
-		if len(entries) == batchSize {
+		if inBatch[entry.URL] {
+			stats.Duplicates++
+			continue
+		}
+		inBatch[entry.URL] = true
+		params = append(params, river.InsertManyParams{Args: HTTPArgs{URL: entry.URL, Host: entry.Host}})
+		if len(params) == batchSize {
 			if err := flush(); err != nil {
 				return stats, err
 			}
@@ -69,17 +84,17 @@ func Import(ctx context.Context, q Importer, input io.Reader, batchSize int) (Im
 	return stats, flush()
 }
 
-func Normalize(raw string) (queue.Entry, error) {
+func Normalize(raw string) (Entry, error) {
 	raw = strings.TrimSpace(raw)
 	if !strings.Contains(raw, "://") {
 		raw = "https://" + raw
 	}
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return queue.Entry{}, fmt.Errorf("batch: invalid URL %q: %w", raw, err)
+		return Entry{}, fmt.Errorf("batch: invalid URL %q: %w", raw, err)
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" || parsed.Hostname() == "" {
-		return queue.Entry{}, fmt.Errorf("batch: %q is not an absolute HTTP(S) URL", raw)
+		return Entry{}, fmt.Errorf("batch: %q is not an absolute HTTP(S) URL", raw)
 	}
 	parsed.Host = strings.ToLower(parsed.Host)
 	parsed.Fragment = ""
@@ -87,5 +102,5 @@ func Normalize(raw string) (queue.Entry, error) {
 	if parsed.Path == "" && parsed.Opaque == "" {
 		parsed.Path = "/"
 	}
-	return queue.Entry{URL: parsed.String(), Host: parsed.Hostname()}, nil
+	return Entry{URL: parsed.String(), Host: parsed.Hostname()}, nil
 }

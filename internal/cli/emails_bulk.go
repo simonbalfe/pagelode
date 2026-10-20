@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/emails"
 	"io"
 	"os"
 	"os/signal"
@@ -12,10 +13,6 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-
-	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/emailstore"
-	"github.com/simonbalfe/pagelode/pkg/emails"
 )
 
 const pagesLoadedInParallelPerSite = 4
@@ -26,7 +23,7 @@ type siteResult struct {
 	err    error
 }
 
-func emailsBulk(configuration config.Config, options emailsFlags, set map[string]bool, args []string, stdout, stderr io.Writer) error {
+func emailsBulk(configuration Config, options emailsFlags, set map[string]bool, args []string, stdout, stderr io.Writer) error {
 	if len(args) != 0 {
 		return errors.New("--input reads the sites from a file; do not also pass a URL")
 	}
@@ -45,6 +42,9 @@ func emailsBulk(configuration config.Config, options emailsFlags, set map[string
 	if !set["render"] {
 		*options.render = "never"
 	}
+	if *options.database == "" {
+		return errors.New("--input stores its results in Postgres: set PAGELODE_DATABASE_URL or --database to a Postgres URL")
+	}
 	if *options.workers < 1 || *options.workers > 512 {
 		return errors.New("workers must be between 1 and 512")
 	}
@@ -61,15 +61,17 @@ func emailsBulk(configuration config.Config, options emailsFlags, set map[string
 	if err != nil {
 		return err
 	}
-	store, err := emailstore.Open(*options.database)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	configuration.DatabaseURL = *options.database
+	configuration.MaxConcurrency = *options.workers * pagesLoadedInParallelPerSite
+	configuration.MaxWaiting = *options.workers * pagesLoadedInParallelPerSite
+	app, err := newApplication(ctx, configuration)
 	if err != nil {
 		return err
 	}
-	defer store.Close()
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	done, err := store.Done(ctx)
+	defer app.Close()
+	done, err := app.store.FinishedEmailSites(ctx)
 	if err != nil {
 		return err
 	}
@@ -83,18 +85,6 @@ func emailsBulk(configuration config.Config, options emailsFlags, set map[string
 	if len(pending) == 0 {
 		return nil
 	}
-
-	configuration.MaxConcurrency = *options.workers * pagesLoadedInParallelPerSite
-	configuration.MaxWaiting = *options.workers * pagesLoadedInParallelPerSite
-	app, err := newApplication(configuration)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := app.Close(); err != nil {
-			fmt.Fprintln(stderr, "pagelode: close:", err)
-		}
-	}()
 
 	jobs := make(chan string)
 	results := make(chan siteResult)
@@ -136,13 +126,13 @@ func emailsBulk(configuration config.Config, options emailsFlags, set map[string
 		var err error
 		if result.err != nil {
 			failed.Add(1)
-			err = store.SaveFailure(ctx, result.site, result.err)
+			err = app.store.SaveEmailFailure(ctx, result.site, result.err)
 		} else {
 			if len(result.report.Emails) > 0 {
 				withEmails.Add(1)
 			}
 			addresses.Add(int64(len(result.report.Emails)))
-			err = store.Save(ctx, result.site, result.report)
+			err = app.store.SaveEmailReport(ctx, result.site, result.report)
 		}
 		if err != nil {
 			saveError = err
@@ -160,7 +150,7 @@ func emailsBulk(configuration config.Config, options emailsFlags, set map[string
 		fmt.Fprintf(stdout, "interrupted after %d of %d sites; rerun the same command to resume\n", finished.Load(), len(pending))
 		return nil
 	}
-	fmt.Fprintf(stdout, "%d sites crawled, %d with emails, %d addresses, %d errors, written to %s\n", finished.Load(), withEmails.Load(), addresses.Load(), failed.Load(), *options.database)
+	fmt.Fprintf(stdout, "%d sites crawled, %d with emails, %d addresses, %d errors, saved to Postgres\n", finished.Load(), withEmails.Load(), addresses.Load(), failed.Load())
 	return nil
 }
 

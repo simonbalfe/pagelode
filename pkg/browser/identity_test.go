@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type generations map[string]int
@@ -35,14 +35,14 @@ func TestRepeatedBlocksRotateToNewIdentityAndSession(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	fetch(t, client, ctx)
+	fetchItem(t, client, ctx)
 	first := <-requests
 	firstKey, firstProxy := first.body["identity"].(string), first.body["proxy_url"].(string)
 	if firstKey == "" || strings.Contains(firstProxy, "{session}") || !strings.HasPrefix(firstProxy, "http://user-") {
 		t.Fatalf("first render identity = %q, proxy = %q; want a key and a concrete session proxy", firstKey, firstProxy)
 	}
 
-	fetch(t, client, ctx)
+	fetchItem(t, client, ctx)
 	if second := <-requests; second.body["identity"] != firstKey {
 		t.Fatalf("second render identity = %v, want %q before rotation", second.body["identity"], firstKey)
 	}
@@ -50,7 +50,7 @@ func TestRepeatedBlocksRotateToNewIdentityAndSession(t *testing.T) {
 		t.Fatalf("after two blocks request = %s %s, want DELETE /v1/identities/%s", rotation.method, rotation.path, firstKey)
 	}
 
-	fetch(t, client, ctx)
+	fetchItem(t, client, ctx)
 	third := <-requests
 	if third.body["identity"] == firstKey || third.body["proxy_url"] == firstProxy {
 		t.Errorf("after rotation identity = %v, proxy = %v; want a new key and session", third.body["identity"], third.body["proxy_url"])
@@ -73,7 +73,7 @@ func TestBlocksWithoutStickyProxyKeepIdentity(t *testing.T) {
 	client := newClient(t, server.URL, "", "http://user:secret@proxy.example:1000")
 	ctx := context.Background()
 	for range 3 {
-		fetch(t, client, ctx)
+		fetchItem(t, client, ctx)
 	}
 	keys := map[any]bool{}
 	for range 3 {
@@ -88,11 +88,11 @@ func TestBlocksWithoutStickyProxyKeepIdentity(t *testing.T) {
 	}
 }
 
-func fetch(t *testing.T, client *Client, ctx context.Context) {
+func fetchItem(t *testing.T, client *Client, ctx context.Context) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if _, err := client.Fetch(ctx, "https://shop.example/item", page.Session{}); err != nil {
+	if _, err := client.Fetch(ctx, "https://shop.example/item", fetch.Session{}); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -12,9 +12,7 @@ import (
 
 	"github.com/simonbalfe/pagelode/pkg/browser"
 	"github.com/simonbalfe/pagelode/pkg/browser/browsertest"
-	"github.com/simonbalfe/pagelode/pkg/httpfetch"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 func TestAuthenticatedEmailCrawl(t *testing.T) {
@@ -56,8 +54,8 @@ func TestAuthenticatedEmailCrawl(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	loader := NewLoader(httpfetch.New(""), client, nil, memory.NewRoutes(time.Hour, nil))
-	service := New(loader, limit.New(4, 10), 4)
+	loader := NewLoader(fetch.NewHTTPClient(""), client, nil, fetch.NewRoutes(time.Hour, nil))
+	service := New(loader, fetch.NewLimiter(4, 10), 4)
 	for _, test := range []struct {
 		name  string
 		count int

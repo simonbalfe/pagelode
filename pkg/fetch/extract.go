@@ -1,4 +1,4 @@
-package extract
+package fetch
 
 import (
 	"bytes"
@@ -19,20 +19,20 @@ const (
 	maximumStructuredChars   = 2_500
 )
 
-type Result struct {
+type Content struct {
 	Content string
 	Links   []string
 	Title   string
 }
 
-func HTML(rawHTML string, baseURL string) (Result, error) {
+func ExtractHTML(rawHTML string, baseURL string) (Content, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
-		return Result{}, fmt.Errorf("extract: parse base URL: %w", err)
+		return Content{}, fmt.Errorf("extract: parse base URL: %w", err)
 	}
 	document, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
 	if err != nil {
-		return Result{}, fmt.Errorf("extract: parse HTML: %w", err)
+		return Content{}, fmt.Errorf("extract: parse HTML: %w", err)
 	}
 
 	title := normalized(document.Find("title").First().Text())
@@ -40,7 +40,7 @@ func HTML(rawHTML string, baseURL string) (Result, error) {
 	if body == "" {
 		body, err = fallbackMarkdown(document, baseURL)
 		if err != nil {
-			return Result{}, err
+			return Content{}, err
 		}
 	}
 	structured := structuredData(document)
@@ -52,7 +52,7 @@ func HTML(rawHTML string, baseURL string) (Result, error) {
 		}
 	}
 
-	return Result{
+	return Content{
 		Content: tidy(content),
 		Links:   sameSiteLinks(document, parsedURL),
 		Title:   title,

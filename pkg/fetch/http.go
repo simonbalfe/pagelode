@@ -1,4 +1,4 @@
-package httpfetch
+package fetch
 
 import (
 	"bytes"
@@ -14,7 +14,6 @@ import (
 	http "github.com/bogdanfinn/fhttp"
 	tlsclient "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 const (
@@ -22,7 +21,7 @@ const (
 	userAgent        = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
 )
 
-type Client struct {
+type HTTPClient struct {
 	proxyURL string
 	current  func(host string) string
 }
@@ -34,28 +33,28 @@ type Form struct {
 	Referer string
 }
 
-func New(proxyURL string) *Client {
-	return &Client{proxyURL: proxyURL}
+func NewHTTPClient(proxyURL string) *HTTPClient {
+	return &HTTPClient{proxyURL: proxyURL}
 }
 
-func Following(current func(host string) string) *Client {
-	return &Client{current: current}
+func NewFollowingHTTPClient(current func(host string) string) *HTTPClient {
+	return &HTTPClient{current: current}
 }
 
-func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
+func (c *HTTPClient) Fetch(ctx context.Context, targetURL string, session Session) (Document, error) {
 	parsedTargetURL, err := url.Parse(targetURL)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("http fetch: parse target URL: %w", err)
+		return Document{}, fmt.Errorf("http fetch: parse target URL: %w", err)
 	}
 	client, err := c.client(parsedTargetURL, session)
 	if err != nil {
-		return page.Document{}, err
+		return Document{}, err
 	}
 	defer client.CloseIdleConnections()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("http fetch: create request: %w", err)
+		return Document{}, fmt.Errorf("http fetch: create request: %w", err)
 	}
 	effectiveUserAgent := userAgent
 	if session.UserAgent != "" {
@@ -65,18 +64,18 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 
 	response, err := client.Do(request)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("http fetch: request: %w", err)
+		return Document{}, fmt.Errorf("http fetch: request: %w", err)
 	}
 	body, readErr := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	closeErr := response.Body.Close()
 	if readErr != nil {
-		return page.Document{}, fmt.Errorf("http fetch: read response: %w", readErr)
+		return Document{}, fmt.Errorf("http fetch: read response: %w", readErr)
 	}
 	if closeErr != nil {
-		return page.Document{}, fmt.Errorf("http fetch: close response: %w", closeErr)
+		return Document{}, fmt.Errorf("http fetch: close response: %w", closeErr)
 	}
 	if len(body) > maxResponseBytes {
-		return page.Document{}, fmt.Errorf("http fetch: response exceeds %d bytes", maxResponseBytes)
+		return Document{}, fmt.Errorf("http fetch: response exceeds %d bytes", maxResponseBytes)
 	}
 
 	finalURL := targetURL
@@ -85,30 +84,30 @@ func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Sessi
 	}
 	parsedFinalURL, err := url.Parse(finalURL)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("http fetch: parse final URL: %w", err)
+		return Document{}, fmt.Errorf("http fetch: parse final URL: %w", err)
 	}
 
 	contentType := detectContentType(response.Header.Get("content-type"), parsedFinalURL.Path)
 	if gzipResource(response.Header.Get("content-type"), parsedFinalURL.Path) {
 		if unzipped, ok := gunzip(body); ok {
 			body = unzipped
-			contentType = page.ContentText
+			contentType = ContentText
 		}
 	}
-	document := page.Document{
-		Provider:   page.ProviderTLS,
+	document := Document{
+		Provider:   ProviderTLS,
 		StatusCode: response.StatusCode,
 		FinalURL:   finalURL,
 		Type:       contentType,
 		Headers:    responseHeaders(response.Header),
-		Session: page.Session{
+		Session: Session{
 			UserAgent: effectiveUserAgent,
 			Cookies:   portableCookies(client.GetCookies(parsedFinalURL), parsedFinalURL.Hostname()),
 		},
 	}
-	if contentType == page.ContentHTML {
+	if contentType == ContentHTML {
 		document.HTML = string(body)
-	} else if contentType == page.ContentText {
+	} else if contentType == ContentText {
 		document.Text = strings.TrimSpace(string(body))
 	}
 	return document, nil
@@ -143,14 +142,14 @@ func responseHeaders(header http.Header) map[string]string {
 	return headers
 }
 
-func (c *Client) Submit(ctx context.Context, form Form, session page.Session) (page.Document, error) {
+func (c *HTTPClient) Submit(ctx context.Context, form Form, session Session) (Document, error) {
 	action, err := url.Parse(form.Action)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("http submit: parse action: %w", err)
+		return Document{}, fmt.Errorf("http submit: parse action: %w", err)
 	}
 	client, err := c.client(action, session, tlsclient.WithNotFollowRedirects())
 	if err != nil {
-		return page.Document{}, err
+		return Document{}, err
 	}
 	defer client.CloseIdleConnections()
 	method := strings.ToUpper(form.Method)
@@ -163,7 +162,7 @@ func (c *Client) Submit(ctx context.Context, form Form, session page.Session) (p
 	}
 	request, err := http.NewRequestWithContext(ctx, method, action.String(), body)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("http submit: create request: %w", err)
+		return Document{}, fmt.Errorf("http submit: create request: %w", err)
 	}
 	effectiveUserAgent := userAgent
 	if session.UserAgent != "" {
@@ -178,28 +177,28 @@ func (c *Client) Submit(ctx context.Context, form Form, session page.Session) (p
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		return page.Document{}, fmt.Errorf("http submit: request: %w", err)
+		return Document{}, fmt.Errorf("http submit: request: %w", err)
 	}
 	if _, err := io.Copy(io.Discard, io.LimitReader(response.Body, maxResponseBytes)); err != nil {
 		_ = response.Body.Close()
-		return page.Document{}, fmt.Errorf("http submit: read response: %w", err)
+		return Document{}, fmt.Errorf("http submit: read response: %w", err)
 	}
 	if err := response.Body.Close(); err != nil {
-		return page.Document{}, fmt.Errorf("http submit: close response: %w", err)
+		return Document{}, fmt.Errorf("http submit: close response: %w", err)
 	}
-	return page.Document{
-		Provider:   page.ProviderTLS,
+	return Document{
+		Provider:   ProviderTLS,
 		StatusCode: response.StatusCode,
 		FinalURL:   action.String(),
-		Type:       page.ContentUnknown,
-		Session: page.Session{
+		Type:       ContentUnknown,
+		Session: Session{
 			UserAgent: effectiveUserAgent,
 			Cookies:   portableCookies(client.GetCookies(action), action.Hostname()),
 		},
 	}, nil
 }
 
-func (c *Client) client(target *url.URL, session page.Session, extra ...tlsclient.HttpClientOption) (tlsclient.HttpClient, error) {
+func (c *HTTPClient) client(target *url.URL, session Session, extra ...tlsclient.HttpClientOption) (tlsclient.HttpClient, error) {
 	profile := profiles.Chrome_150
 	if session.Replayable() {
 		profile = profiles.Chrome_152
@@ -229,7 +228,7 @@ func (c *Client) client(target *url.URL, session page.Session, extra ...tlsclien
 	return client, nil
 }
 
-func requestHeaders(userAgent string, session page.Session) http.Header {
+func requestHeaders(userAgent string, session Session) http.Header {
 	if !session.Replayable() {
 		return http.Header{
 			"accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7"},
@@ -267,7 +266,7 @@ func requestHeaders(userAgent string, session page.Session) http.Header {
 	}
 }
 
-func requestCookies(cookies []page.Cookie) []*http.Cookie {
+func requestCookies(cookies []Cookie) []*http.Cookie {
 	result := make([]*http.Cookie, 0, len(cookies))
 	for _, cookie := range cookies {
 		current := &http.Cookie{
@@ -286,25 +285,25 @@ func requestCookies(cookies []page.Cookie) []*http.Cookie {
 	return result
 }
 
-func detectContentType(header string, path string) page.ContentType {
+func detectContentType(header string, path string) ContentType {
 	mediaType, _, _ := mime.ParseMediaType(header)
 	switch {
 	case mediaType == "text/html" || mediaType == "application/xhtml+xml" || mediaType == "":
 		if strings.HasSuffix(strings.ToLower(path), ".pdf") {
-			return page.ContentPDF
+			return ContentPDF
 		}
-		return page.ContentHTML
+		return ContentHTML
 	case mediaType == "application/pdf":
-		return page.ContentPDF
+		return ContentPDF
 	case strings.HasPrefix(mediaType, "text/") || mediaType == "application/json" || mediaType == "application/xml" || mediaType == "application/javascript" || mediaType == "application/x-javascript" || mediaType == "application/ecmascript":
-		return page.ContentText
+		return ContentText
 	default:
-		return page.ContentUnknown
+		return ContentUnknown
 	}
 }
 
-func portableCookies(cookies []*http.Cookie, defaultDomain string) []page.Cookie {
-	result := make([]page.Cookie, 0, len(cookies))
+func portableCookies(cookies []*http.Cookie, defaultDomain string) []Cookie {
+	result := make([]Cookie, 0, len(cookies))
 	for _, cookie := range cookies {
 		domain := cookie.Domain
 		if domain == "" {
@@ -318,7 +317,7 @@ func portableCookies(cookies []*http.Cookie, defaultDomain string) []page.Cookie
 		if !cookie.Expires.IsZero() {
 			expires = float64(cookie.Expires.Unix())
 		}
-		result = append(result, page.Cookie{
+		result = append(result, Cookie{
 			Name:     cookie.Name,
 			Value:    cookie.Value,
 			Domain:   domain,

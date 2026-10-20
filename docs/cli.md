@@ -3,21 +3,21 @@
 ```text
 pagelode [--json] <URL>
 pagelode extract [--json] <URL>
-pagelode extract batch import [--queue <postgres-url>] <file|->
-pagelode extract batch run [--http-workers 100] [--browser-workers -1] [--out data/pages] [--until-empty]
-pagelode extract batch status | retry [--state failed] [--to pending]
+pagelode extract batch import [--database <postgres-url>] <file|->
+pagelode extract batch run [--http-workers 1000] [--browser-workers -1] [--out data/pages] [--until-empty] [--progress-interval 10s]
+pagelode extract batch status | retry [--state failed|dead]
 pagelode map [--limit 500] [--max-duration 30s] [--depth 2] [--render never] [--explore] [--include <path>] [--exclude <path>] [--subdomains] [--json] <URL>
 pagelode map endpoints [--wait-ms 1500] [--profile <name>] [--stealth] [--verbose] <URL>
 pagelode map endpoints --har <capture.har> [<URL>]
 pagelode emails [--max-pages 20] [--max-emails 100] [--max-duration 30s] [--render auto] [--profile <name>] [--verbose] <URL>
-pagelode emails --input <file|-> [--db data/emails.sqlite] [--workers 32] [--max-pages 8] [--max-emails 50] [--max-duration 20s] [--render never]
+pagelode emails --input <file|-> [--database <postgres-url>] [--workers 32] [--max-pages 8] [--max-emails 50] [--max-duration 20s] [--render never]
 pagelode profile login <name> <URL>
 pagelode serve
 pagelode version
 pagelode help [command [subcommand]]
 ```
 
-Put options before the URL. A bare domain such as `example.com` is accepted wherever a URL is. Every command reads its settings from environment variables; see [configuration](configuration.md) for proxies, browser mode, CapSolver, and limits.
+Put options before the URL. A bare domain such as `example.com` is accepted wherever a URL is. Every command reads its settings from environment variables; see [configuration](configuration.md) for proxies, browser mode, CapSolver, limits, and the Postgres database. Without `PAGELODE_DATABASE_URL`, learned routes and clearances last only for one process.
 
 ## Built-in help
 
@@ -39,14 +39,14 @@ Loads one page through the waterfall and prints clean Markdown. `pagelode <URL>`
 
 ### `pagelode extract batch`
 
-Extracts millions of URLs: queues them in Postgres (`PAGELODE_QUEUE_URL` or `--queue`) and scrapes them with any number of `extract batch run` processes. Each URL is loaded over HTTP first; only pages that need a browser go to the browser stage, which spreads renders over every `PAGELODE_BROWSER_URL` node. A full or unreachable browser puts the URL back without using an attempt.
+Extracts millions of URLs: queues them as River jobs in Postgres (`PAGELODE_DATABASE_URL` or `--database`) and scrapes them with any number of `extract batch run` processes. Each URL is loaded over HTTP first; only pages that need a browser go to the browser stage, which spreads renders over every `PAGELODE_BROWSER_URL` node. A full or unreachable browser snoozes the job without using an attempt. Every subcommand fails without a database URL.
 
 | Subcommand | Effect |
 |---|---|
-| `import <file\|->` | Add URLs or domains, one per line; duplicates are ignored |
-| `run` | Scrape until interrupted, or until the queue is empty with `--until-empty` |
-| `status` | Count URLs per state |
-| `retry` | Move URLs back, by default from `failed` to `pending` |
+| `import <file\|->` | Add URLs or domains, one per line; URLs already queued or finished are counted as duplicates |
+| `run` | Scrape until interrupted, or until no job is left with `--until-empty` |
+| `status` | Count URLs per stage (`http`, `browser`) and state (`pending`, `running`, `retrying`, `done`, `dead`, `failed`) |
+| `retry` | Queue every `failed` (default) or `dead` (`--state dead`) URL again in its own stage |
 
 See [batch scraping](batch.md) for `run` flags and the output files.
 
@@ -80,12 +80,12 @@ Captures one page's network traffic in the browser service and prints a JSON rep
 
 ## `pagelode emails`
 
-Crawls one site and prints one published email address per line. With `--input`, it crawls a list of sites in parallel and writes the results to SQLite instead. See [email finding](emails.md) for crawl behavior and the report format.
+Crawls one site and prints one published email address per line. With `--input`, it crawls a list of sites in parallel and writes the results to Postgres instead. See [email finding](emails.md) for crawl behavior and the report format.
 
 | Option | Default | `--input` default | Effect |
 |---|---|---|---|
 | `--input` | none | | File with one URL or domain per line, or `-` for standard input. Invalid and duplicate lines are skipped |
-| `--db` | | `data/emails.sqlite` | SQLite file to create or extend; needs `--input` |
+| `--database` | | `PAGELODE_DATABASE_URL` | Postgres URL that stores the results; required with `--input`, which fails without it |
 | `--workers` | | `32` | Sites crawled in parallel, 1–512; needs `--input` |
 | `--max-pages` | `20` | `8` | Pages to visit per site, 1–100 |
 | `--max-emails` | `100` | `50` | Stop a site after this many unique addresses, 1–1000 |
@@ -94,7 +94,7 @@ Crawls one site and prints one published email address per line. With `--input`,
 | `--profile` | none | not allowed | Use a saved signed-in browser profile; every page loads in Patchright |
 | `--verbose` | off | not allowed | Print the full JSON report: sources, page outcomes, and crawl details |
 
-With `--input`, the `sites` table holds one row per crawled site with its outcome, page counts, duration, and any error, and the `emails` table holds one row per address and source page. Sites already in `sites` are skipped, so interrupting with Ctrl-C and rerunning resumes. Delete the database to start over.
+With `--input`, the `pagelode.email_sites` table holds one row per crawled site with its outcome, page counts, duration, any error, and when it was scraped, and the `pagelode.email_addresses` table holds one row per address and source page. Sites already in `email_sites` are skipped, so interrupting with Ctrl-C and rerunning resumes. Delete a site's row from `email_sites` (its addresses go with it) to crawl it again.
 
 ## `pagelode profile login <name> <URL>`
 

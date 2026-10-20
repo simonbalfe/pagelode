@@ -1,4 +1,4 @@
-.PHONY: build check run run-browser setup smoke
+.PHONY: build check generate run run-browser setup smoke
 
 build:
 	mkdir -p bin
@@ -9,6 +9,9 @@ check:
 	go vet ./...
 	go test -race ./...
 	cd browser-service && bun run check
+
+generate:
+	sqlc generate
 
 run:
 	go run ./cmd/pagelode serve

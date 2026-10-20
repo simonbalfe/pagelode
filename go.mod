@@ -9,8 +9,10 @@ require (
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/riverqueue/river v0.49.0
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.49.0
+	github.com/riverqueue/river/rivertype v0.49.0
 	golang.org/x/net v0.58.0
-	modernc.org/sqlite v1.60.1
 )
 
 require (
@@ -22,25 +24,23 @@ require (
 	github.com/bogdanfinn/utls v1.7.8-barnius // indirect
 	github.com/bogdanfinn/websocket v1.5.6-barnius // indirect
 	github.com/cloudflare/circl v1.6.2 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-shiori/dom v0.0.0-20230515143342-73569d674e1c // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/itlightning/dateparse v0.2.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
-	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
-	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/riverqueue/river/riverdriver v0.49.0 // indirect
+	github.com/riverqueue/river/rivershared v0.49.0 // indirect
 	github.com/tam7t/hpkp v0.0.0-20160821193359-2b70b4024ed5 // indirect
+	github.com/tidwall/gjson v1.19.0 // indirect
+	github.com/tidwall/match v1.2.0 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
-	modernc.org/libc v1.77.1 // indirect
-	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.12.1 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )

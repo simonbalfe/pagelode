@@ -18,11 +18,12 @@ Place options before the URL. By default, output contains one email address per 
 ### Many sites
 
 ```sh
+export PAGELODE_DATABASE_URL=postgres://user:pass@host/db
 pagelode emails --input sites.txt
-cat sites.txt | pagelode emails --input - --workers 64 --db out/emails.sqlite
+cat sites.txt | pagelode emails --input - --workers 64 --database postgres://user:pass@other-host/db
 ```
 
-`--input` reads one URL or domain per line, crawls the sites in parallel (`--workers`, default 32), and writes the results to the `--db` SQLite file (default `data/emails.sqlite`) instead of printing addresses. Unless set, the per-site limits drop to 8 pages, 50 addresses, and 20 s, and rendering defaults to `never`. `--profile` and `--verbose` are not accepted with `--input`. Sites already in the database are skipped, so rerunning an interrupted command resumes it. Table layout is in the [CLI reference](cli.md#pagelode-emails).
+`--input` reads one URL or domain per line, crawls the sites in parallel (`--workers`, default 32), and writes the results to Postgres at `--database` (default `PAGELODE_DATABASE_URL`) instead of printing addresses; it fails when neither is set. Unless set, the per-site limits drop to 8 pages, 50 addresses, and 20 s, and rendering defaults to `never`. `--profile` and `--verbose` are not accepted with `--input`. Sites already in the database are skipped, so rerunning an interrupted command resumes it. Table layout is in the [CLI reference](cli.md#pagelode-emails).
 
 ## API
 

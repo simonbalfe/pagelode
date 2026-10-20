@@ -19,7 +19,7 @@ flowchart LR
     Caller[API client] --> API[Go HTTP API]
     API --> Limit[Extraction limiter]
     Limit --> Route[Route memory + clearances]
-    Route <--> State[(SQLite state file)]
+    Route <--> State[(Postgres, when PAGELODE_DATABASE_URL is set)]
     Route --> Orchestrator[Waterfall orchestrator]
 
     Orchestrator --> TLS[tls-client: replay and HTTP]
@@ -74,7 +74,7 @@ flowchart TD
     Extract --> Success[Return Markdown, links, provider, and attempts]
 ```
 
-Every loader produces the same internal `page.Document` shape. That keeps classification and extraction independent from transport details. [Browser routing](browser-routing.md) gives the exact rules.
+Every loader produces the same internal `fetch.Document` shape. That keeps classification and extraction independent from transport details. [Browser routing](browser-routing.md) gives the exact rules.
 
 ## The loaders
 
@@ -90,7 +90,7 @@ Patchright handles JavaScript shells, challenge pages, protected domains, and ev
 
 For an ordinary render, Go sends an identity key and a concrete proxy URL. The service leases that warm browser identity: a persistent Chrome context bound to that proxy, launched with the timezone and languages of the proxy's exit IP. It opens a fresh page, applies the cookies, and renders the page. Only when the page shows a challenge hint (a 401, 403, 429, or 503 status, an `x-datadome` or `cf-mitigated: challenge` header, a `__cf_chl_` URL, or a challenge title) does it try to settle a challenge. It then waits until the page goes quiet, at most `settle_ms`, and returns HTML, updated cookies, response headers, and any challenge that remains. A render with a named profile launches that profile's own persistent context instead. See [browser service](browser-service.md#waiting-for-the-page).
 
-When `CAPSOLVER_API_KEY` is set, `captcha` wraps every browser render. When the service reports a Google `/sorry` reCAPTCHA or DataDome `challenge`, it is solved in Go through the identity's proxy and rendered again with the solved cookie; see [captchas](browser-service.md#captchas).
+When `CAPSOLVER_API_KEY` is set, the challenge `Solver` in `browser` wraps every browser render. When the service reports a Google `/sorry` reCAPTCHA or DataDome `challenge`, it is solved in Go through the identity's proxy and rendered again with the solved cookie; see [captchas](browser-service.md#captchas).
 
 ### CapSolver
 
@@ -114,7 +114,7 @@ sequenceDiagram
     S->>B: Navigate and settle
     B-->>S: HTML, URL, title, cookies, status
     S-->>C: JSON render result
-    C-->>O: page.Document
+    C-->>O: fetch.Document
 ```
 
 `browser` is the Go client. It calls these routes:
@@ -127,12 +127,12 @@ sequenceDiagram
 | `CloseSession` | `DELETE /v1/sessions/{id}` | Close a session and save its profile |
 
 - Requests carry `PAGELODE_BROWSER_TOKEN` as a bearer token. Anonymous renders carry an `identity` key and a concrete `proxy_url` derived from `PAGELODE_PROXY_URL`; see [identities and rotation](browser-service.md#identities-and-rotation).
-- Every render sends `settle_ms` from `PAGELODE_BROWSER_SETTLE_MS` and capture limits from `page.MaxCapture*` (200 requests, 256 KiB per body, 2 MiB total).
+- Every render sends `settle_ms` from `PAGELODE_BROWSER_SETTLE_MS` and capture limits from `fetch.MaxCapture*` (200 requests, 256 KiB per body, 2 MiB total).
 - The render timeout comes from the request deadline, capped at 45 seconds.
-- Errors use `{"error":{"code","message"}}`. A `429 saturated` response becomes `limit.ErrSaturated` in Go.
+- Errors use `{"error":{"code","message"}}`. A `429 saturated` response becomes `fetch.ErrSaturated` in Go.
 - Responses larger than 32 MiB are rejected.
 
-The boundary deliberately exposes browser facts rather than extraction policy. Block signatures and challenge markers live in one file, `pkg/signatures/signatures.json`, read by both Go and the service. The full API, sessions, identities, and container are documented in [browser service](browser-service.md).
+The boundary deliberately exposes browser facts rather than extraction policy. Block signatures and challenge markers live in one file, `pkg/fetch/signatures.json`, read by both Go and the service. The full API, sessions, identities, and container are documented in [browser service](browser-service.md).
 
 ## Classification
 
@@ -193,7 +193,7 @@ flowchart LR
 
 When the browser service succeeds, PageLode remembers `patchright` for the hostname and stores the browser session as a clearance for replay. A later request to the same host can replay the clearance or begin at the browser instead of repeating an HTTP attempt that is likely to fail.
 
-Entries expire after `PAGELODE_ROUTE_TTL`. Routes, clearances, and identity generations are written through to a local SQLite file (`internal/state`, `PAGELODE_STATE_PATH`) and loaded at start, so they survive restarts and separate CLI runs. Configured protected domains are pre-seeded to Patchright, and subdomains inherit their parent-domain rule.
+Entries expire after `PAGELODE_ROUTE_TTL`. When `PAGELODE_DATABASE_URL` is set, routes, clearances, and identity generations are written through to Postgres (`internal/store`) and loaded at start, so they survive restarts, separate CLI runs, and are shared by every process on that database. Without it they live only in the process. Configured protected domains are pre-seeded to Patchright, and subdomains inherit their parent-domain rule.
 
 ## Concurrency and backpressure
 
@@ -221,33 +221,16 @@ Importable packages live under `pkg/`; app-only wiring lives under `internal/`; 
 | Path | Responsibility |
 |---|---|
 | `cmd/pagelode` | Process entry point; calls `internal/cli` |
-| `internal/cli` | Command parsing, help, process wiring, HTTP lifecycle, graceful shutdown |
+| `internal/cli` | Command parsing, help, environment configuration (`config.go`), process wiring, HTTP lifecycle, graceful shutdown |
 | `internal/api` | HTTP contract, validation, timeouts, health reporting |
-| `internal/config` | Environment configuration |
-| `internal/state` | SQLite persistence for routes, clearances, and identity generations |
-| `internal/emailstore` | SQLite persistence for `emails --input` runs |
-| `pkg/orchestrator` | Waterfall, attempt evidence, escalation, final results |
-| `pkg/emails` | Email-finding crawl, page loading policy, address extraction |
-| `pkg/httpfetch` | Profiled direct HTTP loader and session capture |
-| `pkg/browser` | HTTP client for the browser service: render, capture, sessions, and identity keys and rotation (`identity.go`) |
+| `internal/store` | Postgres persistence generated by sqlc (`schema.sql`, `queries.sql`): routes, clearances, identity generations, `emails --input` results, and batch job counts |
+| `pkg/fetch` | The extraction core: loader-neutral document, session, and capture values (`page.go`, `capture.go`); the bounded concurrency `Limiter` (`ErrSaturated`); the profiled HTTP loader (`http.go`); block, render, retry, dead, and accept decisions with the embedded `signatures.json` shared with the browser service (`classify.go`, `signatures.go`); the waterfall with attempt evidence (`orchestrator.go`); expiring per-host routes and clearances; Readability, Markdown, links, and structured data (`extract.go`) |
+| `pkg/browser` | HTTP client for the browser service: render, capture, sessions, identity keys and rotation (`identity.go`), proxy URL templates (`proxy.go`); the challenge `Solver` for Google `/sorry` and DataDome (`solver.go`) and the CapSolver client with the Cloudflare solved-session handoff over tls-client (`capsolver.go`) |
 | `pkg/browser/browsertest` | Starts the real browser service with `bun` for gated integration tests |
-| `pkg/proxy` | Proxy URL templates and session substitution |
-| `pkg/capsolver` | CapSolver task polling: Cloudflare solved-session handoff over tls-client, reCAPTCHA tokens, DataDome cookies |
-| `pkg/captcha` | Solves Google `/sorry` and DataDome challenges reported by the browser service, then renders again |
-| `pkg/classify` | Block, render, retry, dead, and accept decisions |
-| `pkg/signatures` | Embedded `signatures.json`: block patterns and challenge signals shared with the browser service |
-| `pkg/extract` | Readability, DOM cleanup, Markdown, links, structured data |
-| `pkg/memory` | Expiring hostname-to-provider routes and clearances |
-| `pkg/limit` | Bounded concurrency and queueing for extraction; `ErrSaturated` |
-| `pkg/page` | Loader-neutral document and session values, capture limits |
-| `pkg/sitemap` | Site mapping crawl and URL collection from sitemaps and links |
+| `pkg/sitemap` | Site mapping crawl and URL collection from sitemaps and links; script endpoint scanning, simhash near-duplicate detection, and URL shapes and templates |
 | `pkg/discovery` | Data-endpoint discovery from one browser capture, HAR analysis, endpoint grouping |
-| `pkg/scriptscan` | Script URL and relative endpoint extraction |
-| `pkg/similarity` | Simhash fingerprints and near-duplicate page index |
-| `pkg/urlshape` | URL shapes, sampling, and path templates |
-| `pkg/profile` | Named browser profile name validation |
-| `pkg/queue` | Shared Postgres URL queue: import, leased claims, completion, retry, counts |
-| `pkg/batch` | Two-stage bulk runner over `queue`, per-host limits, rolling JSONL.gz output; see [batch scraping](batch.md) |
+| `pkg/emails` | Email-finding crawl, page loading policy, address extraction |
+| `pkg/batch` | Two-stage bulk extraction on River job queues (`http`, `browser`), per-host limits, rolling JSONL.gz output; see [batch scraping](batch.md) |
 | `browser-service/src` | Bun + Hono browser service: Patchright renders, identities, sessions, profiles, request validation |
 
 ## Failure behaviour
@@ -258,14 +241,15 @@ This separation makes an extraction failure observable without pretending that b
 
 ## Deployment model
 
-The provided `compose.yaml` runs two containers:
+The provided `compose.yaml` runs three containers:
 
 | Service | Image | Contents |
 |---|---|---|
-| `pagelode` | root `Dockerfile` | Static Go binary with `pkg/signatures` embedded; no browser, Node, or Bun. `PAGELODE_STATE_PATH=/data/state.sqlite` on the `pagelode-data` volume. Listens on `8083` |
+| `pagelode` | root `Dockerfile` | Static Go binary with `pkg/fetch/signatures.json` embedded; no browser, Node, or Bun. `PAGELODE_DATABASE_URL` points at `postgres`. Listens on `8083` |
 | `browser` | `browser-service/Dockerfile` | `oven/bun` with Google Chrome running headed on an Xvfb display, plus fluxbox, PulseAudio, Mesa, and fonts. Listens on `127.0.0.1:8090` |
+| `postgres` | `postgres:17` | Routes, clearances, identity generations, email results, and batch jobs, on the `postgres-data` volume |
 
-PageLode reaches the browser service at `http://browser:8090`. Both containers share `BROWSER_SERVICE_TOKEN`. Browser identities and profiles persist in the `browser-data` volume at `/data`, and `BROWSER_TZ` sets the browser container's `TZ`. PageLode's routes, clearances, and identity generations persist in the `pagelode-data` volume. The browser image builds from the repository root (`docker build -f browser-service/Dockerfile .`) so it can copy `pkg/signatures/`. The PageLode image defaults to `pagelode serve`; supplying a URL instead runs a one-shot extraction.
+PageLode reaches the browser service at `http://browser:8090`. Both containers share `BROWSER_SERVICE_TOKEN`. Browser identities and profiles persist in the `browser-data` volume at `/data`, and `BROWSER_TZ` sets the browser container's `TZ`. The browser image builds from the repository root (`docker build -f browser-service/Dockerfile .`) so it can copy `pkg/fetch/signatures.json`. The PageLode image defaults to `pagelode serve`; supplying a URL instead runs a one-shot extraction.
 
 ```mermaid
 flowchart TB
@@ -276,7 +260,7 @@ flowchart TB
         Service[Bun browser service :8090] --> Chrome[Headed Google Chrome on Xvfb]
     end
     Go -->|HTTP + bearer token| Service
-    PL --> StateVolume[(pagelode-data volume /data)]
+    Go --> PG[(postgres container, postgres-data volume)]
     BR --> Volume[(browser-data volume /data)]
 ```
 
@@ -308,7 +292,7 @@ The loader shares the same HTTP client, browser service client, CapSolver client
 ## Current limitations
 
 - PDF extraction is not implemented.
-- Route memory and clearances persist in a local SQLite file and are not shared between replicas.
+- Without `PAGELODE_DATABASE_URL`, route memory and clearances live only in the process and are lost on exit.
 - Browser processes are reused through the browser service's warm identity pool. Interactive browser sessions exist only as raw CDP sessions on the browser service.
 - Challenge interaction is intentionally small and cannot solve every protection system.
 - Proxy credentials are supported. The browser service matches timezone and languages to the proxy exit IP, but proxy quality and browser fingerprint coherence remain deployment concerns.

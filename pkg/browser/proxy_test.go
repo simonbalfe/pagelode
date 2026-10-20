@@ -1,4 +1,4 @@
-package proxy
+package browser
 
 import "testing"
 
@@ -19,10 +19,10 @@ func TestWithSession(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := WithSession(test.raw, "abc123"); got != test.want {
+			if got := ProxyWithSession(test.raw, "abc123"); got != test.want {
 				t.Errorf("WithSession(%q) = %q, want %q", test.raw, got, test.want)
 			}
-			if got := Sticky(test.raw); got != test.sticky {
+			if got := StickyProxy(test.raw); got != test.sticky {
 				t.Errorf("Sticky(%q) = %v, want %v", test.raw, got, test.sticky)
 			}
 		})

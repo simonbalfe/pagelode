@@ -3,13 +3,11 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/simonbalfe/pagelode/pkg/discovery"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/pkg/discovery"
 )
 
 func TestMapEndpointsCLIFromHAR(t *testing.T) {
@@ -20,7 +18,7 @@ func TestMapEndpointsCLIFromHAR(t *testing.T) {
 	}
 	app := &application{discoverer: discovery.New(nil)}
 	var output bytes.Buffer
-	if err := app.endpoints(config.Config{RequestTimeout: time.Second}, []string{"--har", path}, &output, &output); err != nil {
+	if err := app.endpoints(Config{RequestTimeout: time.Second}, []string{"--har", path}, &output, &output); err != nil {
 		t.Fatal(err)
 	}
 	var report discovery.Report
@@ -44,7 +42,7 @@ func TestMapEndpointsCLIVerbosity(t *testing.T) {
 			args = append([]string{"--verbose"}, args...)
 		}
 		var output bytes.Buffer
-		if err := app.endpoints(config.Config{RequestTimeout: time.Second}, args, &output, &output); err != nil {
+		if err := app.endpoints(Config{RequestTimeout: time.Second}, args, &output, &output); err != nil {
 			t.Fatal(err)
 		}
 		if got := bytes.Contains(output.Bytes(), []byte(`"evidence"`)); got != verbose {

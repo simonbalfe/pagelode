@@ -14,31 +14,27 @@ import (
 	"sync"
 	"time"
 
-	"github.com/simonbalfe/pagelode/pkg/orchestrator"
-	"github.com/simonbalfe/pagelode/pkg/queue"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 const (
-	flushInterval     = 30 * time.Second
-	fileRecords       = 5000
-	partSuffix        = ".part"
-	fileExtension     = ".jsonl.gz"
-	completeAttempts  = 3
-	completeRetryWait = 2 * time.Second
+	flushInterval = 2 * time.Second
+	quietPeriod   = 100 * time.Millisecond
+	fileRecords   = 5000
+	partSuffix    = ".part"
+	fileExtension = ".jsonl.gz"
 )
 
 type Record struct {
 	ID        int64     `json:"id"`
 	FetchedAt time.Time `json:"fetchedAt"`
-	orchestrator.Result
+	fetch.Result
 }
 
 type Writer struct {
 	dir     string
 	prefix  string
-	q       Queue
 	records chan pending
-	flushes chan chan error
 	done    chan struct{}
 
 	mu  sync.Mutex
@@ -46,55 +42,42 @@ type Writer struct {
 }
 
 type pending struct {
-	item   queue.Item
-	result orchestrator.Result
+	id     int64
+	result fetch.Result
+	reply  chan written
 }
 
-func NewWriter(dir, owner string, q Queue) (*Writer, error) {
+type written struct {
+	ref string
+	err error
+}
+
+func NewWriter(dir, owner string) (*Writer, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("batch: create output directory: %w", err)
 	}
-	w := &Writer{dir: dir, prefix: "pages-" + fileSafe(owner), q: q, records: make(chan pending), flushes: make(chan chan error), done: make(chan struct{})}
+	w := &Writer{dir: dir, prefix: "pages-" + fileSafe(owner), records: make(chan pending), done: make(chan struct{})}
 	go w.loop()
 	return w, nil
 }
 
-func (w *Writer) Add(ctx context.Context, item queue.Item, result orchestrator.Result) error {
+func (w *Writer) Add(ctx context.Context, id int64, result fetch.Result) (string, error) {
+	reply := make(chan written, 1)
 	select {
-	case w.records <- pending{item: item, result: result}:
-		return nil
+	case w.records <- pending{id: id, result: result, reply: reply}:
 	case <-w.done:
-		return w.failure()
+		return "", w.failure()
 	case <-ctx.Done():
-		return ctx.Err()
+		return "", ctx.Err()
 	}
+	answer := <-reply
+	return answer.ref, answer.err
 }
 
-func (w *Writer) Flush(ctx context.Context) error {
-	reply := make(chan error, 1)
-	select {
-	case w.flushes <- reply:
-	case <-w.done:
-		return w.failure()
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	select {
-	case err := <-reply:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func (w *Writer) Close(ctx context.Context) error {
+func (w *Writer) Close() error {
 	close(w.records)
-	select {
-	case <-w.done:
-		return w.failure()
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	<-w.done
+	return w.failure()
 }
 
 func (w *Writer) failure() error {
@@ -111,7 +94,7 @@ func (w *Writer) fail(err error) {
 
 func (w *Writer) loop() {
 	defer close(w.done)
-	ticker := time.NewTicker(flushInterval / 3)
+	ticker := time.NewTicker(quietPeriod / 2)
 	defer ticker.Stop()
 	var current *outputFile
 	sequence := 0
@@ -119,7 +102,7 @@ func (w *Writer) loop() {
 		select {
 		case record, ok := <-w.records:
 			if !ok {
-				if err := w.finish(current); err != nil {
+				if err := current.finish(); err != nil {
 					w.fail(err)
 				}
 				return
@@ -128,35 +111,30 @@ func (w *Writer) loop() {
 				sequence++
 				file, err := w.open(sequence)
 				if err != nil {
+					record.reply <- written{err: err}
 					w.fail(err)
 					return
 				}
 				current = file
 			}
+			current.written = time.Now()
 			if err := current.write(record); err != nil {
+				current.reject(err)
 				w.fail(errors.Join(err, current.abandon()))
 				return
 			}
-			if len(current.completions) >= fileRecords {
-				if err := w.finish(current); err != nil {
+			if len(current.waiting) >= fileRecords {
+				if err := current.finish(); err != nil {
 					w.fail(err)
 					return
 				}
 				current = nil
 			}
-		case reply := <-w.flushes:
-			err := w.finish(current)
-			current = nil
-			reply <- err
-			if err != nil {
-				w.fail(err)
-				return
-			}
 		case <-ticker.C:
-			if current == nil || time.Since(current.opened) < flushInterval {
+			if current == nil || time.Since(current.opened) < flushInterval && time.Since(current.written) < quietPeriod {
 				continue
 			}
-			if err := w.finish(current); err != nil {
+			if err := current.finish(); err != nil {
 				w.fail(err)
 				return
 			}
@@ -177,47 +155,44 @@ func (w *Writer) open(sequence int) (*outputFile, error) {
 	return &outputFile{name: name, path: filepath.Join(w.dir, name), file: file, buffered: buffered, compressed: compressed, encoder: json.NewEncoder(compressed), opened: opened}, nil
 }
 
-func (w *Writer) finish(current *outputFile) error {
-	if current == nil {
-		return nil
-	}
-	if err := current.close(); err != nil {
-		return err
-	}
-	var err error
-	for attempt := range completeAttempts {
-		ctx, cancel := context.WithTimeout(context.Background(), completeTimeout)
-		err = w.q.Complete(ctx, current.completions)
-		cancel()
-		if err == nil {
-			return nil
-		}
-		if attempt < completeAttempts-1 {
-			time.Sleep(completeRetryWait)
-		}
-	}
-	return fmt.Errorf("batch: complete %d pages written to %s: %w", len(current.completions), current.name, err)
-}
-
 type outputFile struct {
-	name        string
-	path        string
-	file        *os.File
-	buffered    *bufio.Writer
-	compressed  *gzip.Writer
-	encoder     *json.Encoder
-	opened      time.Time
-	completions []queue.Completion
+	name       string
+	path       string
+	file       *os.File
+	buffered   *bufio.Writer
+	compressed *gzip.Writer
+	encoder    *json.Encoder
+	opened     time.Time
+	written    time.Time
+	waiting    []chan written
 }
 
 func (f *outputFile) write(record pending) error {
-	if err := f.encoder.Encode(Record{ID: record.item.ID, FetchedAt: time.Now().UTC(), Result: record.result}); err != nil {
+	f.waiting = append(f.waiting, record.reply)
+	if err := f.encoder.Encode(Record{ID: record.id, FetchedAt: time.Now().UTC(), Result: record.result}); err != nil {
 		return fmt.Errorf("batch: write %s: %w", f.name, err)
 	}
-	done := completion(record.item, queue.Done, record.result)
-	done.ContentRef = f.name + ":" + strconv.Itoa(len(f.completions)+1)
-	f.completions = append(f.completions, done)
 	return nil
+}
+
+func (f *outputFile) finish() error {
+	if f == nil {
+		return nil
+	}
+	if err := f.close(); err != nil {
+		f.reject(err)
+		return err
+	}
+	for index, reply := range f.waiting {
+		reply <- written{ref: f.name + ":" + strconv.Itoa(index+1)}
+	}
+	return nil
+}
+
+func (f *outputFile) reject(err error) {
+	for _, reply := range f.waiting {
+		reply <- written{err: err}
+	}
 }
 
 func (f *outputFile) close() error {

@@ -5,10 +5,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
-func detectProtocol(entry page.Exchange) (string, string) {
+func detectProtocol(entry fetch.Exchange) (string, string) {
 	mime := strings.ToLower(entry.MIMEType)
 	requestType := strings.ToLower(header(entry.RequestHeaders, "content-type"))
 	if isSOAP(entry, requestType, mime) {
@@ -84,7 +84,7 @@ func detectProtocol(entry page.Exchange) (string, string) {
 	return "http", ""
 }
 
-func authSignals(entry page.Exchange) []string {
+func authSignals(entry fetch.Exchange) []string {
 	result := []string{}
 	for name, value := range entry.RequestHeaders {
 		lower := strings.ToLower(name)
@@ -143,7 +143,7 @@ func paginationName(name string) bool {
 	return false
 }
 
-func paginationSignals(endpoint *Endpoint, entry page.Exchange, query url.Values, evidence string) []Signal {
+func paginationSignals(endpoint *Endpoint, entry fetch.Exchange, query url.Values, evidence string) []Signal {
 	result := []Signal{}
 	add := func(location, name string) {
 		result = append(result, Signal{EndpointID: endpoint.ID, Kind: "pagination", Location: location, Name: safeName(name), Basis: "inferred", Evidence: []string{evidence}})
@@ -171,7 +171,7 @@ func paginationSignals(endpoint *Endpoint, entry page.Exchange, query url.Values
 	return result
 }
 
-func protectionSignals(entry page.Exchange) []string {
+func protectionSignals(entry fetch.Exchange) []string {
 	result := []string{}
 	switch entry.Status {
 	case 401:

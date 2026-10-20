@@ -8,6 +8,8 @@ import { explorePage } from "./explore.ts";
 import { portableCookies, replayHeaders } from "./replay.ts";
 import type { RenderRequest, RenderResult } from "./schema.ts";
 
+const blockedResourceTypes: Record<string, true> = { image: true, media: true, font: true };
+
 export type RenderEnvironment = {
   readonly signal: AbortSignal;
   readonly log: Log;
@@ -20,6 +22,7 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
     void page.close().catch(() => log("page_close_failed"));
   };
   signal.addEventListener("abort", closePage, { once: true });
+  if (signal.aborted) closePage();
   const captureDeadline = input.capture === undefined ? undefined : setTimeout(closePage, input.timeout_ms);
   const deadline = Date.now() + input.timeout_ms;
   const activity = trackActivity(page);
@@ -35,6 +38,12 @@ export async function renderPage(context: BrowserContext, input: RenderRequest, 
       documentHeaders = response.headers();
       documentRequest = response.request();
     });
+    if (input.block_resources) {
+      await page.route("**/*", (route) => {
+        const settled = blockedResourceTypes[route.request().resourceType()] ? route.abort() : route.continue();
+        settled.catch(() => undefined);
+      });
+    }
     if (input.cookies.length > 0) await addCookies(page, input);
     const response = await page.goto(input.url, { timeout: input.timeout_ms, waitUntil: input.wait_until });
     const hinted = await challengeHinted(page, documentStatus || response?.status() || 0, documentHeaders);

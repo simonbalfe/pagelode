@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type HAR struct {
@@ -57,21 +57,21 @@ type HAREntry struct {
 }
 
 func AnalyzeHAR(har HAR, target string) Report {
-	capture := &page.Capture{Entries: []page.Exchange{}}
-	remaining := page.MaxCaptureTotalBytes
+	capture := &fetch.Capture{Entries: []fetch.Exchange{}}
+	remaining := fetch.MaxCaptureTotalBytes
 	var first time.Time
-	document := page.Document{Provider: page.Provider("har"), Traffic: capture, Type: page.ContentHTML}
+	document := fetch.Document{Provider: fetch.Provider("har"), Traffic: capture, Type: fetch.ContentHTML}
 	for i, item := range har.Log.Entries {
-		if i >= page.MaxCaptureRequests {
+		if i >= fetch.MaxCaptureRequests {
 			capture.Dropped++
 			continue
 		}
-		entry := page.Exchange{ID: fmt.Sprintf("r%d", i+1), URL: item.Request.URL, Method: item.Request.Method, Status: item.Response.Status, MIMEType: item.Response.Content.MIMEType, ResourceType: item.ResourceType, RequestHeaders: harHeaders(item.Request.Headers), ResponseHeaders: harHeaders(item.Response.Headers)}
+		entry := fetch.Exchange{ID: fmt.Sprintf("r%d", i+1), URL: item.Request.URL, Method: item.Request.Method, Status: item.Response.Status, MIMEType: item.Response.Content.MIMEType, ResourceType: item.ResourceType, RequestHeaders: harHeaders(item.Request.Headers), ResponseHeaders: harHeaders(item.Response.Headers)}
 		if item.Request.PostData.MIMEType != "" {
 			entry.RequestHeaders["content-type"] = item.Request.PostData.MIMEType
 		}
 		requestBody := item.Request.PostData.Text
-		if len(requestBody) > page.MaxCaptureBodyBytes || len(requestBody) > remaining {
+		if len(requestBody) > fetch.MaxCaptureBodyBytes || len(requestBody) > remaining {
 			entry.Truncated = true
 		} else {
 			entry.RequestBody = requestBody
@@ -79,7 +79,7 @@ func AnalyzeHAR(har HAR, target string) Report {
 		}
 		body := item.Response.Content.Text
 		if item.Response.Content.Encoding == "base64" {
-			if len(body) > base64.StdEncoding.EncodedLen(page.MaxCaptureBodyBytes) {
+			if len(body) > base64.StdEncoding.EncodedLen(fetch.MaxCaptureBodyBytes) {
 				entry.Truncated = true
 				body = ""
 			} else {
@@ -95,7 +95,7 @@ func AnalyzeHAR(har HAR, target string) Report {
 			entry.Error = "unsupported HAR body encoding"
 			body = ""
 		}
-		if len(body) > page.MaxCaptureBodyBytes || len(body) > remaining {
+		if len(body) > fetch.MaxCaptureBodyBytes || len(body) > remaining {
 			entry.Truncated = true
 		} else {
 			entry.ResponseBody = body

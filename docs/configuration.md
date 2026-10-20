@@ -11,9 +11,9 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 | `PORT` | `8083` | HTTP server port |
 | `PAGELODE_BROWSER_URL` | `http://127.0.0.1:8090` | Base URL of the browser service (`http` or `https`). A comma-separated list spreads renders over several browser service nodes |
 | `PAGELODE_BROWSER_TOKEN` | empty | Bearer token sent to every browser service node; must match `BROWSER_SERVICE_TOKEN` |
-| `PAGELODE_BROWSER_IDENTITIES` | `1` | Browser identities, each with its own proxy session. Hosts are spread over them by a stable hash, each rotates on its own, and identity `n` renders on node `n` modulo the node count |
-| `PAGELODE_BROWSER_NODE_SLOTS` | `4` | Renders PageLode sends to one browser service node at once; match that node's `BROWSER_SERVICE_CONCURRENCY` |
-| `PAGELODE_QUEUE_URL` | empty | Postgres URL (`postgres://` or `postgresql://`) of the shared queue used by `pagelode extract batch` |
+| `PAGELODE_BROWSER_IDENTITIES` | `4` | Browser identities, each with its own Chrome and proxy session. Hosts are spread over them by a stable hash, each rotates on its own, and identity `n` renders on node `n` modulo the node count. Several identities keep one wedged Chrome from stalling every render |
+| `PAGELODE_BROWSER_NODE_SLOTS` | `16` | Renders PageLode sends to one browser service node at once; match that node's `BROWSER_SERVICE_CONCURRENCY` |
+| `PAGELODE_DATABASE_URL` | empty | Postgres URL (`postgres://` or `postgresql://`) for learned routes, clearances, identity generations, `emails --input` results, and the `extract batch` queue; see [database](#database) |
 | `PAGELODE_PROXY_URL` | empty | Shared HTTP, HTTPS, SOCKS4, or SOCKS5 proxy template for every loader; see [proxies](#proxies) |
 | `CAPSOLVER_API_KEY` | empty | Enable CapSolver: the Cloudflare fallback, Google `/sorry`, and DataDome sliders. Only the PageLode process reads it |
 | `PAGELODE_CAPSOLVER_URL` | `https://api.capsolver.com` | CapSolver API base URL |
@@ -24,13 +24,16 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 | `PAGELODE_REQUEST_TIMEOUT` | `90s` | Deadline for a complete extraction |
 | `PAGELODE_ROUTE_TTL` | `30m` | Lifetime of a learned hostname route |
 | `PAGELODE_BROWSER_SETTLE_MS` | `2000` | Longest wait for a browser render to go quiet after load, 0–10000 ms; sent as `settle_ms`. Quiet pages return sooner |
-| `PAGELODE_STATE_PATH` | user configuration directory plus `pagelode/state.sqlite` | SQLite file for learned routes, clearances, and identity generations |
 
 PageLode sends at most `PAGELODE_BROWSER_NODE_SLOTS` renders to each browser service node at once; further renders wait for a slot within their deadline. The service also limits itself (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`). When its queue is full it answers `429 saturated`; PageLode records an `error` attempt. A node that cannot be reached is skipped for 15 seconds and the render is retried once on the next node; when no node is reachable the render fails with `limit.ErrUnavailable`.
 
-### State file
+### Database
 
-`PAGELODE_STATE_PATH` defaults to `~/Library/Application Support/pagelode/state.sqlite` on macOS and `~/.config/pagelode/state.sqlite` on Linux. It holds learned routes, clearances (cookies, browser headers, proxy URL), and the current identity generation per proxy, so routes and clearances survive restarts and separate CLI runs. The file is created with mode `0600` because clearances are private. Rows are loaded at start, expired rows are pruned, and every change is written through; a failed write is logged and does not stop the request. The Docker image sets it to `/data/state.sqlite` on the `pagelode-data` volume.
+`PAGELODE_DATABASE_URL` points at a Postgres database. PageLode keeps its tables in the `pagelode` schema and creates them on start if they are missing. It holds learned routes, clearances (cookies, browser headers, proxy URL), and the current identity generation per proxy, so routes and clearances survive restarts and separate CLI runs; a process loads them once at start and does not see what other running processes learn later. Clearances are private, so restrict access to the database. Rows are loaded at start, expired rows are pruned, and every change is written through; a failed write is logged and does not stop the request.
+
+Without `PAGELODE_DATABASE_URL`, `extract`, `map`, `map endpoints`, single-site `emails`, and `serve` work with routes, clearances, and identity generations kept in memory for the life of the process. `emails --input` and every `extract batch` command need the database and fail without it; both also accept `--database <URL>`.
+
+`compose.yaml` runs a `postgres:17` service on the `postgres-data` volume and points `pagelode` at it. Tests that need Postgres read `PAGELODE_TEST_DATABASE_URL` and skip when it is unset; each test uses its own schema and drops it afterwards.
 
 ## Browser service
 

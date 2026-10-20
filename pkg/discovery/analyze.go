@@ -7,12 +7,11 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/simonbalfe/pagelode/pkg/orchestrator"
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
-func Analyze(target string, document page.Document) Report {
-	result := Report{Page: PageInfo{URL: sanitizeURL(target), FinalURL: sanitizeURL(document.FinalURL), Title: document.Title, Provider: document.Provider, Status: document.StatusCode}, Outcome: "ok", Endpoints: []Endpoint{}, Evidence: []Evidence{}, Protocols: []Signal{}, Auth: []Signal{}, Protections: []Signal{}, Sequences: []Sequence{}, Pagination: []Signal{}, DataSources: []DataSource{}, Warnings: []string{}, Attempts: []orchestrator.Attempt{}}
+func Analyze(target string, document fetch.Document) Report {
+	result := Report{Page: PageInfo{URL: sanitizeURL(target), FinalURL: sanitizeURL(document.FinalURL), Title: document.Title, Provider: document.Provider, Status: document.StatusCode}, Outcome: "ok", Endpoints: []Endpoint{}, Evidence: []Evidence{}, Protocols: []Signal{}, Auth: []Signal{}, Protections: []Signal{}, Sequences: []Sequence{}, Pagination: []Signal{}, DataSources: []DataSource{}, Warnings: []string{}, Attempts: []fetch.Attempt{}}
 	if document.Traffic == nil {
 		result.Warnings = append(result.Warnings, "network capture unavailable")
 		return result
@@ -42,7 +41,7 @@ func Analyze(target string, document page.Document) Report {
 	return result
 }
 
-func analyzeEntry(result *Report, groups map[string]int, index int, entry page.Exchange) {
+func analyzeEntry(result *Report, groups map[string]int, index int, entry fetch.Exchange) {
 	evidenceID := fmt.Sprintf("r%d", index+1)
 	classification, reason := classifyEntry(entry)
 	result.Evidence = append(result.Evidence, Evidence{ID: evidenceID, URL: sanitizeURL(entry.URL), Method: entry.Method, Status: entry.Status, ResourceType: entry.ResourceType, Classification: classification, Score: scoreEntry(entry, defaultBlocklist()), Reason: reason, FrameID: entry.FrameID, Initiator: entry.Initiator, StartedMS: entry.StartedMS, Truncated: entry.Truncated, Incomplete: entry.Error != ""})
@@ -113,7 +112,7 @@ func analyzeEntry(result *Report, groups map[string]int, index int, entry page.E
 	}
 }
 
-func classifyEntry(entry page.Exchange) (string, string) {
+func classifyEntry(entry fetch.Exchange) (string, string) {
 	score := scoreEntry(entry, defaultBlocklist())
 	if score > 0 {
 		return "data", fmt.Sprintf("printing press API score %d > 0", score)

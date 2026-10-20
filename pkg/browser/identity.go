@@ -7,8 +7,6 @@ import (
 	"hash/fnv"
 	"strings"
 	"sync"
-
-	"github.com/simonbalfe/pagelode/pkg/proxy"
 )
 
 const rotateAfterBlocks = 2
@@ -82,7 +80,7 @@ func (i *Identities) seededProxy(seed string) string {
 	if i.template == "" {
 		return ""
 	}
-	return proxy.WithSession(i.template, shortHash(seed))
+	return ProxyWithSession(i.template, shortHash(seed))
 }
 
 func (i *Identities) observe(key string, host string, blocked bool) (string, bool, error) {
@@ -97,7 +95,7 @@ func (i *Identities) observe(key string, host string, blocked bool) (string, boo
 		return "", false, nil
 	}
 	slot.blocks[host]++
-	if slot.blocks[host] < rotateAfterBlocks || !proxy.Sticky(i.template) {
+	if slot.blocks[host] < rotateAfterBlocks || !StickyProxy(i.template) {
 		return "", false, nil
 	}
 	retired := key

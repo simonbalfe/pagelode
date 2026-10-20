@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"os/signal"
@@ -14,17 +15,11 @@ import (
 	"time"
 
 	"github.com/simonbalfe/pagelode/internal/api"
-	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/state"
+	"github.com/simonbalfe/pagelode/internal/store"
 	"github.com/simonbalfe/pagelode/pkg/browser"
-	"github.com/simonbalfe/pagelode/pkg/capsolver"
-	"github.com/simonbalfe/pagelode/pkg/captcha"
 	"github.com/simonbalfe/pagelode/pkg/discovery"
 	"github.com/simonbalfe/pagelode/pkg/emails"
-	"github.com/simonbalfe/pagelode/pkg/httpfetch"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/orchestrator"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"github.com/simonbalfe/pagelode/pkg/sitemap"
 )
 
@@ -33,11 +28,11 @@ const version = "0.1.0"
 type application struct {
 	emailFinder    *emails.Service
 	mapper         *sitemap.Service
-	extractor      *orchestrator.Service
+	extractor      *fetch.Service
 	discoverer     *discovery.Service
-	extractLimiter *limit.Limiter
-	routes         *memory.Routes
-	state          *state.Store
+	extractLimiter *fetch.Limiter
+	routes         *fetch.Routes
+	store          *store.Store
 }
 
 func Run(args []string, stdout io.Writer, stderr io.Writer) error {
@@ -53,7 +48,8 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return nil
 	}
 
-	configuration, err := config.Load()
+	log.SetOutput(io.Discard)
+	configuration, err := LoadConfig()
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
@@ -63,15 +59,11 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) error {
 	if args[0] == "extract" && len(args) > 1 && args[1] == "batch" {
 		return batchCommand(configuration, args[2:], stdout, stderr)
 	}
-	app, err := newApplication(configuration)
+	app, err := newApplication(context.Background(), configuration)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := app.Close(); err != nil {
-			fmt.Fprintln(stderr, "pagelode: close:", err)
-		}
-	}()
+	defer app.Close()
 
 	if args[0] == "serve" {
 		if len(args) != 1 {
@@ -94,28 +86,36 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) error {
 	return app.extract(configuration, args, stdout, stderr)
 }
 
-func newApplication(configuration config.Config) (*application, error) {
-	store, err := state.Open(configuration.StatePath)
-	if err != nil {
-		return nil, fmt.Errorf("open state %s: %w", configuration.StatePath, err)
+func newApplication(ctx context.Context, configuration Config) (*application, error) {
+	if configuration.DatabaseURL == "" {
+		return wire(configuration, nil)
 	}
-	app, err := wire(configuration, store)
+	persistence, err := store.Open(ctx, configuration.DatabaseURL)
 	if err != nil {
-		return nil, errors.Join(err, store.Close())
+		return nil, err
+	}
+	app, err := wire(configuration, persistence)
+	if err != nil {
+		persistence.Close()
+		return nil, err
 	}
 	return app, nil
 }
 
-func wire(configuration config.Config, store *state.Store) (*application, error) {
-	routes := memory.NewRoutes(configuration.RouteTTL, configuration.ProtectedDomains)
-	if err := routes.Restore(store); err != nil {
-		return nil, err
+func wire(configuration Config, persistence *store.Store) (*application, error) {
+	routes := fetch.NewRoutes(configuration.RouteTTL, configuration.ProtectedDomains)
+	clearances := fetch.NewClearances(configuration.RouteTTL)
+	var generations browser.GenerationStore
+	if persistence != nil {
+		if err := routes.Restore(persistence); err != nil {
+			return nil, err
+		}
+		if err := clearances.Restore(persistence); err != nil {
+			return nil, err
+		}
+		generations = persistence
 	}
-	clearances := memory.NewClearances(configuration.RouteTTL)
-	if err := clearances.Restore(store); err != nil {
-		return nil, err
-	}
-	identities, err := browser.NewIdentities(configuration.ProxyURL, configuration.BrowserIdentities, store)
+	identities, err := browser.NewIdentities(configuration.ProxyURL, configuration.BrowserIdentities, generations)
 	if err != nil {
 		return nil, err
 	}
@@ -123,42 +123,42 @@ func wire(configuration config.Config, store *state.Store) (*application, error)
 	if err != nil {
 		return nil, fmt.Errorf("configure browser service: %w", err)
 	}
-	extractLimiter := limit.New(configuration.MaxConcurrency, configuration.MaxWaiting)
-	httpClient := httpfetch.Following(identities.ProxyFor)
+	extractLimiter := fetch.NewLimiter(configuration.MaxConcurrency, configuration.MaxWaiting)
+	httpClient := fetch.NewFollowingHTTPClient(identities.ProxyFor)
 	capSolverFetcher, captchaTasks, err := capSolver(configuration)
 	if err != nil {
 		return nil, err
 	}
-	renderer := captcha.New(browserClient, captchaTasks, httpClient)
+	renderer := browser.NewSolver(browserClient, captchaTasks, httpClient)
 	emailLoader := emails.NewLoader(httpClient, renderer, capSolverFetcher, routes)
 	return &application{
 		mapper:         sitemap.New(httpClient, extractLimiter).WithBrowser(browserClient),
 		emailFinder:    emails.New(emailLoader, extractLimiter, configuration.MaxConcurrency),
 		discoverer:     discovery.New(renderer).WithProxy(configuration.ProxyURL != ""),
-		extractor:      orchestrator.New(httpClient, renderer, capSolverFetcher, routes, clearances),
+		extractor:      fetch.NewService(httpClient, renderer, capSolverFetcher, routes, clearances),
 		extractLimiter: extractLimiter,
 		routes:         routes,
-		state:          store,
+		store:          persistence,
 	}, nil
 }
 
-func capSolver(configuration config.Config) (orchestrator.Fetcher, captcha.Tasks, error) {
-	api := capsolver.NewAPI(configuration.CapSolverAPIKey, configuration.CapSolverURL)
+func capSolver(configuration Config) (fetch.Fetcher, browser.Tasks, error) {
+	api := browser.NewCapSolverAPI(configuration.CapSolverAPIKey, configuration.CapSolverURL)
 	if api == nil {
 		return nil, nil, nil
 	}
 	proxyURL := configuration.CapSolverProxyURL
 	if proxyURL != "" {
 		resolveContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		resolved, err := capsolver.ResolveProxy(resolveContext, proxyURL)
+		resolved, err := browser.ResolveProxy(resolveContext, proxyURL)
 		cancel()
 		if err != nil {
 			return nil, nil, fmt.Errorf("configure CapSolver: %w", err)
 		}
 		proxyURL = resolved
 	}
-	solverHTTP := httpfetch.New(proxyURL)
-	client, err := capsolver.New(api, proxyURL, solverHTTP, solverHTTP)
+	solverHTTP := fetch.NewHTTPClient(proxyURL)
+	client, err := browser.NewCapSolver(api, proxyURL, solverHTTP, solverHTTP)
 	if err != nil {
 		return nil, nil, fmt.Errorf("configure CapSolver: %w", err)
 	}
@@ -174,7 +174,7 @@ func defineExtractFlags(flags *flag.FlagSet) *bool {
 	return jsonOutput
 }
 
-func (a *application) extract(configuration config.Config, args []string, stdout io.Writer, stderr io.Writer) error {
+func (a *application) extract(configuration Config, args []string, stdout io.Writer, stderr io.Writer) error {
 	flags := newFlagSet("", stderr)
 	jsonOutput := defineExtractFlags(flags)
 	if err := flags.Parse(args); err != nil {
@@ -211,7 +211,7 @@ func (a *application) extract(configuration config.Config, args []string, stdout
 	return nil
 }
 
-func (a *application) serve(configuration config.Config, output io.Writer) error {
+func (a *application) serve(configuration Config, output io.Writer) error {
 	logger := slog.New(slog.NewJSONHandler(output, nil))
 	apiServer := api.New(a.extractor, a.discoverer, a.extractLimiter, a.routes, configuration.RequestTimeout, logger).WithEmails(a.emailFinder).WithMap(a.mapper)
 	server := &http.Server{
@@ -234,18 +234,20 @@ func (a *application) serve(configuration config.Config, output io.Writer) error
 		}
 	}()
 
-	logger.Info("pagelode listening", "address", configuration.Address, "protected_domains", configuration.ProtectedDomains, "state", configuration.StatePath)
+	logger.Info("pagelode listening", "address", configuration.Address, "protected_domains", configuration.ProtectedDomains, "persisted_state", configuration.DatabaseURL != "")
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
 }
 
-func (a *application) Close() error {
-	return a.state.Close()
+func (a *application) Close() {
+	if a.store != nil {
+		a.store.Close()
+	}
 }
 
-func attemptDetail(attempts []orchestrator.Attempt) string {
+func attemptDetail(attempts []fetch.Attempt) string {
 	if len(attempts) == 0 || attempts[len(attempts)-1].Detail == "" {
 		return ""
 	}

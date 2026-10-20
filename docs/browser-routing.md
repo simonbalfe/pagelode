@@ -6,11 +6,11 @@ Three pathways make the decision:
 
 | Pathway | Entry point | Decision code |
 |---|---|---|
-| `/extract` and `pagelode <url>` | `orchestrator.Service.Extract` | `pkg/orchestrator/orchestrator.go` |
+| `/extract` and `pagelode <url>` | `fetch.Service.Extract` | `pkg/fetch/orchestrator.go` |
 | `/emails` and `pagelode emails` | `emails.Loader.Load` | `pkg/emails/loader.go` |
 | `/discover` and `pagelode map endpoints` | `discovery.Service` | `pkg/discovery/service.go`; one browser capture, no escalation or route memory; see [discovery](discovery.md#loading-and-limits) |
 
-Extraction and email loading use the same classifier (`classify`) and route memory (`memory`), persisted in SQLite (`internal/state`).
+Extraction and email loading use the same classifier (`fetch.Classify`) and route memory (`fetch.Routes`), persisted in Postgres (`internal/store`) when `PAGELODE_DATABASE_URL` is set.
 
 ## Loaders
 
@@ -18,14 +18,14 @@ Extraction and email loading use the same classifier (`classify`) and route memo
 |---|---|---|---|
 | `replay` | `bogdanfinn/tls-client` with a browser-harvested session: same proxy IP, cookies, and Chrome headers | Cheapest | Tried first when a browser render has recorded a clearance for the host; see [clearance replay](browser-service.md#clearance-replay) |
 | `tls` | `bogdanfinn/tls-client` with a Chrome TLS profile | Cheapest | Tried unless a route is remembered |
-| `patchright` | Patchright in the browser service, called over HTTP by `browser` through the `captcha` wrapper, which solves Google `/sorry` and DataDome challenges reported by the service when `CAPSOLVER_API_KEY` is set | High | JavaScript shells, challenge pages, protected domains, and every other HTTP failure |
+| `patchright` | Patchright in the browser service, called over HTTP by `browser` through the challenge `Solver` (`browser.Solver`), which solves Google `/sorry` and DataDome challenges reported by the service when `CAPSOLVER_API_KEY` is set | High | JavaScript shells, challenge pages, protected domains, and every other HTTP failure |
 | `capsolver` | CapSolver `AntiCloudflareTask`, then tls-client fetches the solved page through the same sticky proxy | Highest | Optional last resort; needs `CAPSOLVER_API_KEY` and a sticky authenticated proxy |
 
 The cookies and user agent from the HTTP attempt are passed to each browser fallback. HTTP uses the current browser identity's proxy, so both share one exit IP; see [identities and rotation](browser-service.md#identities-and-rotation).
 
 ## Classification
 
-`classify.Document` runs after every attempt. The checks run in this order, and the first match wins. Block patterns and challenge signals come from `pkg/signatures/signatures.json`, shared with the browser service.
+`fetch.Classify` runs after every attempt. The checks run in this order, and the first match wins. Block patterns and challenge signals come from `pkg/fetch/signatures.json`, shared with the browser service.
 
 | Order | Condition | Result |
 |---|---|---|
@@ -131,19 +131,19 @@ flowchart TD
 ### Rules
 
 - **Each provider runs at most once per request.**
-- **Browser limit.** Go sends at most `PAGELODE_BROWSER_NODE_SLOTS` renders to each browser service node at once; the service's own queue (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`) limits it too. Its `429 saturated` reply becomes `limit.ErrSaturated` in Go and counts as an `error` attempt; an unreachable node set becomes `limit.ErrUnavailable`, and a cancelled context also counts as an `error` attempt. The waterfall then moves on to the next step.
+- **Browser limit.** Go sends at most `PAGELODE_BROWSER_NODE_SLOTS` renders to each browser service node at once; the service's own queue (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`) limits it too. Its `429 saturated` reply becomes `fetch.ErrSaturated` in Go and counts as an `error` attempt; an unreachable node set becomes `limit.ErrUnavailable`, and a cancelled context also counts as an `error` attempt. The waterfall then moves on to the next step.
 - **Route learning.** A usable browser result records `patchright` for the hostname, valid for `PAGELODE_ROUTE_TTL`, and records the browser session as the host's clearance. HTTP, replay, and CapSolver successes are not recorded.
 - **Evidence.** Every attempt is recorded with its provider, outcome, status, duration, classification, reason, and render score.
 
 ## Route memory
 
-`memory.Routes.Preferred` resolves a hostname as follows:
+`fetch.Routes.Preferred` resolves a hostname as follows:
 
 1. Lowercase the hostname and remove any trailing dot.
 2. If the host matches a `PAGELODE_PROTECTED_DOMAINS` entry exactly, or is a subdomain of one, use Patchright. Protected domains never expire.
 3. Otherwise use the learned entry if it has not expired. Expired entries are deleted when read.
 
-Learned routes and clearances are written through to the SQLite state file at `PAGELODE_STATE_PATH` and loaded at start with expired rows pruned, so they survive restarts and separate CLI runs. A failed write is logged and does not stop the request. See [configuration](configuration.md#state-file).
+With `PAGELODE_DATABASE_URL` set, learned routes and clearances are written through to Postgres and loaded at start with expired rows pruned, so they survive restarts and separate CLI runs. A failed write is logged and does not stop the request. Without it they last only for the process. See [configuration](configuration.md#database).
 
 ## Email loader
 

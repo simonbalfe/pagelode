@@ -1,4 +1,4 @@
-package page
+package fetch
 
 type Provider string
 

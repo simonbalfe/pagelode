@@ -1,17 +1,15 @@
-package memory
+package fetch
 
 import (
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 type Clearance struct {
 	Host    string
-	Session page.Session
+	Session Session
 	Expires time.Time
 }
 
@@ -22,7 +20,7 @@ type ClearanceStore interface {
 }
 
 type clearance struct {
-	session page.Session
+	session Session
 	expires time.Time
 }
 
@@ -52,21 +50,21 @@ func (c *Clearances) Restore(store ClearanceStore) error {
 	return nil
 }
 
-func (c *Clearances) Get(host string) (page.Session, bool) {
+func (c *Clearances) Get(host string) (Session, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[normalizeHost(host)]
 	if !ok {
-		return page.Session{}, false
+		return Session{}, false
 	}
 	if c.now().After(entry.expires) {
 		delete(c.entries, normalizeHost(host))
-		return page.Session{}, false
+		return Session{}, false
 	}
 	return entry.session, true
 }
 
-func (c *Clearances) Record(host string, session page.Session) {
+func (c *Clearances) Record(host string, session Session) {
 	if !session.Replayable() {
 		return
 	}

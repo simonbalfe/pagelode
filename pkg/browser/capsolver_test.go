@@ -1,4 +1,4 @@
-package capsolver
+package browser
 
 import (
 	"context"
@@ -8,26 +8,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type sessionFetcher struct {
-	session page.Session
+	session fetch.Session
 	calls   int
 }
 
-func (s *sessionFetcher) Fetch(_ context.Context, target string, session page.Session) (page.Document, error) {
+func (s *sessionFetcher) Fetch(_ context.Context, target string, session fetch.Session) (fetch.Document, error) {
 	s.calls++
 	s.session = session
-	return page.Document{
-		Provider:   page.ProviderTLS,
+	return fetch.Document{
+		Provider:   fetch.ProviderTLS,
 		StatusCode: http.StatusOK,
 		FinalURL:   target,
-		Type:       page.ContentHTML,
+		Type:       fetch.ContentHTML,
 		HTML:       "<html><body>solved</body></html>",
-		Session: page.Session{
+		Session: fetch.Session{
 			UserAgent: "Bootstrap Browser",
-			Cookies:   []page.Cookie{{Name: "bootstrap", Value: "cookie"}},
+			Cookies:   []fetch.Cookie{{Name: "bootstrap", Value: "cookie"}},
 		},
 	}, nil
 }
@@ -61,20 +61,20 @@ func TestFetchSolvesAndPassesSession(t *testing.T) {
 	defer server.Close()
 
 	downstream := &sessionFetcher{}
-	api := NewAPI("key", server.URL)
+	api := NewCapSolverAPI("key", server.URL)
 	api.pollWait = time.Millisecond
-	client, err := New(api, "http://user:pass@proxy.example:8080", downstream, downstream)
+	client, err := NewCapSolver(api, "http://user:pass@proxy.example:8080", downstream, downstream)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	document, err := client.Fetch(context.Background(), "https://example.com/page", page.Session{})
+	document, err := client.Fetch(context.Background(), "https://example.com/page", fetch.Session{})
 	if err != nil {
 		t.Fatalf("Fetch() error = %v", err)
 	}
 	if requests != 2 {
 		t.Errorf("requests = %d, want 2", requests)
 	}
-	if document.Provider != page.ProviderCapSolver {
+	if document.Provider != fetch.ProviderCapSolver {
 		t.Errorf("provider = %q, want capsolver", document.Provider)
 	}
 	if downstream.calls != 2 {
@@ -91,7 +91,7 @@ func TestFetchSolvesAndPassesSession(t *testing.T) {
 func TestNewIsDisabledWithoutCredentials(t *testing.T) {
 	t.Parallel()
 
-	client, err := New(NewAPI("", "https://api.capsolver.com"), "", &sessionFetcher{}, &sessionFetcher{})
+	client, err := NewCapSolver(NewCapSolverAPI("", "https://api.capsolver.com"), "", &sessionFetcher{}, &sessionFetcher{})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -140,7 +140,7 @@ func TestRecaptchaRunsThroughTheGivenProxy(t *testing.T) {
 				_, _ = writer.Write([]byte(`{"errorId":0,"status":"ready","solution":{"gRecaptchaResponse":"token"}}`))
 			}))
 			defer server.Close()
-			api := NewAPI("key", server.URL)
+			api := NewCapSolverAPI("key", server.URL)
 			api.pollWait = time.Millisecond
 
 			token, err := api.Recaptcha(context.Background(), RecaptchaTask{WebsiteURL: "https://www.google.com/sorry/index", WebsiteKey: "site", DataS: "data-s", ProxyURL: test.proxyURL})

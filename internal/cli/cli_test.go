@@ -105,3 +105,20 @@ func TestHelpRejectsUnknownTopics(t *testing.T) {
 		t.Fatalf("Run() error = %v, want unknown help topic", err)
 	}
 }
+
+func TestDatabaseCommandsNameTheDatabaseSetting(t *testing.T) {
+	t.Setenv("PAGELODE_DATABASE_URL", "")
+	for _, args := range [][]string{
+		{"extract", "batch", "status"},
+		{"extract", "batch", "run"},
+		{"extract", "batch", "retry"},
+		{"extract", "batch", "import", "-"},
+		{"emails", "--input", "-"},
+	} {
+		var output bytes.Buffer
+		err := Run(args, &output, &output)
+		if err == nil || !strings.Contains(err.Error(), "PAGELODE_DATABASE_URL") || !strings.Contains(err.Error(), "--database") {
+			t.Errorf("Run(%v) error = %v, want one naming PAGELODE_DATABASE_URL and --database", args, err)
+		}
+	}
+}

@@ -1,4 +1,4 @@
-package page
+package fetch
 
 type CaptureOptions struct {
 	WaitMS  int    `json:"wait_ms"`

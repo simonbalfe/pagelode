@@ -4,8 +4,6 @@ import (
 	"errors"
 	"net/url"
 	"strings"
-
-	"github.com/simonbalfe/pagelode/pkg/urlshape"
 )
 
 const (
@@ -82,13 +80,13 @@ func (r Request) Validate() (Request, error) {
 }
 
 type Report struct {
-	URL       string              `json:"url"`
-	Outcome   string              `json:"outcome"`
-	URLs      []Entry             `json:"urls"`
-	Summary   Summary             `json:"summary"`
-	Warnings  []string            `json:"warnings,omitempty"`
-	Endpoints []string            `json:"endpoints,omitempty"`
-	Templates []urlshape.Template `json:"templates,omitempty"`
+	URL       string     `json:"url"`
+	Outcome   string     `json:"outcome"`
+	URLs      []Entry    `json:"urls"`
+	Summary   Summary    `json:"summary"`
+	Warnings  []string   `json:"warnings,omitempty"`
+	Endpoints []string   `json:"endpoints,omitempty"`
+	Templates []Template `json:"templates,omitempty"`
 }
 
 type Entry struct {

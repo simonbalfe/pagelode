@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,9 +14,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 type recorded struct {
@@ -75,7 +73,7 @@ func TestNewRejectsInvalidURL(t *testing.T) {
 }
 
 func TestRenderRequestBody(t *testing.T) {
-	cookies := []page.Cookie{{Name: "sid", Value: "1", Domain: "example.org", Path: "/"}}
+	cookies := []fetch.Cookie{{Name: "sid", Value: "1", Domain: "example.org", Path: "/"}}
 	for _, test := range []struct {
 		name        string
 		capture     bool
@@ -90,10 +88,10 @@ func TestRenderRequestBody(t *testing.T) {
 			server, requests := fakeService(t, http.StatusOK, `{"status_code":200}`)
 			client := newClient(t, server.URL, "", "http://proxy:8080")
 			ctx := context.Background()
-			session := page.Session{Cookies: cookies}
+			session := fetch.Session{Cookies: cookies}
 			var err error
 			if test.capture {
-				_, err = client.Capture(ctx, "https://example.org/", session, page.CaptureOptions{WaitMS: 250, Profile: test.profile})
+				_, err = client.Capture(ctx, "https://example.org/", session, fetch.CaptureOptions{WaitMS: 250, Profile: test.profile})
 			} else {
 				_, err = client.Fetch(ctx, "https://example.org/", session)
 			}
@@ -118,7 +116,7 @@ func TestRenderRequestBody(t *testing.T) {
 			if hasCapture != test.wantCapture {
 				t.Errorf("capture present = %t, want %t", hasCapture, test.wantCapture)
 			}
-			if hasCapture && (capture["wait_ms"] != float64(250) || capture["max_requests"] != float64(page.MaxCaptureRequests) || capture["max_body_bytes"] != float64(page.MaxCaptureBodyBytes) || capture["max_total_bytes"] != float64(page.MaxCaptureTotalBytes)) {
+			if hasCapture && (capture["wait_ms"] != float64(250) || capture["max_requests"] != float64(fetch.MaxCaptureRequests) || capture["max_body_bytes"] != float64(fetch.MaxCaptureBodyBytes) || capture["max_total_bytes"] != float64(fetch.MaxCaptureTotalBytes)) {
 				t.Errorf("capture = %v, want wait_ms 250 and Go's capture limits", capture)
 			}
 			if _, hasIdentity := body["identity"]; hasIdentity == (test.profile != "") {
@@ -146,8 +144,8 @@ func TestExploreRequestAndResponse(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			server, requests := fakeService(t, http.StatusOK, `{"status_code":200,"final_url":"https://example.org/","html":"<a href=\"/p2\">2</a>","explored_urls":["https://example.org/tab","https://example.org/p2"]}`)
 			client := newClient(t, server.URL, "", "http://proxy:8080")
-			cookies := []page.Cookie{{Name: "sid", Value: "1", Domain: "example.org", Path: "/"}}
-			document, err := client.Explore(context.Background(), "https://example.org/", page.Session{Cookies: cookies}, page.ExploreOptions{MaxClicks: test.maxClicks})
+			cookies := []fetch.Cookie{{Name: "sid", Value: "1", Domain: "example.org", Path: "/"}}
+			document, err := client.Explore(context.Background(), "https://example.org/", fetch.Session{Cookies: cookies}, fetch.ExploreOptions{MaxClicks: test.maxClicks})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -182,7 +180,7 @@ func TestExploreRequestAndResponse(t *testing.T) {
 
 func TestFetchOmitsExplore(t *testing.T) {
 	server, requests := fakeService(t, http.StatusOK, `{"status_code":200}`)
-	document, err := newClient(t, server.URL, "", "").Fetch(context.Background(), "https://example.org/", page.Session{})
+	document, err := newClient(t, server.URL, "", "").Fetch(context.Background(), "https://example.org/", fetch.Session{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +197,7 @@ func TestRenderTimeoutFollowsDeadline(t *testing.T) {
 	client := newClient(t, server.URL, "", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := client.Fetch(ctx, "https://example.org/", page.Session{}); err != nil {
+	if _, err := client.Fetch(ctx, "https://example.org/", fetch.Session{}); err != nil {
 		t.Fatal(err)
 	}
 	record := <-requests
@@ -210,7 +208,7 @@ func TestRenderTimeoutFollowsDeadline(t *testing.T) {
 
 	short, cancelShort := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancelShort()
-	if _, err := client.Fetch(short, "https://example.org/", page.Session{}); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := client.Fetch(short, "https://example.org/", fetch.Session{}); !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("Fetch() error = %v, want context.DeadlineExceeded", err)
 	}
 	if len(requests) != 0 {
@@ -221,11 +219,11 @@ func TestRenderTimeoutFollowsDeadline(t *testing.T) {
 func TestRenderDecodesDocument(t *testing.T) {
 	server, _ := fakeService(t, http.StatusOK, `{"status_code":201,"final_url":"https://example.org/final","title":"Example","html":"<p>hi</p>","user_agent":"Agent/2","headers":{"cf-mitigated":"challenge"},"challenge":{"vendor":"datadome","url":"https://geo.captcha-delivery.com/captcha/?t=fe"},"cookies":[{"name":"new","value":"2"}],"traffic":{"entries":[{"id":"1","url":"https://example.org/api"}],"dropped":3,"duration_ms":40}}`)
 	client := newClient(t, server.URL, "", "")
-	document, err := client.Capture(context.Background(), "https://example.org/", page.Session{UserAgent: "Agent/1", Cookies: []page.Cookie{{Name: "old"}}}, page.CaptureOptions{WaitMS: 100})
+	document, err := client.Capture(context.Background(), "https://example.org/", fetch.Session{UserAgent: "Agent/1", Cookies: []fetch.Cookie{{Name: "old"}}}, fetch.CaptureOptions{WaitMS: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if document.Provider != page.ProviderPatchright || document.Type != page.ContentHTML || document.StatusCode != 201 || document.FinalURL != "https://example.org/final" || document.Title != "Example" || document.HTML != "<p>hi</p>" {
+	if document.Provider != fetch.ProviderPatchright || document.Type != fetch.ContentHTML || document.StatusCode != 201 || document.FinalURL != "https://example.org/final" || document.Title != "Example" || document.HTML != "<p>hi</p>" {
 		t.Errorf("document = %+v", document)
 	}
 	if document.Session.UserAgent != "Agent/2" || len(document.Session.Cookies) != 1 || document.Session.Cookies[0].Name != "new" {
@@ -234,7 +232,7 @@ func TestRenderDecodesDocument(t *testing.T) {
 	if document.Traffic == nil || len(document.Traffic.Entries) != 1 || document.Traffic.Dropped != 3 || document.Traffic.DurationMS != 40 {
 		t.Errorf("traffic = %+v", document.Traffic)
 	}
-	if document.Headers["cf-mitigated"] != "challenge" || document.Challenge == nil || document.Challenge.Vendor != page.ChallengeDataDome || document.Challenge.URL != "https://geo.captcha-delivery.com/captcha/?t=fe" {
+	if document.Headers["cf-mitigated"] != "challenge" || document.Challenge == nil || document.Challenge.Vendor != fetch.ChallengeDataDome || document.Challenge.URL != "https://geo.captcha-delivery.com/captcha/?t=fe" {
 		t.Errorf("headers = %v, challenge = %+v; want the service's header and DataDome facts", document.Headers, document.Challenge)
 	}
 }
@@ -242,7 +240,7 @@ func TestRenderDecodesDocument(t *testing.T) {
 func TestRenderKeepsUserAgentWhenOmitted(t *testing.T) {
 	server, _ := fakeService(t, http.StatusOK, `{"status_code":200}`)
 	client := newClient(t, server.URL, "", "")
-	document, err := client.Fetch(context.Background(), "https://example.org/", page.Session{UserAgent: "Agent/1"})
+	document, err := client.Fetch(context.Background(), "https://example.org/", fetch.Session{UserAgent: "Agent/1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +256,7 @@ func TestBearerToken(t *testing.T) {
 	}{{"", ""}, {"secret", "Bearer secret"}} {
 		server, requests := fakeService(t, http.StatusOK, `{}`)
 		client := newClient(t, server.URL, test.token, "")
-		if _, err := client.Fetch(context.Background(), "https://example.org/", page.Session{}); err != nil {
+		if _, err := client.Fetch(context.Background(), "https://example.org/", fetch.Session{}); err != nil {
 			t.Fatal(err)
 		}
 		record := <-requests
@@ -284,12 +282,12 @@ func TestServiceErrors(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			server, _ := fakeService(t, test.status, test.body)
 			client := newClient(t, server.URL, "", "")
-			_, err := client.Fetch(context.Background(), "https://example.org/", page.Session{})
+			_, err := client.Fetch(context.Background(), "https://example.org/", fetch.Session{})
 			if err == nil || !strings.HasPrefix(err.Error(), test.want) {
 				t.Fatalf("Fetch() error = %v, want prefix %q", err, test.want)
 			}
-			if got := errors.Is(err, limit.ErrSaturated); got != test.saturated {
-				t.Errorf("errors.Is(err, limit.ErrSaturated) = %t, want %t", got, test.saturated)
+			if got := errors.Is(err, fetch.ErrSaturated); got != test.saturated {
+				t.Errorf("errors.Is(err, fetch.ErrSaturated) = %t, want %t", got, test.saturated)
 			}
 		})
 	}
@@ -371,7 +369,7 @@ func TestRenderFailsOverToReachableNode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	for attempt := range 2 {
-		document, err := client.Fetch(ctx, "https://example.org/", page.Session{})
+		document, err := client.Fetch(ctx, "https://example.org/", fetch.Session{})
 		if err != nil {
 			t.Fatalf("Fetch() attempt %d error = %v, want success on the reachable node", attempt, err)
 		}
@@ -392,9 +390,9 @@ func TestRenderWithoutReachableNodeIsUnavailable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	for _, attempt := range []string{"nodes refuse connections", "nodes already marked down"} {
-		_, err := client.Fetch(ctx, "https://example.org/", page.Session{})
-		if !errors.Is(err, limit.ErrUnavailable) {
-			t.Errorf("%s: Fetch() error = %v, want limit.ErrUnavailable", attempt, err)
+		_, err := client.Fetch(ctx, "https://example.org/", fetch.Session{})
+		if !errors.Is(err, fetch.ErrUnavailable) {
+			t.Errorf("%s: Fetch() error = %v, want fetch.ErrUnavailable", attempt, err)
 		}
 	}
 }
@@ -425,7 +423,7 @@ func TestNodeSlotsBoundConcurrentRenders(t *testing.T) {
 	var group sync.WaitGroup
 	for range 6 {
 		group.Go(func() {
-			if _, err := client.Fetch(ctx, "https://example.org/", page.Session{}); err != nil {
+			if _, err := client.Fetch(ctx, "https://example.org/", fetch.Session{}); err != nil {
 				t.Error(err)
 			}
 		})

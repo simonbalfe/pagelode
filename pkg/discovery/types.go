@@ -1,32 +1,31 @@
 package discovery
 
 import (
-	"github.com/simonbalfe/pagelode/pkg/orchestrator"
-	"github.com/simonbalfe/pagelode/pkg/page"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 type Report struct {
-	Page        PageInfo               `json:"page"`
-	Outcome     string                 `json:"outcome"`
-	Summary     Summary                `json:"summary"`
-	Endpoints   []Endpoint             `json:"endpoints"`
-	Evidence    []Evidence             `json:"evidence,omitempty"`
-	Protocols   []Signal               `json:"protocols"`
-	Auth        []Signal               `json:"auth"`
-	Protections []Signal               `json:"protections"`
-	Sequences   []Sequence             `json:"sequences,omitempty"`
-	Pagination  []Signal               `json:"pagination"`
-	DataSources []DataSource           `json:"dataSources"`
-	Warnings    []string               `json:"warnings"`
-	Attempts    []orchestrator.Attempt `json:"attempts,omitempty"`
+	Page        PageInfo        `json:"page"`
+	Outcome     string          `json:"outcome"`
+	Summary     Summary         `json:"summary"`
+	Endpoints   []Endpoint      `json:"endpoints"`
+	Evidence    []Evidence      `json:"evidence,omitempty"`
+	Protocols   []Signal        `json:"protocols"`
+	Auth        []Signal        `json:"auth"`
+	Protections []Signal        `json:"protections"`
+	Sequences   []Sequence      `json:"sequences,omitempty"`
+	Pagination  []Signal        `json:"pagination"`
+	DataSources []DataSource    `json:"dataSources"`
+	Warnings    []string        `json:"warnings"`
+	Attempts    []fetch.Attempt `json:"attempts,omitempty"`
 }
 
 type PageInfo struct {
-	URL      string        `json:"url"`
-	FinalURL string        `json:"finalUrl"`
-	Title    string        `json:"title"`
-	Provider page.Provider `json:"provider"`
-	Status   int           `json:"status"`
+	URL      string         `json:"url"`
+	FinalURL string         `json:"finalUrl"`
+	Title    string         `json:"title"`
+	Provider fetch.Provider `json:"provider"`
+	Status   int            `json:"status"`
 }
 
 type Summary struct {

@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/simonbalfe/pagelode/pkg/discovery"
-	"github.com/simonbalfe/pagelode/pkg/limit"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 )
 
 func (s *Server) discover(response http.ResponseWriter, request *http.Request) {
@@ -38,7 +38,7 @@ func (s *Server) discover(response http.ResponseWriter, request *http.Request) {
 	err = s.extractLimiter.Run(ctx, func() error { var err error; report, err = s.discoverer.Discover(ctx, input); return err })
 	if err != nil {
 		switch {
-		case errors.Is(err, limit.ErrSaturated):
+		case errors.Is(err, fetch.ErrSaturated):
 			response.Header().Set("Retry-After", "1")
 			writeJSON(response, http.StatusTooManyRequests, map[string]string{"error": "PageLode queue is full"})
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):

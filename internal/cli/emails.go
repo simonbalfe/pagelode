@@ -6,11 +6,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/emails"
 	"io"
 	"time"
-
-	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/pkg/emails"
 )
 
 type emailsFlags struct {
@@ -25,10 +23,10 @@ type emailsFlags struct {
 	render    *string
 }
 
-func defineEmailsFlags(flags *flag.FlagSet) emailsFlags {
+func defineEmailsFlags(flags *flag.FlagSet, configuration Config) emailsFlags {
 	var options emailsFlags
-	options.input = flags.String("input", "", "`file` of URLs or domains, one per line, or - for standard input; crawls every site in parallel and writes to --db")
-	options.database = flags.String("db", "data/emails.sqlite", "SQLite database `path` to create or extend with --input")
+	options.input = flags.String("input", "", "`file` of URLs or domains, one per line, or - for standard input; crawls every site in parallel and writes to --database")
+	options.database = flags.String("database", configuration.DatabaseURL, "Postgres `URL` that stores the --input results (PAGELODE_DATABASE_URL)")
 	options.workers = flags.Int("workers", 32, "sites crawled in parallel with --input (1–512)")
 	options.maxPages = flags.Int("max-pages", 20, "maximum pages to visit per site (1–100; 8 with --input)")
 	options.maxEmails = flags.Int("max-emails", 100, "stop a site after this many unique addresses (1–1000; 50 with --input)")
@@ -39,9 +37,9 @@ func defineEmailsFlags(flags *flag.FlagSet) emailsFlags {
 	return options
 }
 
-func emailsCommand(configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func emailsCommand(configuration Config, args []string, stdout, stderr io.Writer) error {
 	flags := newFlagSet("emails", stderr)
-	options := defineEmailsFlags(flags)
+	options := defineEmailsFlags(flags, configuration)
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -53,8 +51,8 @@ func emailsCommand(configuration config.Config, args []string, stdout, stderr io
 	if set["input"] {
 		return emailsBulk(configuration, options, set, flags.Args(), stdout, stderr)
 	}
-	if set["db"] || set["workers"] {
-		return errors.New("--db and --workers apply only with --input")
+	if set["database"] || set["workers"] {
+		return errors.New("--database and --workers apply only with --input")
 	}
 	if flags.NArg() != 1 {
 		return errors.New("provide one URL or domain, or --input <file|-> for many sites; place options before the URL")
@@ -62,15 +60,11 @@ func emailsCommand(configuration config.Config, args []string, stdout, stderr io
 	if *options.duration < time.Second || *options.duration > 2*time.Minute {
 		return errors.New("max-duration must be between 1s and 2m")
 	}
-	app, err := newApplication(configuration)
+	app, err := newApplication(context.Background(), configuration)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := app.Close(); err != nil {
-			fmt.Fprintln(stderr, "pagelode: close:", err)
-		}
-	}()
+	defer app.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), configuration.RequestTimeout)
 	defer cancel()
 	report, err := app.emailFinder.Find(ctx, emails.Request{URL: flags.Arg(0), MaxPages: *options.maxPages, MaxEmails: *options.maxEmails, MaxDurationMS: int(options.duration.Milliseconds()), Profile: *options.profile, Render: *options.render})

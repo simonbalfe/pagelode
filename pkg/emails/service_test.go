@@ -3,22 +3,18 @@ package emails
 import (
 	"context"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/fetch"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/simonbalfe/pagelode/pkg/httpfetch"
-	"github.com/simonbalfe/pagelode/pkg/limit"
-	"github.com/simonbalfe/pagelode/pkg/memory"
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
-type loadFunc func(context.Context, string, Options) (page.Document, error)
+type loadFunc func(context.Context, string, Options) (fetch.Document, error)
 
-func (f loadFunc) Load(ctx context.Context, target string, options Options) (page.Document, error) {
+func (f loadFunc) Load(ctx context.Context, target string, options Options) (fetch.Document, error) {
 	return f(ctx, target, options)
 }
 
@@ -40,8 +36,8 @@ func TestCrawlPrioritizesContactsAndRetainsSources(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	loader := NewLoader(httpfetch.New(""), nil, nil, memory.NewRoutes(time.Hour, nil))
-	service := New(loader, limit.New(1, 10), 1)
+	loader := NewLoader(fetch.NewHTTPClient(""), nil, nil, fetch.NewRoutes(time.Hour, nil))
+	service := New(loader, fetch.NewLimiter(1, 10), 1)
 	report, err := service.Find(context.Background(), Request{URL: server.URL, MaxPages: 3, Render: "never"})
 	if err != nil {
 		t.Fatal(err)
@@ -65,10 +61,10 @@ func TestCrawlPrioritizesContactsAndRetainsSources(t *testing.T) {
 }
 
 func TestLimitsAndCancellation(t *testing.T) {
-	loader := loadFunc(func(ctx context.Context, target string, _ Options) (page.Document, error) {
-		return page.Document{FinalURL: target, HTML: `<p>a@example.org b@example.org c@example.org</p><a href="/contact">Contact</a>`, StatusCode: 200}, nil
+	loader := loadFunc(func(ctx context.Context, target string, _ Options) (fetch.Document, error) {
+		return fetch.Document{FinalURL: target, HTML: `<p>a@example.org b@example.org c@example.org</p><a href="/contact">Contact</a>`, StatusCode: 200}, nil
 	})
-	service := New(loader, limit.New(4, 10), 4)
+	service := New(loader, fetch.NewLimiter(4, 10), 4)
 	report, err := service.Find(context.Background(), Request{URL: "example.org", MaxPages: 1, MaxEmails: 1})
 	if err != nil {
 		t.Fatal(err)
@@ -84,14 +80,14 @@ func TestLimitsAndCancellation(t *testing.T) {
 }
 
 func TestDurationReturnsPartialResults(t *testing.T) {
-	loader := loadFunc(func(ctx context.Context, target string, _ Options) (page.Document, error) {
+	loader := loadFunc(func(ctx context.Context, target string, _ Options) (fetch.Document, error) {
 		if strings.HasSuffix(target, "/") {
-			return page.Document{FinalURL: target, HTML: `<p>saved@example.org</p><a href="/contact">Contact</a>`, StatusCode: 200}, nil
+			return fetch.Document{FinalURL: target, HTML: `<p>saved@example.org</p><a href="/contact">Contact</a>`, StatusCode: 200}, nil
 		}
 		<-ctx.Done()
-		return page.Document{}, ctx.Err()
+		return fetch.Document{}, ctx.Err()
 	})
-	service := New(loader, limit.New(4, 10), 1)
+	service := New(loader, fetch.NewLimiter(4, 10), 1)
 	report, err := service.Find(context.Background(), Request{URL: "example.org", MaxDurationMS: 1000})
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +99,7 @@ func TestDurationReturnsPartialResults(t *testing.T) {
 
 func TestProfileLoadsSeriallyAndSkipsPublicSitemap(t *testing.T) {
 	var active atomic.Int32
-	loader := loadFunc(func(_ context.Context, target string, options Options) (page.Document, error) {
+	loader := loadFunc(func(_ context.Context, target string, options Options) (fetch.Document, error) {
 		if active.Add(1) != 1 {
 			t.Error("profile loaded concurrently")
 		}
@@ -118,9 +114,9 @@ func TestProfileLoadsSeriallyAndSkipsPublicSitemap(t *testing.T) {
 		if strings.HasSuffix(target, "/") {
 			body += `<a href="/contact">Contact</a><a href="/team">Team</a>`
 		}
-		return page.Document{FinalURL: target, HTML: body, StatusCode: 200}, nil
+		return fetch.Document{FinalURL: target, HTML: body, StatusCode: 200}, nil
 	})
-	report, err := New(loader, limit.New(4, 10), 4).Find(context.Background(), Request{URL: "example.org", Profile: "account"})
+	report, err := New(loader, fetch.NewLimiter(4, 10), 4).Find(context.Background(), Request{URL: "example.org", Profile: "account"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,10 +126,10 @@ func TestProfileLoadsSeriallyAndSkipsPublicSitemap(t *testing.T) {
 }
 
 func TestRejectOutsideRedirect(t *testing.T) {
-	loader := loadFunc(func(context.Context, string, Options) (page.Document, error) {
-		return page.Document{FinalURL: "https://outside.test/", HTML: `<p>outside@example.org</p>`, StatusCode: 200}, nil
+	loader := loadFunc(func(context.Context, string, Options) (fetch.Document, error) {
+		return fetch.Document{FinalURL: "https://outside.test/", HTML: `<p>outside@example.org</p>`, StatusCode: 200}, nil
 	})
-	report, err := New(loader, limit.New(1, 10), 1).Find(context.Background(), Request{URL: "example.org", MaxPages: 1})
+	report, err := New(loader, fetch.NewLimiter(1, 10), 1).Find(context.Background(), Request{URL: "example.org", MaxPages: 1})
 	if err != nil {
 		t.Fatal(err)
 	}

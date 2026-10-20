@@ -6,11 +6,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/simonbalfe/pagelode/pkg/discovery"
 	"io"
 	"os"
-
-	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/pkg/discovery"
 )
 
 type discoverFlags struct {
@@ -31,7 +29,7 @@ func defineDiscoverFlags(flags *flag.FlagSet) discoverFlags {
 	return options
 }
 
-func (a *application) endpoints(configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func (a *application) endpoints(configuration Config, args []string, stdout, stderr io.Writer) error {
 	flags := newFlagSet("map endpoints", stderr)
 	options := defineDiscoverFlags(flags)
 	if err := flags.Parse(args); err != nil {

@@ -12,42 +12,43 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/simonbalfe/pagelode/internal/config"
+	"github.com/riverqueue/river/rivertype"
+
+	"github.com/simonbalfe/pagelode/internal/store"
 	"github.com/simonbalfe/pagelode/pkg/batch"
-	"github.com/simonbalfe/pagelode/pkg/queue"
 )
 
 type batchRunFlags struct {
-	queueURL        *string
-	out             *string
-	httpWorkers     *int
-	browserWorkers  *int
-	untilEmpty      *bool
-	maxAttempts     *int
-	hostConcurrency *int
-	lease           *time.Duration
-	pageTimeout     *time.Duration
+	databaseURL      *string
+	out              *string
+	httpWorkers      *int
+	browserWorkers   *int
+	untilEmpty       *bool
+	hostConcurrency  *int
+	lease            *time.Duration
+	pageTimeout      *time.Duration
+	progressInterval *time.Duration
 }
 
-func defineBatchRunFlags(flags *flag.FlagSet, configuration config.Config) batchRunFlags {
+func defineBatchRunFlags(flags *flag.FlagSet, configuration Config) batchRunFlags {
 	return batchRunFlags{
-		queueURL:        defineQueueFlag(flags, configuration),
-		out:             flags.String("out", "data/pages", "directory for the gzipped JSONL page files"),
-		httpWorkers:     flags.Int("http-workers", 100, "URLs loaded over HTTP at once"),
-		browserWorkers:  flags.Int("browser-workers", -1, "URLs rendered at once; -1 uses every browser slot (nodes × PAGELODE_BROWSER_NODE_SLOTS), 0 skips the browser stage"),
-		untilEmpty:      flags.Bool("until-empty", false, "exit when no URL is left instead of waiting for more"),
-		maxAttempts:     flags.Int("max-attempts", 3, "browser failures before a URL is marked failed"),
-		hostConcurrency: flags.Int("host-concurrency", 4, "pages of one host loaded at once by this process"),
-		lease:           flags.Duration("lease", 10*time.Minute, "how long a claimed URL stays reserved for this process"),
-		pageTimeout:     flags.Duration("page-timeout", 90*time.Second, "time budget for one stage of one URL"),
+		databaseURL:      defineDatabaseFlag(flags, configuration),
+		out:              flags.String("out", "data/pages", "directory for the gzipped JSONL page files"),
+		httpWorkers:      flags.Int("http-workers", 1000, "URLs loaded over HTTP at once"),
+		browserWorkers:   flags.Int("browser-workers", -1, "URLs rendered at once; -1 uses every browser slot (nodes × PAGELODE_BROWSER_NODE_SLOTS), 0 skips the browser stage"),
+		untilEmpty:       flags.Bool("until-empty", false, "exit when no URL is left instead of waiting for more"),
+		hostConcurrency:  flags.Int("host-concurrency", 4, "pages of one host loaded at once by this process"),
+		lease:            flags.Duration("lease", 10*time.Minute, "how long a running URL may go without finishing before another process takes it over"),
+		pageTimeout:      flags.Duration("page-timeout", 10*time.Second, "time budget for loading one URL in one stage; a page that takes longer fails without a retry"),
+		progressInterval: flags.Duration("progress-interval", 10*time.Second, "how often to print queue-wide progress to stderr"),
 	}
 }
 
-func defineQueueFlag(flags *flag.FlagSet, configuration config.Config) *string {
-	return flags.String("queue", configuration.QueueURL, "Postgres `URL` of the shared queue (PAGELODE_QUEUE_URL)")
+func defineDatabaseFlag(flags *flag.FlagSet, configuration Config) *string {
+	return flags.String("database", configuration.DatabaseURL, "Postgres `URL` of the shared queue (PAGELODE_DATABASE_URL)")
 }
 
-func batchCommand(configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func batchCommand(configuration Config, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		return errors.New("usage: pagelode extract batch <import|run|status|retry> [flags]")
 	}
@@ -67,11 +68,11 @@ func batchCommand(configuration config.Config, args []string, stdout, stderr io.
 	}
 }
 
-func openQueue(ctx context.Context, queueURL string) (*queue.Queue, error) {
-	if queueURL == "" {
-		return nil, errors.New("set PAGELODE_QUEUE_URL or --queue to a Postgres URL")
+func openQueue(ctx context.Context, databaseURL string) (*batch.Queue, error) {
+	if databaseURL == "" {
+		return nil, errors.New("extract batch keeps its queue in Postgres: set PAGELODE_DATABASE_URL or --database to a Postgres URL")
 	}
-	q, err := queue.Open(ctx, queueURL)
+	q, err := batch.Open(ctx, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("open queue: %w", err)
 	}
@@ -88,9 +89,9 @@ func parseBatchFlags(flags *flag.FlagSet, args []string) (bool, error) {
 	return true, nil
 }
 
-func batchImport(ctx context.Context, configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func batchImport(ctx context.Context, configuration Config, args []string, stdout, stderr io.Writer) error {
 	flags := newFlagSet("extract batch import", stderr)
-	queueURL := defineQueueFlag(flags, configuration)
+	databaseURL := defineDatabaseFlag(flags, configuration)
 	batchSize := flags.Int("batch-size", 10_000, "URLs inserted per transaction")
 	if proceed, err := parseBatchFlags(flags, args); !proceed {
 		return err
@@ -107,18 +108,18 @@ func batchImport(ctx context.Context, configuration config.Config, args []string
 		defer file.Close()
 		input = file
 	}
-	q, err := openQueue(ctx, *queueURL)
+	q, err := openQueue(ctx, *databaseURL)
 	if err != nil {
 		return err
 	}
 	defer q.Close()
 
-	stats, err := batch.Import(ctx, q, input, *batchSize)
-	fmt.Fprintf(stdout, "%d lines, %d new URLs queued, %d duplicates, %d invalid\n", stats.Lines, stats.Inserted, stats.Lines-stats.Invalid-stats.Inserted, stats.Invalid)
+	stats, err := q.Import(ctx, input, *batchSize)
+	fmt.Fprintf(stdout, "%d lines, %d new URLs queued, %d duplicates, %d invalid\n", stats.Lines, stats.Inserted, stats.Duplicates, stats.Invalid)
 	return err
 }
 
-func batchRun(ctx context.Context, configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func batchRun(ctx context.Context, configuration Config, args []string, stdout, stderr io.Writer) error {
 	flags := newFlagSet("extract batch run", stderr)
 	options := defineBatchRunFlags(flags, configuration)
 	if proceed, err := parseBatchFlags(flags, args); !proceed {
@@ -136,86 +137,132 @@ func batchRun(ctx context.Context, configuration config.Config, args []string, s
 		return err
 	}
 
-	q, err := openQueue(ctx, *options.queueURL)
+	q, err := openQueue(ctx, *options.databaseURL)
 	if err != nil {
 		return err
 	}
 	defer q.Close()
-	app, err := newApplication(configuration)
+	configuration.DatabaseURL = *options.databaseURL
+	app, err := newApplication(ctx, configuration)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := app.Close(); err != nil {
-			fmt.Fprintln(stderr, "pagelode: close:", err)
-		}
-	}()
-	sink, err := batch.NewWriter(*options.out, owner, q)
+	defer app.Close()
+	sink, err := batch.NewWriter(*options.out, owner)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(stderr, "pagelode batch: %s running %d HTTP and %d browser workers, writing to %s\n", owner, *options.httpWorkers, browserWorkers, *options.out)
-	stats, err := batch.Run(ctx, q, app.extractor, sink, batch.Options{
-		Owner:           owner,
-		HTTPWorkers:     *options.httpWorkers,
-		BrowserWorkers:  browserWorkers,
-		Lease:           *options.lease,
-		PageTimeout:     *options.pageTimeout,
-		MaxAttempts:     *options.maxAttempts,
-		HostConcurrency: *options.hostConcurrency,
-		UntilEmpty:      *options.untilEmpty,
-		Progress:        stderr,
+	header := palette(stderr)
+	fmt.Fprintf(stderr, "%s  %d HTTP + %d browser workers  %s  %s\n", header("1", "pagelode batch"), *options.httpWorkers, browserWorkers, header("2", "writing to"), *options.out)
+	stats, err := q.Run(ctx, app.extractor, sink, batch.Options{
+		Owner:            owner,
+		HTTPWorkers:      *options.httpWorkers,
+		BrowserWorkers:   browserWorkers,
+		Lease:            *options.lease,
+		PageTimeout:      *options.pageTimeout,
+		HostConcurrency:  *options.hostConcurrency,
+		UntilEmpty:       *options.untilEmpty,
+		Progress:         stderr,
+		Color:            colorful(stderr),
+		ProgressInterval: *options.progressInterval,
+		Counts: func(ctx context.Context) (batch.Counts, error) {
+			return batchCounts(ctx, app.store)
+		},
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "%d done, %d dead, %d failed, %d sent to the browser stage, %d retried, %d put back\n", stats.Done.Load(), stats.Dead.Load(), stats.Failed.Load(), stats.NeedsBrowser.Load(), stats.Retried.Load(), stats.Deferred.Load())
+	fmt.Fprintf(stdout, "%d done, %d dead, %d failed, %d sent to the browser stage, %d put back\n", stats.Done.Load(), stats.Dead.Load(), stats.Failed.Load(), stats.NeedsBrowser.Load(), stats.Deferred.Load())
 	return nil
 }
 
-func batchStatus(ctx context.Context, configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func batchStatus(ctx context.Context, configuration Config, args []string, stdout, stderr io.Writer) error {
 	flags := newFlagSet("extract batch status", stderr)
-	queueURL := defineQueueFlag(flags, configuration)
+	databaseURL := defineDatabaseFlag(flags, configuration)
 	if proceed, err := parseBatchFlags(flags, args); !proceed {
 		return err
 	}
-	q, err := openQueue(ctx, *queueURL)
+	q, persistence, err := openQueueAndStore(ctx, *databaseURL)
 	if err != nil {
 		return err
 	}
 	defer q.Close()
-	counts, err := q.Counts(ctx)
+	defer persistence.Close()
+	counts, err := batchCounts(ctx, persistence)
 	if err != nil {
 		return err
 	}
 	table := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
-	fmt.Fprintln(table, "state\tready\twaiting\ttotal\t")
-	for _, count := range counts {
-		fmt.Fprintf(table, "%s\t%d\t%d\t%d\t\n", count.State, count.Ready, count.Waiting, count.Ready+count.Waiting)
+	fmt.Fprintln(table, "stage\tstate\tURLs\t")
+	for _, kind := range batch.Kinds() {
+		stage := batch.Stage(kind)
+		for _, state := range batch.States() {
+			fmt.Fprintf(table, "%s\t%s\t%d\t\n", stage, state, counts[stage][state])
+		}
 	}
 	return table.Flush()
 }
 
-func batchRetry(ctx context.Context, configuration config.Config, args []string, stdout, stderr io.Writer) error {
+func batchCounts(ctx context.Context, persistence *store.Store) (batch.Counts, error) {
+	rows, err := persistence.BatchJobCounts(ctx, batch.Kinds())
+	if err != nil {
+		return nil, err
+	}
+	counts := make(batch.Counts)
+	for _, row := range rows {
+		stage := batch.Stage(row.Kind)
+		if counts[stage] == nil {
+			counts[stage] = make(map[batch.State]int64)
+		}
+		counts[stage][batch.StateOf(rivertype.JobState(row.State))] += row.Jobs
+	}
+	return counts, nil
+}
+
+func batchRetry(ctx context.Context, configuration Config, args []string, stdout, stderr io.Writer) error {
 	flags := newFlagSet("extract batch retry", stderr)
-	queueURL := defineQueueFlag(flags, configuration)
-	from := flags.String("state", string(queue.Failed), "state to move back: failed, dead, or done")
-	to := flags.String("to", string(queue.Pending), "state to move URLs to: pending or needs_browser")
+	databaseURL := defineDatabaseFlag(flags, configuration)
+	from := flags.String("state", string(batch.Failed), "state to retry: failed or dead")
 	if proceed, err := parseBatchFlags(flags, args); !proceed {
 		return err
 	}
-	q, err := openQueue(ctx, *queueURL)
+	if flags.NArg() != 0 {
+		return errors.New("extract batch retry takes no arguments")
+	}
+	jobState, err := batch.State(*from).RetryFrom()
+	if err != nil {
+		return err
+	}
+	q, persistence, err := openQueueAndStore(ctx, *databaseURL)
 	if err != nil {
 		return err
 	}
 	defer q.Close()
-	moved, err := q.Reset(ctx, queue.State(*from), queue.State(*to))
+	defer persistence.Close()
+	ids, err := persistence.BatchJobIDs(ctx, batch.Kinds(), string(jobState))
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "%d URLs moved from %s to %s\n", moved, *from, *to)
+	retried, err := q.Retry(ctx, ids)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "%d %s URLs moved back to pending in their stage\n", retried, *from)
 	return nil
+}
+
+func openQueueAndStore(ctx context.Context, databaseURL string) (*batch.Queue, *store.Store, error) {
+	q, err := openQueue(ctx, databaseURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	persistence, err := store.Open(ctx, databaseURL)
+	if err != nil {
+		q.Close()
+		return nil, nil, err
+	}
+	return q, persistence, nil
 }
 
 func batchOwner() (string, error) {

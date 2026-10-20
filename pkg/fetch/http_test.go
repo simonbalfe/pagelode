@@ -1,4 +1,4 @@
-package httpfetch
+package fetch
 
 import (
 	"bytes"
@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"sync/atomic"
 	"testing"
-
-	"github.com/simonbalfe/pagelode/pkg/page"
 )
 
 func TestFetchReadsCompressedSitemapAndJavaScript(t *testing.T) {
@@ -42,15 +40,15 @@ func TestFetchReadsCompressedSitemapAndJavaScript(t *testing.T) {
 
 	tests := []struct {
 		path     string
-		wantType page.ContentType
+		wantType ContentType
 		wantText string
 	}{
-		{"/sitemap.xml.gz", page.ContentText, `<urlset><url><loc>https://example.test/a</loc></url></urlset>`},
-		{"/app.js", page.ContentText, `fetch("/api/items")`},
-		{"/archive.gz", page.ContentUnknown, ""},
+		{"/sitemap.xml.gz", ContentText, `<urlset><url><loc>https://example.test/a</loc></url></urlset>`},
+		{"/app.js", ContentText, `fetch("/api/items")`},
+		{"/archive.gz", ContentUnknown, ""},
 	}
 	for _, test := range tests {
-		document, err := New("").Fetch(context.Background(), server.URL+test.path, page.Session{})
+		document, err := NewHTTPClient("").Fetch(context.Background(), server.URL+test.path, Session{})
 		if err != nil {
 			t.Fatalf("Fetch(%s) error = %v", test.path, err)
 		}
@@ -84,8 +82,8 @@ func TestSubmitPostsFormAndKeepsRedirectCookies(t *testing.T) {
 	defer server.Close()
 
 	form := Form{Method: "post", Action: server.URL + "/sorry/index", Values: url.Values{"token": {"solved"}, "continue": {"/landing"}}, Referer: server.URL + "/sorry/index"}
-	session := page.Session{UserAgent: "Browser", Cookies: []page.Cookie{{Name: "session", Value: "browser"}}}
-	document, err := New("").Submit(context.Background(), form, session)
+	session := Session{UserAgent: "Browser", Cookies: []Cookie{{Name: "session", Value: "browser"}}}
+	document, err := NewHTTPClient("").Submit(context.Background(), form, session)
 	if err != nil {
 		t.Fatalf("Submit() error = %v", err)
 	}
@@ -100,7 +98,7 @@ func TestSubmitPostsFormAndKeepsRedirectCookies(t *testing.T) {
 	}
 }
 
-func hasCookie(cookies []page.Cookie, name string, value string) bool {
+func hasCookie(cookies []Cookie, name string, value string) bool {
 	for _, cookie := range cookies {
 		if cookie.Name == name && cookie.Value == value {
 			return true
