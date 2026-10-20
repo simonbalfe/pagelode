@@ -198,8 +198,8 @@ flowchart TD
 ```
 
 - **Key in the service.** `identity` from the request; otherwise `default` without a proxy, or `proxy-<hash of the proxy URL>`. `acquire(key, proxy)` binds a key to its proxy; a different proxy for the same key returns `409`. The profile directory is `identity-<hash of key>`. There are no generations in the service.
-- **Key in Go** (`internal/browser/identity.go`). `pl-<hash of PAGELODE_PROXY_URL template>-g<generation>`. The proxy session id is derived from the key, so it is stable across runs. The generation is stored in the SQLite state file.
-- **Proxy session.** Go fills `{session}` (raw or URL-encoded) or a provider password token (`_session-`, `_hardsession-`, `_lockedsession-`) in the template (`internal/proxy`). Profiles use a session derived from `profile:<name>`; ad-hoc sessions get a random one. Plain HTTP follows the current identity's proxy, so HTTP and the browser share one exit IP.
+- **Key in Go** (`browser/identity.go`). `pl-<hash of PAGELODE_PROXY_URL template>-g<generation>`. The proxy session id is derived from the key, so it is stable across runs. The generation is stored in the SQLite state file.
+- **Proxy session.** Go fills `{session}` (raw or URL-encoded) or a provider password token (`_session-`, `_hardsession-`, `_lockedsession-`) in the template (`proxy`). Profiles use a session derived from `profile:<name>`; ad-hoc sessions get a random one. Plain HTTP follows the current identity's proxy, so HTTP and the browser share one exit IP.
 - **Rotation.** When one host blocks the current identity on 2 consecutive renders (status 401, 403, or 429, or a `challenge` fact) and the proxy has a changeable session, Go moves to the next generation, persists it, and best-effort deletes the old identity. Without a changeable session there is no rotation.
 - **Persona.** With an HTTP(S) proxy the service looks up the exit IP through that proxy. The country selects languages (for example GB gives `en-GB, en-US, en`) and the timezone comes from the lookup. They are applied natively: `TZ` and `LANG` in Chrome's environment, `--lang`, and `intl.accept_languages` in the profile. Nothing is emulated with JavaScript, because Cloudflare detects emulated values.
 - **WebRTC.** With a proxy, the profile sets `webrtc.ip_handling_policy` to `disable_non_proxied_udp`, so WebRTC cannot reveal the server's real IP.
@@ -229,7 +229,7 @@ flowchart LR
 | Header order | Chrome's navigation order, including `sec-fetch-*` and `priority` |
 | TLS handshake | tls-client's newest Chrome profile (`Chrome_152`) |
 
-- PageLode keeps clearances per host (`internal/memory/clearances.go`) for `PAGELODE_ROUTE_TTL` and tries replay before the waterfall. They are written through to the SQLite state file, so they survive restarts and separate CLI runs. They contain cookies, browser headers, and the proxy URL, so the file is private (mode `0600`).
+- PageLode keeps clearances per host (`memory/clearances.go`) for `PAGELODE_ROUTE_TTL` and tries replay before the waterfall. They are written through to the SQLite state file, so they survive restarts and separate CLI runs. They contain cookies, browser headers, and the proxy URL, so the file is private (mode `0600`).
 - A blocked replay forgets the clearance and runs the normal waterfall, which harvests a fresh one.
 - Replayed results report provider `replay`.
 - Other tools can read the same data from `GET /v1/identities/:key/clearance`.
@@ -274,7 +274,7 @@ PageLode reaches the service through `PAGELODE_BROWSER_URL` and `PAGELODE_BROWSE
 
 ## Captchas
 
-`internal/captcha` in Go wraps the browser client for extraction, discovery, and email finding. It runs only when `CAPSOLVER_API_KEY` is set in the PageLode process, and acts only on the service's `challenge` facts.
+`captcha` in Go wraps the browser client for extraction, discovery, and email finding. It runs only when `CAPSOLVER_API_KEY` is set in the PageLode process, and acts only on the service's `challenge` facts.
 
 | `challenge` fact | Go action | Then |
 |---|---|---|

@@ -90,7 +90,7 @@ Patchright handles JavaScript shells, challenge pages, protected domains, and ev
 
 For an ordinary render, Go sends an identity key and a concrete proxy URL. The service leases that warm browser identity: a persistent Chrome context bound to that proxy, launched with the timezone and languages of the proxy's exit IP. It opens a fresh page, applies the cookies, and renders the page. Only when the page shows a challenge hint (a 401, 403, 429, or 503 status, an `x-datadome` or `cf-mitigated: challenge` header, a `__cf_chl_` URL, or a challenge title) does it try to settle a challenge. It then waits until the page goes quiet, at most `settle_ms`, and returns HTML, updated cookies, response headers, and any challenge that remains. A render with a named profile launches that profile's own persistent context instead. See [browser service](browser-service.md#waiting-for-the-page).
 
-When `CAPSOLVER_API_KEY` is set, `internal/captcha` wraps every browser render. When the service reports a Google `/sorry` reCAPTCHA or DataDome `challenge`, it is solved in Go through the identity's proxy and rendered again with the solved cookie; see [captchas](browser-service.md#captchas).
+When `CAPSOLVER_API_KEY` is set, `captcha` wraps every browser render. When the service reports a Google `/sorry` reCAPTCHA or DataDome `challenge`, it is solved in Go through the identity's proxy and rendered again with the solved cookie; see [captchas](browser-service.md#captchas).
 
 ### CapSolver
 
@@ -117,7 +117,7 @@ sequenceDiagram
     C-->>O: page.Document
 ```
 
-`internal/browser` is the Go client. It calls these routes:
+`browser` is the Go client. It calls these routes:
 
 | Go method | Route | Use |
 |---|---|---|
@@ -220,21 +220,28 @@ Request contexts carry deadlines through the API, orchestrator, loaders, and bro
 |---|---|
 | `cmd/pagelode` | CLI parsing, process wiring, HTTP lifecycle, graceful shutdown |
 | `internal/api` | HTTP contract, validation, timeouts, health reporting |
-| `internal/orchestrator` | Waterfall, attempt evidence, escalation, final results |
-| `internal/emails` | Email-finding crawl, page loading policy, address extraction |
-| `internal/httpfetch` | Profiled direct HTTP loader and session capture |
-| `internal/browser` | HTTP client for the browser service: render, capture, sessions, and identity keys and rotation (`identity.go`) |
-| `internal/proxy` | Proxy URL templates and session substitution |
-| `internal/capsolver` | CapSolver task polling: Cloudflare solved-session handoff over tls-client, reCAPTCHA tokens, DataDome cookies |
-| `internal/captcha` | Solves Google `/sorry` and DataDome challenges reported by the browser service, then renders again |
-| `internal/classify` | Block, render, retry, dead, and accept decisions |
+| `orchestrator` | Waterfall, attempt evidence, escalation, final results |
+| `emails` | Email-finding crawl, page loading policy, address extraction |
+| `httpfetch` | Profiled direct HTTP loader and session capture |
+| `browser` | HTTP client for the browser service: render, capture, sessions, and identity keys and rotation (`identity.go`) |
+| `proxy` | Proxy URL templates and session substitution |
+| `capsolver` | CapSolver task polling: Cloudflare solved-session handoff over tls-client, reCAPTCHA tokens, DataDome cookies |
+| `captcha` | Solves Google `/sorry` and DataDome challenges reported by the browser service, then renders again |
+| `classify` | Block, render, retry, dead, and accept decisions |
 | `signatures` | Embedded `signatures/signatures.json`: block patterns and challenge signals shared with the browser service |
-| `internal/extract` | Readability, DOM cleanup, Markdown, links, structured data |
-| `internal/memory` | Expiring hostname-to-provider routes and clearances |
+| `extract` | Readability, DOM cleanup, Markdown, links, structured data |
+| `memory` | Expiring hostname-to-provider routes and clearances |
 | `internal/state` | SQLite persistence for routes, clearances, and identity generations |
-| `internal/limit` | Bounded concurrency and queueing for extraction; `ErrSaturated` |
-| `internal/page` | Loader-neutral document and session values, capture limits |
-| `internal/browser/browsertest` | Starts the real browser service with `bun` for gated integration tests |
+| `limit` | Bounded concurrency and queueing for extraction; `ErrSaturated` |
+| `page` | Loader-neutral document and session values, capture limits |
+| `browser/browsertest` | Starts the real browser service with `bun` for gated integration tests |
+| `sitemap` | Site mapping crawl and URL collection from sitemaps and links |
+| `discovery` | Data-endpoint discovery from one browser capture, HAR analysis, endpoint grouping |
+| `scriptscan` | Script URL and relative endpoint extraction |
+| `similarity` | Simhash fingerprints and near-duplicate page index |
+| `urlshape` | URL shapes, sampling, and path templates |
+| `profile` | Named browser profile name validation |
+| `internal/emailstore` | SQLite persistence for bulk email jobs |
 | `browser-service/src` | Bun + Hono browser service: Patchright renders, identities, sessions, profiles, request validation |
 
 ## Failure behaviour

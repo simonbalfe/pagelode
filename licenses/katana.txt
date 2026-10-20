@@ -22,4 +22,4 @@ SOFTWARE.
 
 ---
 
-PageLode's discovery helpers (internal/urlshape, internal/similarity, internal/scriptscan) are inspired by Katana's URL fingerprinting, path trie, simhash similarity and relative-endpoint extraction. No Katana source is included verbatim.
+PageLode's discovery helpers (urlshape, similarity, scriptscan) are inspired by Katana's URL fingerprinting, path trie, simhash similarity and relative-endpoint extraction. No Katana source is included verbatim.

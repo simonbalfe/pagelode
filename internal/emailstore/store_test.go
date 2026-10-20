@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/simonbalfe/pagelode/internal/emails"
+	"github.com/simonbalfe/pagelode/emails"
 )
 
 func report(addresses ...string) emails.Report {

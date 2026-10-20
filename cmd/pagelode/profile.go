@@ -9,9 +9,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/simonbalfe/pagelode/internal/browser"
+	"github.com/simonbalfe/pagelode/browser"
+	"github.com/simonbalfe/pagelode/discovery"
 	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/discovery"
 )
 
 const profileRequestTimeout = 2 * time.Minute

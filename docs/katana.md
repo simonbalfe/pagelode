@@ -32,7 +32,7 @@ Worth reusing from its headless code, implemented in the service rather than wit
 |---|---|---|
 | `-jc` JavaScript crawling | Parses fetched JavaScript files for paths and URLs | Discovery today only sees requests the page actually made. Parsing the page's scripts finds endpoints behind clicks and routes not taken during the capture |
 | `-jsl` jsluice (BishopFox, Go library) | AST-based extraction of URLs, `fetch`/XHR calls, and secrets from JavaScript | The library to use for the above; Katana marks it memory-intensive, so bound file size and count |
-| Knowledge base `-kb-endpoints` | Classifies each request as REST, GraphQL, SOAP, or XHR from method, path, content types, and `SOAPAction`; records auth scheme and parameter names | Matches discovery's endpoint groups and auth signals; compare its `classify` rules with `internal/discovery/classifier.go` and adopt missing GraphQL and SOAP cases |
+| Knowledge base `-kb-endpoints` | Classifies each request as REST, GraphQL, SOAP, or XHR from method, path, content types, and `SOAPAction`; records auth scheme and parameter names | Matches discovery's endpoint groups and auth signals; compare its `classify` rules with `discovery/classifier.go` and adopt missing GraphQL and SOAP cases |
 | `-fx` form extraction | Records forms, inputs, textareas, and selects | Input for the planned authenticated scans and form-driven collection |
 | `-kf` known files | Crawls `robots.txt` and `sitemap.xml` | Already covered by `pagelode map` |
 | `-td` tech detection (`wappalyzergo`) | Detects frameworks and platforms per page | Pick extraction and discovery strategies per platform (Next.js data, WordPress REST, Shopify JSON) |

@@ -73,4 +73,4 @@ Address syntax and presence establish that an address was published; they do not
 
 ## Code organization
 
-`internal/emails` owns request validation, page loading policy, candidate selection, address decoding, and bounded crawling. The CLI and API share its service. HTTP and the Patchright browser service provide the acquisition and capture implementations; the browser service contains no email extraction logic.
+`emails` owns request validation, page loading policy, candidate selection, address decoding, and bounded crawling. The CLI and API share its service. HTTP and the Patchright browser service provide the acquisition and capture implementations; the browser service contains no email extraction logic.

@@ -1,3 +1,4 @@
+// Package emailstore records emails-bulk results per site in SQLite so interrupted runs can resume.
 package emailstore
 
 import (
@@ -10,7 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/simonbalfe/pagelode/internal/emails"
+	"github.com/simonbalfe/pagelode/emails"
 )
 
 const schema = `

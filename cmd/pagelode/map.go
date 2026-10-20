@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/sitemap"
+	"github.com/simonbalfe/pagelode/sitemap"
 )
 
 type stringList []string

@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/simonbalfe/pagelode/emails"
 	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/emails"
 	"github.com/simonbalfe/pagelode/internal/emailstore"
 )
 

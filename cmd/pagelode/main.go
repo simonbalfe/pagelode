@@ -1,3 +1,5 @@
+// Command pagelode extracts page content, discovers data endpoints, finds emails, and maps sites,
+// either as one-shot CLI commands or as an HTTP server via "pagelode serve".
 package main
 
 import (
@@ -14,19 +16,19 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/simonbalfe/pagelode/browser"
+	"github.com/simonbalfe/pagelode/capsolver"
+	"github.com/simonbalfe/pagelode/captcha"
+	"github.com/simonbalfe/pagelode/discovery"
+	"github.com/simonbalfe/pagelode/emails"
+	"github.com/simonbalfe/pagelode/httpfetch"
 	"github.com/simonbalfe/pagelode/internal/api"
-	"github.com/simonbalfe/pagelode/internal/browser"
-	"github.com/simonbalfe/pagelode/internal/capsolver"
-	"github.com/simonbalfe/pagelode/internal/captcha"
 	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/discovery"
-	"github.com/simonbalfe/pagelode/internal/emails"
-	"github.com/simonbalfe/pagelode/internal/httpfetch"
-	"github.com/simonbalfe/pagelode/internal/limit"
-	"github.com/simonbalfe/pagelode/internal/memory"
-	"github.com/simonbalfe/pagelode/internal/orchestrator"
-	"github.com/simonbalfe/pagelode/internal/sitemap"
 	"github.com/simonbalfe/pagelode/internal/state"
+	"github.com/simonbalfe/pagelode/limit"
+	"github.com/simonbalfe/pagelode/memory"
+	"github.com/simonbalfe/pagelode/orchestrator"
+	"github.com/simonbalfe/pagelode/sitemap"
 )
 
 const version = "0.1.0"

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simonbalfe/pagelode/internal/memory"
-	"github.com/simonbalfe/pagelode/internal/page"
+	"github.com/simonbalfe/pagelode/memory"
+	"github.com/simonbalfe/pagelode/page"
 )
 
 func TestStateSurvivesReopen(t *testing.T) {

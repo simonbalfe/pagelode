@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simonbalfe/pagelode/internal/discovery"
-	"github.com/simonbalfe/pagelode/internal/limit"
-	"github.com/simonbalfe/pagelode/internal/memory"
-	"github.com/simonbalfe/pagelode/internal/page"
+	"github.com/simonbalfe/pagelode/discovery"
+	"github.com/simonbalfe/pagelode/limit"
+	"github.com/simonbalfe/pagelode/memory"
+	"github.com/simonbalfe/pagelode/page"
 )
 
 type apiCapturer struct{ calls int }

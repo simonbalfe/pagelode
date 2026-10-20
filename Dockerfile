@@ -3,9 +3,7 @@ FROM golang:1.26.0-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY cmd ./cmd
-COPY internal ./internal
-COPY signatures ./signatures
+COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/pagelode ./cmd/pagelode
 
 FROM debian:bookworm-slim

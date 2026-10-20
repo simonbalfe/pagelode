@@ -11,6 +11,13 @@ PageLode is the Go-first successor experiment for OpenExtract.
 - Do not add managed extraction providers; those remain caller-owned fallbacks.
 - For Google search, the replayable clearance is the browser-minted `__Secure-ENID` cookie (plus `GOOGLE_ABUSE_EXEMPTION` when `/sorry` was solved), replayed from the harvesting IP. Measurements and open questions: [browser service](docs/browser-service.md#google-which-cookie-the-replay-needs).
 
+## Layout
+
+- Importable packages live at the module root and must not depend on `internal/`.
+- App-only wiring lives in `internal/`: HTTP API (`internal/api`), env config (`internal/config`), and SQLite stores (`internal/state`, `internal/emailstore`).
+- `cmd/pagelode` only wires packages together.
+- Promote a package out of `internal/` only when another project needs to import it.
+
 ## Validation
 
 - Run `go test ./...`, `go vet ./...`, and `go test -race ./...` after Go changes.

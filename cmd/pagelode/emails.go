@@ -9,8 +9,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/simonbalfe/pagelode/emails"
 	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/emails"
 )
 
 type emailsFlags struct {

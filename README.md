@@ -318,6 +318,57 @@ Compose starts two containers that share `BROWSER_SERVICE_TOKEN`:
 
 Browser data and profiles persist in the `browser-data` volume at `/data`. `BROWSER_TZ` sets the browser container's timezone (default `Etc/UTC`). See [browser service](docs/browser-service.md) for the API, sessions, identities, and the container.
 
+## Using PageLode as a library
+
+The packages at the module root are importable; `internal/` holds the app's HTTP API, config, and SQLite stores.
+
+- Shared types: `page` — loader-neutral documents, sessions, and captures.
+- Loaders:
+  - `httpfetch` — profiled direct HTTP loader.
+  - `browser` — client for the Bun browser service; needs the service from `browser-service/` running.
+  - `capsolver` — CapSolver task polling for Cloudflare, reCAPTCHA, and DataDome.
+  - `captcha` — wraps the browser client to solve reported challenges and render again.
+- Policy:
+  - `classify` — block, render, retry, dead, and accept decisions.
+  - `memory` — expiring per-host routes and clearances.
+  - `proxy` — proxy URL templates and session substitution.
+  - `limit` — bounded concurrency and queueing.
+- Waterfall: `orchestrator` — HTTP-then-browser escalation with attempt evidence.
+- Processors and jobs:
+  - `extract` — Readability, Markdown, links, structured data.
+  - `sitemap` — site mapping.
+  - `emails` — email-finding crawl.
+  - `discovery` — data-endpoint discovery from browser captures and HAR files.
+  - `scriptscan` — script URL and endpoint extraction.
+  - `similarity` — simhash near-duplicate detection.
+  - `urlshape` — URL shapes and path templates.
+  - `profile` — named profile validation.
+
+```sh
+go get github.com/simonbalfe/pagelode
+```
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/simonbalfe/pagelode/httpfetch"
+	"github.com/simonbalfe/pagelode/page"
+)
+
+func main() {
+	client := httpfetch.New("") // optional proxy URL
+	doc, err := client.Fetch(context.Background(), "https://example.com", page.Session{})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(doc.StatusCode, doc.Title)
+}
+```
+
 ## Current scope
 
 PageLode currently supports HTML and text pages. It detects common block pages and JavaScript-only shells, limits response sizes and concurrency, and remembers the best loader and browser clearances per domain in a local SQLite file that survives restarts.

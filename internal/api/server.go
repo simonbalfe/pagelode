@@ -1,3 +1,4 @@
+// Package api serves PageLode's extract, discover, emails, and map operations over HTTP.
 package api
 
 import (
@@ -12,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/simonbalfe/pagelode/internal/discovery"
-	"github.com/simonbalfe/pagelode/internal/emails"
-	"github.com/simonbalfe/pagelode/internal/limit"
-	"github.com/simonbalfe/pagelode/internal/memory"
-	"github.com/simonbalfe/pagelode/internal/orchestrator"
-	"github.com/simonbalfe/pagelode/internal/sitemap"
+	"github.com/simonbalfe/pagelode/discovery"
+	"github.com/simonbalfe/pagelode/emails"
+	"github.com/simonbalfe/pagelode/limit"
+	"github.com/simonbalfe/pagelode/memory"
+	"github.com/simonbalfe/pagelode/orchestrator"
+	"github.com/simonbalfe/pagelode/sitemap"
 )
 
 const maximumRequestBytes = 16 << 10

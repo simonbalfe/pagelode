@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/simonbalfe/pagelode/discovery"
 	"github.com/simonbalfe/pagelode/internal/config"
-	"github.com/simonbalfe/pagelode/internal/discovery"
 )
 
 func TestDiscoverCLIFromHAR(t *testing.T) {

@@ -6,11 +6,11 @@ Three pathways make the decision:
 
 | Pathway | Entry point | Decision code |
 |---|---|---|
-| `/extract` and `pagelode <url>` | `orchestrator.Service.Extract` | `internal/orchestrator/orchestrator.go` |
-| `/emails` and `pagelode emails` | `emails.Loader.Load` | `internal/emails/loader.go` |
-| `/discover` and `pagelode discover` | `discovery.Service` | `internal/discovery/service.go`; one browser capture, no escalation or route memory; see [discovery](discovery.md#loading-and-limits) |
+| `/extract` and `pagelode <url>` | `orchestrator.Service.Extract` | `orchestrator/orchestrator.go` |
+| `/emails` and `pagelode emails` | `emails.Loader.Load` | `emails/loader.go` |
+| `/discover` and `pagelode discover` | `discovery.Service` | `discovery/service.go`; one browser capture, no escalation or route memory; see [discovery](discovery.md#loading-and-limits) |
 
-Extraction and email loading use the same classifier (`internal/classify`) and route memory (`internal/memory`), persisted in SQLite (`internal/state`).
+Extraction and email loading use the same classifier (`classify`) and route memory (`memory`), persisted in SQLite (`internal/state`).
 
 ## Loaders
 
@@ -18,7 +18,7 @@ Extraction and email loading use the same classifier (`internal/classify`) and r
 |---|---|---|---|
 | `replay` | `bogdanfinn/tls-client` with a browser-harvested session: same proxy IP, cookies, and Chrome headers | Cheapest | Tried first when a browser render has recorded a clearance for the host; see [clearance replay](browser-service.md#clearance-replay) |
 | `tls` | `bogdanfinn/tls-client` with a Chrome TLS profile | Cheapest | Tried unless a route is remembered |
-| `patchright` | Patchright in the browser service, called over HTTP by `internal/browser` through the `internal/captcha` wrapper, which solves Google `/sorry` and DataDome challenges reported by the service when `CAPSOLVER_API_KEY` is set | High | JavaScript shells, challenge pages, protected domains, and every other HTTP failure |
+| `patchright` | Patchright in the browser service, called over HTTP by `browser` through the `captcha` wrapper, which solves Google `/sorry` and DataDome challenges reported by the service when `CAPSOLVER_API_KEY` is set | High | JavaScript shells, challenge pages, protected domains, and every other HTTP failure |
 | `capsolver` | CapSolver `AntiCloudflareTask`, then tls-client fetches the solved page through the same sticky proxy | Highest | Optional last resort; needs `CAPSOLVER_API_KEY` and a sticky authenticated proxy |
 
 The cookies and user agent from the HTTP attempt are passed to each browser fallback. HTTP uses the current browser identity's proxy, so both share one exit IP; see [identities and rotation](browser-service.md#identities-and-rotation).

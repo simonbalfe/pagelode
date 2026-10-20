@@ -1,3 +1,4 @@
+// Package config loads and validates PageLode's configuration from environment variables.
 package config
 
 import (
@@ -10,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/simonbalfe/pagelode/internal/proxy"
+	"github.com/simonbalfe/pagelode/proxy"
 )
 
 type Config struct {
