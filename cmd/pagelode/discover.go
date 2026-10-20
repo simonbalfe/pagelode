@@ -13,26 +13,39 @@ import (
 	"github.com/simonbalfe/pagelode/internal/discovery"
 )
 
+type discoverFlags struct {
+	wait    *int
+	profile *string
+	verbose *bool
+	stealth *bool
+	har     *string
+}
+
+func defineDiscoverFlags(flags *flag.FlagSet) discoverFlags {
+	var options discoverFlags
+	options.wait = flags.Int("wait-ms", 1500, "longest wait for network activity after page load, 100–10000 ms; ends earlier when the page goes quiet")
+	options.profile = flags.String("profile", "", "`name` of a saved signed-in browser profile (see pagelode profile login)")
+	options.verbose = flags.Bool("verbose", false, "include request evidence, matching scores, and loading details")
+	options.stealth = flags.Bool("stealth", false, "refuse to load unless the browser routes through PAGELODE_PROXY_URL")
+	options.har = flags.String("har", "", "analyze a HAR `file` without opening a browser")
+	return options
+}
+
 func (a *application) discover(configuration config.Config, args []string, stdout, stderr io.Writer) error {
-	flags := flag.NewFlagSet("pagelode discover", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	wait := flags.Int("wait-ms", 1500, "longest wait for network activity after page load; ends earlier when the page goes quiet (100–10000 ms)")
-	profileName := flags.String("profile", "", "use a saved authenticated browser profile")
-	verbose := flags.Bool("verbose", false, "include request evidence, matching scores, and loading details")
-	stealth := flags.Bool("stealth", false, "refuse to load unless the browser routes through PAGELODE_PROXY_URL")
-	harPath := flags.String("har", "", "analyze a HAR file without opening a browser")
+	flags := newFlagSet("discover", stderr)
+	options := defineDiscoverFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
 		return err
 	}
-	request := discovery.Request{WaitMS: *wait, Verbose: *verbose, Profile: *profileName, Stealth: *stealth}
-	if *harPath != "" {
+	request := discovery.Request{WaitMS: *options.wait, Verbose: *options.verbose, Profile: *options.profile, Stealth: *options.stealth}
+	if *options.har != "" {
 		if flags.NArg() > 1 {
 			return errors.New("provide at most one page URL with --har")
 		}
-		har, err := readHAR(*harPath)
+		har, err := readHAR(*options.har)
 		if err != nil {
 			return err
 		}

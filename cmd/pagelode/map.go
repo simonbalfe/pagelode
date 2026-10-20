@@ -7,31 +7,53 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/simonbalfe/pagelode/internal/config"
 	"github.com/simonbalfe/pagelode/internal/sitemap"
 )
 
+type stringList []string
+
+func (l *stringList) String() string {
+	return strings.Join(*l, ",")
+}
+
+func (l *stringList) Set(value string) error {
+	*l = append(*l, value)
+	return nil
+}
+
+type mapFlags struct {
+	limit      *int
+	duration   *time.Duration
+	subdomains *bool
+	depth      *int
+	render     *string
+	explore    *bool
+	jsonOutput *bool
+	include    *stringList
+	exclude    *stringList
+}
+
+func defineMapFlags(flags *flag.FlagSet) mapFlags {
+	options := mapFlags{include: new(stringList), exclude: new(stringList)}
+	options.limit = flags.Int("limit", 500, "maximum URLs to return (1–5000)")
+	options.duration = flags.Duration("max-duration", 30*time.Second, "time budget (1s–2m)")
+	options.subdomains = flags.Bool("subdomains", false, "include subdomains of the site")
+	options.depth = flags.Int("depth", 0, "link levels to follow from the start page, 1–5 (default 2; 1 reads only the start page)")
+	options.render = flags.String("render", "never", "load pages in a browser: never, auto (only pages that need JavaScript), or always")
+	options.explore = flags.Bool("explore", false, "scroll and click safe controls on the start page in a browser to reveal more links (needs --render auto or always)")
+	options.jsonOutput = flags.Bool("json", false, "print the complete JSON report")
+	flags.Var(options.include, "include", "only URLs whose path matches this `pattern`, e.g. /blog/* (repeatable)")
+	flags.Var(options.exclude, "exclude", "skip URLs whose path matches this `pattern` (repeatable)")
+	return options
+}
+
 func (a *application) siteMap(configuration config.Config, args []string, stdout, stderr io.Writer) error {
-	flags := flag.NewFlagSet("pagelode map", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	limit := flags.Int("limit", 500, "maximum URLs to return (1–5000)")
-	duration := flags.Duration("max-duration", 30*time.Second, "time budget (1s–2m)")
-	subdomains := flags.Bool("subdomains", false, "include subdomains of the site")
-	depth := flags.Int("depth", 0, "link levels to follow from the start page (1–5; default 2, 1 reads only the start page)")
-	render := flags.String("render", "never", "load pages in a browser: never, auto (only pages that need JavaScript), or always")
-	explore := flags.Bool("explore", false, "scroll and click safe controls on the start page in a browser to reveal more links (needs --render auto or always)")
-	jsonOutput := flags.Bool("json", false, "print the complete JSON report")
-	var include, exclude []string
-	flags.Func("include", "only URLs whose path matches this pattern, e.g. /blog/* (repeatable)", func(value string) error {
-		include = append(include, value)
-		return nil
-	})
-	flags.Func("exclude", "skip URLs whose path matches this pattern (repeatable)", func(value string) error {
-		exclude = append(exclude, value)
-		return nil
-	})
+	flags := newFlagSet("map", stderr)
+	options := defineMapFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -41,16 +63,26 @@ func (a *application) siteMap(configuration config.Config, args []string, stdout
 	if flags.NArg() != 1 {
 		return errors.New("provide one URL or domain; place options before the URL")
 	}
-	if *duration < time.Second || *duration > 2*time.Minute {
+	if *options.duration < time.Second || *options.duration > 2*time.Minute {
 		return errors.New("max-duration must be between 1s and 2m")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), configuration.RequestTimeout)
 	defer cancel()
-	report, err := a.mapper.Map(ctx, sitemap.Request{URL: flags.Arg(0), Limit: *limit, MaxDurationMS: int(duration.Milliseconds()), Subdomains: *subdomains, Include: include, Exclude: exclude, Depth: *depth, Render: *render, Explore: *explore})
+	report, err := a.mapper.Map(ctx, sitemap.Request{
+		URL:           flags.Arg(0),
+		Limit:         *options.limit,
+		MaxDurationMS: int(options.duration.Milliseconds()),
+		Subdomains:    *options.subdomains,
+		Include:       *options.include,
+		Exclude:       *options.exclude,
+		Depth:         *options.depth,
+		Render:        *options.render,
+		Explore:       *options.explore,
+	})
 	if err != nil {
 		return err
 	}
-	if *jsonOutput {
+	if *options.jsonOutput {
 		encoder := json.NewEncoder(stdout)
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(report); err != nil {

@@ -27,15 +27,29 @@ type siteResult struct {
 	err    error
 }
 
+type emailsBulkFlags struct {
+	database  *string
+	workers   *int
+	maxPages  *int
+	maxEmails *int
+	duration  *time.Duration
+	render    *string
+}
+
+func defineEmailsBulkFlags(flags *flag.FlagSet) emailsBulkFlags {
+	var options emailsBulkFlags
+	options.database = flags.String("db", "data/emails.sqlite", "SQLite database `path` to create or extend")
+	options.workers = flags.Int("workers", 32, "sites crawled in parallel (1–512)")
+	options.maxPages = flags.Int("max-pages", 8, "maximum pages to visit per site (1–100)")
+	options.maxEmails = flags.Int("max-emails", 50, "stop a site after this many unique addresses (1–1000)")
+	options.duration = flags.Duration("max-duration", 20*time.Second, "crawl time budget per site (1s–2m)")
+	options.render = flags.String("render", "never", "browser rendering: auto, never, or always")
+	return options
+}
+
 func emailsBulk(configuration config.Config, args []string, stdout, stderr io.Writer) error {
-	flags := flag.NewFlagSet("pagelode emails-bulk", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	databasePath := flags.String("db", "data/emails.sqlite", "SQLite database to write")
-	workers := flags.Int("workers", 32, "sites crawled in parallel (1–512)")
-	maxPages := flags.Int("max-pages", 8, "maximum pages to visit per site (1–100)")
-	maxEmails := flags.Int("max-emails", 50, "stop a site after this many unique addresses (1–1000)")
-	duration := flags.Duration("max-duration", 20*time.Second, "crawl time budget per site (1s–2m)")
-	render := flags.String("render", "never", "browser rendering: auto, never, or always")
+	flags := newFlagSet("emails-bulk", stderr)
+	options := defineEmailsBulkFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -45,13 +59,13 @@ func emailsBulk(configuration config.Config, args []string, stdout, stderr io.Wr
 	if flags.NArg() != 1 {
 		return errors.New("provide one file of URLs or domains, one per line, or - for standard input; place options before it")
 	}
-	if *workers < 1 || *workers > 512 {
+	if *options.workers < 1 || *options.workers > 512 {
 		return errors.New("workers must be between 1 and 512")
 	}
-	if *duration < time.Second || *duration > 2*time.Minute {
+	if *options.duration < time.Second || *options.duration > 2*time.Minute {
 		return errors.New("max-duration must be between 1s and 2m")
 	}
-	template := emails.Request{MaxPages: *maxPages, MaxEmails: *maxEmails, MaxDurationMS: int(duration.Milliseconds()), Render: *render}
+	template := emails.Request{MaxPages: *options.maxPages, MaxEmails: *options.maxEmails, MaxDurationMS: int(options.duration.Milliseconds()), Render: *options.render}
 	probe := template
 	probe.URL = "example.com"
 	if _, err := probe.Validate(); err != nil {
@@ -61,7 +75,7 @@ func emailsBulk(configuration config.Config, args []string, stdout, stderr io.Wr
 	if err != nil {
 		return err
 	}
-	store, err := emailstore.Open(*databasePath)
+	store, err := emailstore.Open(*options.database)
 	if err != nil {
 		return err
 	}
@@ -79,13 +93,13 @@ func emailsBulk(configuration config.Config, args []string, stdout, stderr io.Wr
 			pending = append(pending, target)
 		}
 	}
-	fmt.Fprintf(stderr, "pagelode: %d sites, %d already done, %d to crawl with %d workers\n", len(targets), len(targets)-len(pending), len(pending), *workers)
+	fmt.Fprintf(stderr, "pagelode: %d sites, %d already done, %d to crawl with %d workers\n", len(targets), len(targets)-len(pending), len(pending), *options.workers)
 	if len(pending) == 0 {
 		return nil
 	}
 
-	configuration.MaxConcurrency = *workers * pagesLoadedInParallelPerSite
-	configuration.MaxWaiting = *workers * pagesLoadedInParallelPerSite
+	configuration.MaxConcurrency = *options.workers * pagesLoadedInParallelPerSite
+	configuration.MaxWaiting = *options.workers * pagesLoadedInParallelPerSite
 	app, err := newApplication(configuration)
 	if err != nil {
 		return err
@@ -99,7 +113,7 @@ func emailsBulk(configuration config.Config, args []string, stdout, stderr io.Wr
 	jobs := make(chan string)
 	results := make(chan siteResult)
 	var crawlers sync.WaitGroup
-	for range *workers {
+	for range *options.workers {
 		crawlers.Add(1)
 		go func() {
 			defer crawlers.Done()
@@ -160,7 +174,7 @@ func emailsBulk(configuration config.Config, args []string, stdout, stderr io.Wr
 		fmt.Fprintf(stdout, "interrupted after %d of %d sites; rerun the same command to resume\n", finished.Load(), len(pending))
 		return nil
 	}
-	fmt.Fprintf(stdout, "%d sites crawled, %d with emails, %d addresses, %d errors, written to %s\n", finished.Load(), withEmails.Load(), addresses.Load(), failed.Load(), *databasePath)
+	fmt.Fprintf(stdout, "%d sites crawled, %d with emails, %d addresses, %d errors, written to %s\n", finished.Load(), withEmails.Load(), addresses.Load(), failed.Load(), *options.database)
 	return nil
 }
 

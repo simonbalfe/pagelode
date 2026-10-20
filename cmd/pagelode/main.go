@@ -49,9 +49,12 @@ func main() {
 }
 
 func run(args []string, stdout io.Writer, stderr io.Writer) error {
-	if len(args) == 0 || args[0] == "help" {
-		writeUsage(stdout)
+	if len(args) == 0 {
+		writeRootHelp(stdout)
 		return nil
+	}
+	if handled, err := handleHelp(args, stdout); handled {
+		return err
 	}
 	if args[0] == "version" || args[0] == "--version" || args[0] == "-v" {
 		fmt.Fprintf(stdout, "PageLode %s\n", version)
@@ -173,14 +176,18 @@ func capSolver(configuration config.Config) (orchestrator.Fetcher, captcha.Tasks
 	return client, api, nil
 }
 
-func (a *application) extract(configuration config.Config, args []string, stdout io.Writer, stderr io.Writer) error {
-	flags := flag.NewFlagSet("pagelode", flag.ContinueOnError)
-	flags.SetOutput(stderr)
+func defineExtractFlags(flags *flag.FlagSet) *bool {
 	jsonOutput := flags.Bool("json", false, "print the complete JSON result")
 	flags.BoolVar(jsonOutput, "j", false, "print the complete JSON result")
+	return jsonOutput
+}
+
+func (a *application) extract(configuration config.Config, args []string, stdout io.Writer, stderr io.Writer) error {
+	flags := newFlagSet("", stderr)
+	jsonOutput := defineExtractFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			writeUsage(stdout)
+			writeRootHelp(stdout)
 			return nil
 		}
 		return err
@@ -251,26 +258,4 @@ func attemptDetail(attempts []orchestrator.Attempt) string {
 		return ""
 	}
 	return ": " + attempts[len(attempts)-1].Detail
-}
-
-func writeUsage(output io.Writer) {
-	fmt.Fprintln(output, `PageLode extracts Markdown, maps sites, discovers page data endpoints, and finds emails.
-
-Usage:
-  pagelode <URL>
-  pagelode --json <URL>
-  pagelode extract <URL>
-  pagelode discover [--profile <name>] [--stealth] [--verbose] [--wait-ms 1500] <URL>
-  pagelode discover --har <capture.har>
-  pagelode emails [--max-pages 20] [--profile <name>] [--verbose] <URL>
-  pagelode map [--limit 500] [--include /blog/*] [--exclude /admin/*] [--subdomains] [--json] <URL>
-  pagelode emails-bulk [--db data/emails.sqlite] [--workers 32] [--max-pages 8] [--render never] <file|->
-  pagelode profile login <name> <URL>
-  pagelode serve
-  pagelode version
-
-Examples:
-  pagelode example.com
-  pagelode https://example.com/article
-  pagelode --json example.com`)
 }

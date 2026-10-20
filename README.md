@@ -54,6 +54,49 @@ pagelode help
 
 Put options before the URL. A bare domain such as `example.com` is accepted wherever a URL is. Every command reads its settings from environment variables; see [configuration](docs/configuration.md) for proxies, browser mode, CapSolver, and limits.
 
+### Built-in help
+
+```sh
+pagelode help
+pagelode help map
+pagelode map --help
+```
+
+`pagelode help` lists every command; `pagelode help <command>` and `pagelode <command> --help` print that command's description, usage, examples, and every flag with its type and default. Help never loads configuration or contacts the browser service. `pagelode --version` prints the version.
+
+```text
+PageLode extracts Markdown, maps sites, discovers page data endpoints, and finds emails.
+
+Usage:
+  pagelode <URL> [flags]
+  pagelode [command]
+
+Examples:
+  pagelode example.com
+  pagelode --json example.com
+  pagelode map example.com
+  pagelode emails example.com
+
+Available Commands:
+  discover     Find the data endpoints behind a page
+  emails       Find published email addresses on a site
+  emails-bulk  Find email addresses for many sites and store them in SQLite
+  extract      Extract a page as clean Markdown (the default command)
+  help         Help about any command
+  map          List a site's pages, page templates, and script endpoints
+  profile      Manage saved signed-in browser profiles
+  serve        Run the HTTP API
+  version      Print the version
+
+Flags:
+  -h, --help      help for pagelode
+  -j, --json      print the complete JSON result
+  -v, --version   print the version
+
+Use "pagelode [command] --help" for more information about a command.
+Settings come from environment variables; see docs/configuration.md.
+```
+
 ### Commands at a glance
 
 | Command | Question it answers | Output | Browser service |
