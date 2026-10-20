@@ -47,7 +47,7 @@ Use the same operations for automatic scans. Bound hosts, pages, depth, duration
 
 Mapping discovers page URLs; network discovery identifies API calls. Keep those outputs distinct. Seed maps from sitemaps, sitemap indexes, and page links. Support host/subdomain scope, include/exclude path patterns, query handling, canonicalization, and URL deduplication.
 
-**Mapping status: implemented** (`pagelode map`, `POST /map`; see the README), including browser-rendered link discovery, gzip sitemaps, and robots disallow rules. Remaining for mapping: a recursive crawl that returns page content (`/crawl`), per-host rate limits, and richer interaction such as pagination and filter controls.
+**Mapping status: implemented** (`pagelode map`, `POST /map`; see [site mapping](map.md)), including browser-rendered link discovery, gzip sitemaps, and robots disallow rules. Remaining for mapping: a recursive crawl that returns page content (`/crawl`), per-host rate limits, and richer interaction such as pagination and filter controls.
 
 Crawling retrieves the mapped or discovered pages with bounded depth and page counts. Add per-host concurrency, rate limits, robots policy, retry delays, and throttling backoff. Report skipped and failed URLs alongside completed pages.
 
