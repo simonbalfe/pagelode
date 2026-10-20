@@ -23,7 +23,7 @@ make run-browser   # in a second terminal
 | `extract batch` | `extract` for millions of URLs across many machines | Gzipped JSONL; queue in Postgres |
 | `map` | List a site's pages, page templates, and script endpoints | One URL per line, or `--json` |
 | `map endpoints` | Find the data endpoints behind a page | JSON report |
-| `emails` | Find published email addresses on a site; `--input` for a list of sites | One address per line, or SQLite with `--input` |
+| `emails` | Find published email addresses on a site; `--input` for a list of sites | One address per line, or Postgres (`PAGELODE_DATABASE_URL`) with `--input` |
 | `profile login` | Save a signed-in browser for `--profile` | Named profile |
 | `serve` | Run the same operations as an HTTP API | API on `PORT` (default `8083`) |
 
@@ -45,7 +45,7 @@ Run `pagelode help <command>` for every flag. Settings come from environment var
 BROWSER_SERVICE_TOKEN=change-me docker compose up --build
 ```
 
-Starts the API on `8083` and the browser service on `127.0.0.1:8090`. See [deployment](docs/architecture.md#deployment-model).
+Starts the API on `8083`, the browser service on `127.0.0.1:8090`, and Postgres for learned routes, clearances, and `emails --input` results. See [deployment](docs/architecture.md#deployment-model).
 
 ## Documentation
 
@@ -59,6 +59,7 @@ Starts the API on `8083` and the browser service on `127.0.0.1:8090`. See [deplo
 - [Using PageLode as a library](docs/library.md)
 - [Architecture](docs/architecture.md)
 - [Browser service](docs/browser-service.md)
+- [Browser stage performance](docs/browser-performance.md): measurements, capacity estimate, Lightpanda evaluation
 - [Browser routing](docs/browser-routing.md)
 - [Browser stack decision](docs/browser-stack-decision.md)
 - [Cloudflare fallback status](docs/cloudflare-status.md)
