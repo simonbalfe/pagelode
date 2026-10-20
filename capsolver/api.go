@@ -16,8 +16,6 @@ import (
 
 const maxResponseBytes = 1 << 20
 
-// API is a CapSolver task API client that creates tasks and polls for their
-// results. Error descriptions redact the API key and proxy credentials.
 type API struct {
 	key      string
 	url      string
@@ -25,7 +23,6 @@ type API struct {
 	pollWait time.Duration
 }
 
-// RecaptchaTask describes a reCAPTCHA v2 challenge; ProxyURL is optional.
 type RecaptchaTask struct {
 	WebsiteURL string
 	WebsiteKey string
@@ -33,7 +30,6 @@ type RecaptchaTask struct {
 	ProxyURL   string
 }
 
-// DataDomeTask describes a DataDome slider challenge; ProxyURL is required.
 type DataDomeTask struct {
 	CaptchaURL string
 	UserAgent  string
@@ -77,7 +73,6 @@ type solution struct {
 	GRecaptchaResponse string            `json:"gRecaptchaResponse"`
 }
 
-// NewAPI returns an API for apiURL, or nil when apiKey is empty.
 func NewAPI(apiKey string, apiURL string) *API {
 	if apiKey == "" {
 		return nil
@@ -90,8 +85,6 @@ func NewAPI(apiKey string, apiURL string) *API {
 	}
 }
 
-// Recaptcha solves request and returns the g-recaptcha-response token. It
-// uses the proxyless task type when ProxyURL is empty.
 func (a *API) Recaptcha(ctx context.Context, request RecaptchaTask) (string, error) {
 	solverTask := task{Type: "ReCaptchaV2TaskProxyLess", WebsiteURL: request.WebsiteURL, WebsiteKey: request.WebsiteKey, DataS: request.DataS}
 	if request.ProxyURL != "" {
@@ -112,7 +105,6 @@ func (a *API) Recaptcha(ctx context.Context, request RecaptchaTask) (string, err
 	return solved.GRecaptchaResponse, nil
 }
 
-// DataDome solves request and returns the DataDome cookie to replay.
 func (a *API) DataDome(ctx context.Context, request DataDomeTask) (string, error) {
 	proxy, err := taskProxy(request.ProxyURL)
 	if err != nil {

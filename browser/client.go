@@ -1,8 +1,3 @@
-// Package browser is the Go client for the Bun browser service in
-// browser-service/, which renders pages, opens interactive sessions, and
-// retires proxy identities over HTTP (/v1/render, /v1/sessions,
-// /v1/identities). A 429 from the service is wrapped with limit.ErrSaturated
-// so callers can back off with errors.Is.
 package browser
 
 import (
@@ -17,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/simonbalfe/pagelode/limit"
@@ -28,24 +25,52 @@ const (
 	defaultTimeout   = 45 * time.Second
 	minimumTimeout   = time.Second
 	rotationTimeout  = 10 * time.Second
+	unhealthyFor     = 15 * time.Second
+
+	maxPendingRetirements = 64
 
 	defaultExploreClicks = 10
 	maxExploreClicks     = 50
 )
 
-// Client sends render and session requests to the browser service. It is
-// safe for concurrent use; the optional Identities assigns rotating proxies.
 type Client struct {
-	baseURL    string
+	nodes      []*node
 	token      string
 	settle     time.Duration
 	identities *Identities
 	http       *http.Client
+
+	nextSession atomic.Uint64
+
+	mu       sync.Mutex
+	sessions map[string]openSession
+	pending  []retirement
 }
 
-// SessionRequest describes an interactive browser session to open. A
-// non-empty Profile pins the session to that profile's proxy; TTL is sent in
-// whole seconds.
+type node struct {
+	baseURL   string
+	slots     chan struct{}
+	downUntil atomic.Int64
+}
+
+type openSession struct {
+	node      *node
+	expiresAt time.Time
+}
+
+type retirement struct {
+	node *node
+	key  string
+}
+
+type transportError struct {
+	err error
+}
+
+func (e *transportError) Error() string { return e.err.Error() }
+
+func (e *transportError) Unwrap() error { return e.err }
+
 type SessionRequest struct {
 	Profile       string
 	CreateProfile bool
@@ -54,8 +79,6 @@ type SessionRequest struct {
 	TTL           time.Duration
 }
 
-// Session is an open browser session that callers drive over CDPURL until
-// ExpiresAt or CloseSession.
 type Session struct {
 	ID        string
 	CDPURL    string
@@ -64,32 +87,39 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-// New returns a Client for the service at baseURL, which must be an absolute
-// http or https URL. token is sent as a bearer token when non-empty, settle
-// is how long renders wait after load, and identities may be nil to disable
-// proxying.
-func New(baseURL, token string, settle time.Duration, identities *Identities) (*Client, error) {
-	parsed, err := url.Parse(baseURL)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
-		return nil, fmt.Errorf("browser service URL %q must be an absolute http or https URL", baseURL)
+func New(baseURLs []string, token string, settle time.Duration, nodeSlots int, identities *Identities) (*Client, error) {
+	if len(baseURLs) == 0 {
+		return nil, errors.New("browser service: at least one URL is required")
 	}
-	return &Client{baseURL: strings.TrimRight(baseURL, "/"), token: token, settle: settle, identities: identities, http: &http.Client{}}, nil
+	if nodeSlots < 1 {
+		return nil, fmt.Errorf("browser service: node slots must be at least 1, got %d", nodeSlots)
+	}
+	nodes := make([]*node, 0, len(baseURLs))
+	for _, baseURL := range baseURLs {
+		parsed, err := url.Parse(baseURL)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+			return nil, fmt.Errorf("browser service URL %q must be an absolute http or https URL", baseURL)
+		}
+		nodes = append(nodes, &node{baseURL: strings.TrimRight(baseURL, "/"), slots: make(chan struct{}, nodeSlots)})
+	}
+	return &Client{
+		nodes:      nodes,
+		token:      token,
+		settle:     settle,
+		identities: identities,
+		http:       &http.Client{},
+		sessions:   make(map[string]openSession),
+	}, nil
 }
 
-// Fetch renders targetURL with the session's cookies and returns the
-// resulting document. Blocked responses count towards identity rotation.
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
 	return c.render(ctx, targetURL, session, nil, nil)
 }
 
-// Capture renders targetURL while recording network traffic per options,
-// using the profile's proxy when options.Profile is set.
 func (c *Client) Capture(ctx context.Context, targetURL string, session page.Session, options page.CaptureOptions) (page.Document, error) {
 	return c.render(ctx, targetURL, session, &options, nil)
 }
 
-// Explore renders targetURL and lets the service click up to
-// options.MaxClicks interactive elements (default 10, capped at 50).
 func (c *Client) Explore(ctx context.Context, targetURL string, session page.Session, options page.ExploreOptions) (page.Document, error) {
 	return c.render(ctx, targetURL, session, nil, &exploreRequest{MaxClicks: clampClicks(options.MaxClicks)})
 }
@@ -101,11 +131,18 @@ func clampClicks(requested int) int {
 	return max(0, min(requested, maxExploreClicks))
 }
 
-// CreateSession opens an interactive browser session via POST /v1/sessions.
 func (c *Client) CreateSession(ctx context.Context, request SessionRequest) (Session, error) {
 	proxyURL, err := c.sessionProxy(request.Profile)
 	if err != nil {
 		return Session{}, err
+	}
+	preferred := int((c.nextSession.Add(1) - 1) % uint64(len(c.nodes)))
+	if request.Profile != "" {
+		preferred = bucket(request.Profile, len(c.nodes))
+	}
+	target, ok := c.healthyFrom(preferred)
+	if !ok {
+		return Session{}, fmt.Errorf("patchright: every browser service node is unavailable: %w", limit.ErrUnavailable)
 	}
 	body := sessionRequest{
 		ProxyURL:      proxyURL,
@@ -116,29 +153,45 @@ func (c *Client) CreateSession(ctx context.Context, request SessionRequest) (Ses
 		TTLSeconds:    int(request.TTL / time.Second),
 	}
 	var response sessionResponse
-	if err := c.do(ctx, http.MethodPost, "/v1/sessions", body, &response); err != nil {
+	if err := c.do(ctx, c.nodes[target], http.MethodPost, "/v1/sessions", body, &response); err != nil {
 		return Session{}, err
 	}
+	c.mu.Lock()
+	now := time.Now()
+	for id, open := range c.sessions {
+		if !open.expiresAt.IsZero() && open.expiresAt.Before(now) {
+			delete(c.sessions, id)
+		}
+	}
+	c.sessions[response.ID] = openSession{node: c.nodes[target], expiresAt: response.ExpiresAt}
+	c.mu.Unlock()
 	return Session{ID: response.ID, CDPURL: response.CDPURL, Profile: response.Profile, Headless: response.Headless, ExpiresAt: response.ExpiresAt}, nil
 }
 
-// CloseSession closes the session with the given id.
 func (c *Client) CloseSession(ctx context.Context, id string) error {
-	return c.do(ctx, http.MethodDelete, "/v1/sessions/"+url.PathEscape(id), nil, nil)
+	c.mu.Lock()
+	open, known := c.sessions[id]
+	c.mu.Unlock()
+	target := c.nodes[0]
+	if known {
+		target = open.node
+	}
+	err := c.do(ctx, target, http.MethodDelete, "/v1/sessions/"+url.PathEscape(id), nil, nil)
+	var transport *transportError
+	if known && !errors.As(err, &transport) {
+		c.mu.Lock()
+		delete(c.sessions, id)
+		c.mu.Unlock()
+	}
+	return err
 }
 
 func (c *Client) render(ctx context.Context, targetURL string, session page.Session, capture *page.CaptureOptions, explore *exploreRequest) (page.Document, error) {
-	timeout := defaultTimeout
-	if deadline, ok := ctx.Deadline(); ok {
-		remaining := time.Until(deadline)
-		if remaining < minimumTimeout {
-			return page.Document{}, context.DeadlineExceeded
-		}
-		timeout = min(timeout, remaining)
+	if _, err := renderTimeout(ctx); err != nil {
+		return page.Document{}, err
 	}
 	request := renderRequest{
 		URL:             targetURL,
-		TimeoutMS:       timeout.Milliseconds(),
 		WaitUntil:       "domcontentloaded",
 		SettleMS:        c.settle.Milliseconds(),
 		Cookies:         session.Cookies,
@@ -149,42 +202,129 @@ func (c *Client) render(ctx context.Context, targetURL string, session page.Sess
 		request.Capture = &captureRequest{WaitMS: capture.WaitMS, MaxRequests: page.MaxCaptureRequests, MaxBodyBytes: page.MaxCaptureBodyBytes, MaxTotalBytes: page.MaxCaptureTotalBytes}
 		request.Profile = capture.Profile
 	}
-	if c.identities != nil {
-		if request.Profile != "" {
+	host := hostname(targetURL)
+	preferred := 0
+	switch {
+	case request.Profile != "":
+		preferred = bucket(request.Profile, len(c.nodes))
+		if c.identities != nil {
 			request.ProxyURL = c.identities.profileProxy(request.Profile)
-		} else {
-			request.Identity, request.ProxyURL = c.identities.current()
 		}
+	case c.identities != nil:
+		var slot int
+		slot, request.Identity, request.ProxyURL = c.identities.identity(host)
+		preferred = slot % len(c.nodes)
 	}
 	var response renderResponse
-	if err := c.do(ctx, http.MethodPost, "/v1/render", request, &response); err != nil {
+	served, err := c.renderAnywhere(ctx, preferred, request, &response)
+	if err != nil {
 		return page.Document{}, err
 	}
 	document := document(response, session)
 	if request.Identity != "" {
-		c.observe(ctx, request.Identity, targetURL, document)
+		c.observe(ctx, served, request.Identity, host, document)
 	}
 	return document, nil
 }
 
-func (c *Client) observe(ctx context.Context, key string, targetURL string, document page.Document) {
-	target, err := url.Parse(targetURL)
+func (c *Client) renderAnywhere(ctx context.Context, preferred int, request renderRequest, response *renderResponse) (*node, error) {
+	first, ok := c.healthyFrom(preferred)
+	if !ok {
+		return nil, fmt.Errorf("patchright: every browser service node is unavailable: %w", limit.ErrUnavailable)
+	}
+	err := c.renderOn(ctx, c.nodes[first], request, response)
+	var transport *transportError
+	if !errors.As(err, &transport) {
+		return c.nodes[first], err
+	}
+	second, ok := c.healthyFrom(first + 1)
+	if !ok {
+		return nil, fmt.Errorf("%w: %w", err, limit.ErrUnavailable)
+	}
+	err = c.renderOn(ctx, c.nodes[second], request, response)
+	if errors.As(err, &transport) {
+		return nil, fmt.Errorf("%w: %w", err, limit.ErrUnavailable)
+	}
+	return c.nodes[second], err
+}
+
+func (c *Client) renderOn(ctx context.Context, target *node, request renderRequest, response *renderResponse) error {
+	select {
+	case target.slots <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-target.slots }()
+	timeout, err := renderTimeout(ctx)
 	if err != nil {
+		return err
+	}
+	request.TimeoutMS = timeout.Milliseconds()
+	return c.do(ctx, target, http.MethodPost, "/v1/render", request, response)
+}
+
+func renderTimeout(ctx context.Context) (time.Duration, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return defaultTimeout, nil
+	}
+	remaining := time.Until(deadline)
+	if remaining < minimumTimeout {
+		return 0, context.DeadlineExceeded
+	}
+	return min(defaultTimeout, remaining), nil
+}
+
+func (c *Client) healthyFrom(start int) (int, bool) {
+	now := time.Now().UnixNano()
+	for offset := range len(c.nodes) {
+		index := (start + offset) % len(c.nodes)
+		if c.nodes[index].downUntil.Load() <= now {
+			return index, true
+		}
+	}
+	return 0, false
+}
+
+func (c *Client) observe(ctx context.Context, served *node, key string, host string, document page.Document) {
+	if host == "" {
 		return
 	}
 	blocked := document.Challenge != nil || document.StatusCode == http.StatusUnauthorized || document.StatusCode == http.StatusForbidden || document.StatusCode == http.StatusTooManyRequests
-	retired, rotated, err := c.identities.observe(key, strings.ToLower(target.Hostname()), blocked)
+	retired, rotated, err := c.identities.observe(key, host, blocked)
 	if err != nil {
 		slog.Warn("identity generation not persisted", "error", err)
 	}
 	if !rotated {
 		return
 	}
-	rotateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rotationTimeout)
+	c.mu.Lock()
+	c.pending = append(c.pending, retirement{node: served, key: retired})
+	batch := c.pending
+	c.pending = nil
+	c.mu.Unlock()
+	go c.retire(context.WithoutCancel(ctx), batch)
+}
+
+func (c *Client) retire(ctx context.Context, batch []retirement) {
+	ctx, cancel := context.WithTimeout(ctx, rotationTimeout)
 	defer cancel()
-	if err := c.do(rotateCtx, http.MethodDelete, "/v1/identities/"+url.PathEscape(retired), nil, nil); err != nil {
-		slog.Warn("identity rotation not applied by browser service", "identity", retired, "error", err)
+	var failed []retirement
+	for _, current := range batch {
+		if err := c.do(ctx, current.node, http.MethodDelete, "/v1/identities/"+url.PathEscape(current.key), nil, nil); err != nil {
+			slog.Warn("identity rotation not applied by browser service", "identity", current.key, "node", current.node.baseURL, "error", err)
+			failed = append(failed, current)
+		}
 	}
+	if len(failed) == 0 {
+		return
+	}
+	c.mu.Lock()
+	c.pending = append(failed, c.pending...)
+	if excess := len(c.pending) - maxPendingRetirements; excess > 0 {
+		c.pending = c.pending[excess:]
+	}
+	c.mu.Unlock()
 }
 
 func (c *Client) sessionProxy(profile string) (string, error) {
@@ -198,10 +338,10 @@ func (c *Client) sessionProxy(profile string) (string, error) {
 	if _, err := rand.Read(seed); err != nil {
 		return "", fmt.Errorf("patchright: choose session proxy: %w", err)
 	}
-	return c.identities.proxyFor(fmt.Sprintf("session:%x", seed)), nil
+	return c.identities.seededProxy(fmt.Sprintf("session:%x", seed)), nil
 }
 
-func (c *Client) do(ctx context.Context, method, path string, body, result any) error {
+func (c *Client) do(ctx context.Context, target *node, method, path string, body, result any) error {
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
@@ -210,7 +350,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 		}
 		reader = bytes.NewReader(encoded)
 	}
-	request, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
+	request, err := http.NewRequestWithContext(ctx, method, target.baseURL+path, reader)
 	if err != nil {
 		return fmt.Errorf("patchright: build request: %w", err)
 	}
@@ -222,7 +362,11 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 	}
 	response, err := c.http.Do(request)
 	if err != nil {
-		return fmt.Errorf("patchright: %w", err)
+		if ctx.Err() != nil {
+			return fmt.Errorf("patchright: %w", err)
+		}
+		target.downUntil.Store(time.Now().Add(unhealthyFor).UnixNano())
+		return &transportError{err: fmt.Errorf("patchright: %w", err)}
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
@@ -242,6 +386,14 @@ func (c *Client) do(ctx context.Context, method, path string, body, result any) 
 		return fmt.Errorf("patchright: decode response: %w", err)
 	}
 	return nil
+}
+
+func hostname(targetURL string) string {
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(target.Hostname())
 }
 
 func serviceError(status int, data []byte) error {

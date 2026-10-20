@@ -1,9 +1,3 @@
-// Package orchestrator extracts readable content from a URL by escalating
-// through fetch strategies until one yields an accepted document: replaying a
-// remembered clearance session over HTTP, then a remembered browser route,
-// then plain HTTP, then the Patchright browser, and finally CapSolver. Each
-// fetch is classified, and successful browser fetches are remembered per host
-// so later requests can skip straight to them.
 package orchestrator
 
 import (
@@ -16,19 +10,19 @@ import (
 
 	"github.com/simonbalfe/pagelode/classify"
 	"github.com/simonbalfe/pagelode/extract"
+	"github.com/simonbalfe/pagelode/limit"
 	"github.com/simonbalfe/pagelode/memory"
 	"github.com/simonbalfe/pagelode/page"
 )
 
 const maximumContentCharacters = 12_000
 
-// Fetcher loads a URL with an optional session; each escalation tier is a Fetcher.
+const OutcomeNeedsBrowser = "needs_browser"
+
 type Fetcher interface {
 	Fetch(context.Context, string, page.Session) (page.Document, error)
 }
 
-// Attempt records one fetch made during Extract. Outcome is "ok", "error", or
-// the classification kind of a rejected document.
 type Attempt struct {
 	Provider       page.Provider `json:"provider"`
 	Outcome        string        `json:"outcome"`
@@ -39,8 +33,6 @@ type Attempt struct {
 	RenderScore    int           `json:"renderScore,omitempty"`
 }
 
-// Result is the outcome of Extract. Outcome is "ok", "dead", or "failed";
-// Content is truncated to a fixed character budget.
 type Result struct {
 	URL         string           `json:"url"`
 	FinalURL    string           `json:"finalUrl,omitempty"`
@@ -53,7 +45,6 @@ type Result struct {
 	Attempts    []Attempt        `json:"attempts"`
 }
 
-// Service runs the extraction waterfall against its fetchers and per-host memory.
 type Service struct {
 	http       Fetcher
 	browser    Fetcher
@@ -62,8 +53,6 @@ type Service struct {
 	clearances *memory.Clearances
 }
 
-// New returns a Service. browserFetcher and capSolverFetcher may be nil to
-// disable those tiers; httpFetcher, routes, and clearances are required.
 func New(httpFetcher Fetcher, browserFetcher Fetcher, capSolverFetcher Fetcher, routes *memory.Routes, clearances *memory.Clearances) *Service {
 	return &Service{
 		http:       httpFetcher,
@@ -74,41 +63,62 @@ func New(httpFetcher Fetcher, browserFetcher Fetcher, capSolverFetcher Fetcher, 
 	}
 }
 
-// Extract fetches input, escalating through the waterfall until a document
-// is accepted, judged dead, or every tier is exhausted. Fetch failures are
-// reported in Result.Attempts and Result.Outcome; the error is non-nil only
-// for an invalid URL or an unknown classification.
 func (s *Service) Extract(ctx context.Context, input string) (Result, error) {
-	target, err := parseURL(input)
+	state, err := newRunState(input)
 	if err != nil {
 		return Result{}, err
 	}
-	state := runState{target: target.String(), host: target.Hostname(), tried: make(map[page.Provider]bool)}
-
-	if result, done := s.tryReplay(ctx, &state); done {
-		return result, nil
+	result, session, done, err := s.httpStage(ctx, &state)
+	if done || err != nil {
+		return result, err
 	}
-	if preferred, ok := s.routes.Preferred(state.host); ok {
-		if result, done := s.tryPreferred(ctx, &state, preferred); done {
-			return result, nil
-		}
+	return s.tryPatchright(ctx, &state, session)
+}
+
+func (s *Service) ExtractHTTP(ctx context.Context, input string) (Result, error) {
+	state, err := newRunState(input)
+	if err != nil {
+		return Result{}, err
+	}
+	result, _, done, err := s.httpStage(ctx, &state)
+	if done || err != nil {
+		return result, err
+	}
+	return needsBrowserResult(state), nil
+}
+
+func (s *Service) ExtractBrowser(ctx context.Context, input string) (Result, error) {
+	state, err := newRunState(input)
+	if err != nil {
+		return Result{}, err
+	}
+	state.deferOnCapacity = true
+	return s.tryPatchright(ctx, &state, page.Session{})
+}
+
+func (s *Service) httpStage(ctx context.Context, state *runState) (Result, page.Session, bool, error) {
+	if result, done := s.tryReplay(ctx, state); done {
+		return result, page.Session{}, true, nil
+	}
+	if preferred, ok := s.routes.Preferred(state.host); ok && preferred == page.ProviderPatchright && s.browser != nil {
+		return Result{}, page.Session{}, false, nil
 	}
 
-	document, classification, ok := s.attempt(ctx, &state, page.ProviderTLS, s.http, page.Session{})
+	document, classification, ok := s.attempt(ctx, state, page.ProviderTLS, s.http, page.Session{})
 	if !ok {
-		return s.tryPatchright(ctx, &state, page.Session{})
+		return Result{}, page.Session{}, false, nil
 	}
-	if result, done := s.resolveDocument(&state, document, classification); done {
-		return result, nil
+	if result, done := s.resolveDocument(state, document, classification); done {
+		return result, page.Session{}, true, nil
 	}
 
 	switch classification.Kind {
 	case classify.Dead:
-		return failedResult(state, document, "dead"), nil
+		return failedResult(*state, document, "dead"), page.Session{}, true, nil
 	case classify.Blocked, classify.NeedsRender, classify.Retryable, classify.Accept:
-		return s.tryPatchright(ctx, &state, document.Session)
+		return Result{}, document.Session, false, nil
 	default:
-		return Result{}, fmt.Errorf("extract: unsupported classification %q", classification.Kind)
+		return Result{}, page.Session{}, true, fmt.Errorf("extract: unsupported classification %q", classification.Kind)
 	}
 }
 
@@ -131,33 +141,15 @@ func (s *Service) tryReplay(ctx context.Context, state *runState) (Result, bool)
 	return Result{}, false
 }
 
-func (s *Service) tryPreferred(ctx context.Context, state *runState, provider page.Provider) (Result, bool) {
-	if provider != page.ProviderPatchright || s.browser == nil {
-		return Result{}, false
-	}
-	document, classification, ok := s.attempt(ctx, state, page.ProviderPatchright, s.browser, page.Session{})
-	if !ok {
-		result, _ := s.tryCapSolver(ctx, state, page.Session{})
-		return result, true
-	}
-	if result, done := s.resolveDocument(state, document, classification); done {
-		s.routes.Record(state.host, page.ProviderPatchright)
-		s.clearances.Record(state.host, document.Session)
-		return result, true
-	}
-	if classification.Kind == classify.Dead {
-		return failedResult(*state, document, "dead"), true
-	}
-	result, _ := s.tryCapSolver(ctx, state, document.Session)
-	return result, true
-}
-
 func (s *Service) tryPatchright(ctx context.Context, state *runState, session page.Session) (Result, error) {
 	if s.browser == nil || state.tried[page.ProviderPatchright] {
 		return s.tryCapSolver(ctx, state, session)
 	}
 	document, classification, ok := s.attempt(ctx, state, page.ProviderPatchright, s.browser, session)
 	if !ok {
+		if state.capacityErr != nil {
+			return Result{}, state.capacityErr
+		}
 		return s.tryCapSolver(ctx, state, session)
 	}
 	if result, done := s.resolveDocument(state, document, classification); done {
@@ -195,6 +187,9 @@ func (s *Service) attempt(ctx context.Context, state *runState, provider page.Pr
 	duration := time.Since(started).Milliseconds()
 	if err != nil {
 		state.attempts = append(state.attempts, Attempt{Provider: provider, Outcome: "error", DurationMS: duration, Detail: concise(err)})
+		if state.deferOnCapacity && provider == page.ProviderPatchright && (errors.Is(err, limit.ErrSaturated) || errors.Is(err, limit.ErrUnavailable)) {
+			state.capacityErr = fmt.Errorf("extract: browser capacity: %w", err)
+		}
 		return page.Document{}, classify.Result{}, false
 	}
 
@@ -242,10 +237,30 @@ func (s *Service) resolveDocument(state *runState, document page.Document, class
 }
 
 type runState struct {
-	target   string
-	host     string
-	tried    map[page.Provider]bool
-	attempts []Attempt
+	target          string
+	host            string
+	tried           map[page.Provider]bool
+	attempts        []Attempt
+	deferOnCapacity bool
+	capacityErr     error
+}
+
+func newRunState(input string) (runState, error) {
+	target, err := parseURL(input)
+	if err != nil {
+		return runState{}, err
+	}
+	return runState{target: target.String(), host: target.Hostname(), tried: make(map[page.Provider]bool)}, nil
+}
+
+func needsBrowserResult(state runState) Result {
+	return Result{
+		URL:         state.target,
+		ContentType: page.ContentUnknown,
+		Outcome:     OutcomeNeedsBrowser,
+		Links:       []string{},
+		Attempts:    state.attempts,
+	}
 }
 
 func successResult(state runState, document page.Document, content string, links []string, title string) Result {

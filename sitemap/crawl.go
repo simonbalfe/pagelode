@@ -39,8 +39,6 @@ const (
 	renderAlways = "always"
 )
 
-// Browser renders pages for the crawler when Request.Render allows it; Explore
-// additionally interacts with a page to surface links when Request.Explore is set.
 type Browser interface {
 	Fetch(context.Context, string, page.Session) (page.Document, error)
 	Explore(context.Context, string, page.Session, page.ExploreOptions) (page.Document, error)

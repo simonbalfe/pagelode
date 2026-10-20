@@ -1,12 +1,7 @@
-// Package page defines the provider-neutral document, session, and capture
-// types exchanged between PageLode's fetchers, classifiers, and extractors.
 package page
 
-// Provider identifies which fetch path produced a Document.
 type Provider string
 
-// Provider values name the plain TLS client, the Patchright browser,
-// the CapSolver service, and replay of a captured browser session.
 const (
 	ProviderTLS        Provider = "tls"
 	ProviderPatchright Provider = "patchright"
@@ -14,10 +9,8 @@ const (
 	ProviderReplay     Provider = "replay"
 )
 
-// ContentType classifies a response body by how PageLode can process it.
 type ContentType string
 
-// ContentType values; ContentUnknown marks bodies PageLode does not extract.
 const (
 	ContentHTML    ContentType = "html"
 	ContentText    ContentType = "text"
@@ -25,8 +18,6 @@ const (
 	ContentUnknown ContentType = "unknown"
 )
 
-// Cookie is a browser-portable cookie that can move between fetch providers.
-// Expires is Unix time in seconds; zero means a session cookie.
 type Cookie struct {
 	Name     string  `json:"name"`
 	Value    string  `json:"value"`
@@ -38,8 +29,6 @@ type Cookie struct {
 	SameSite string  `json:"same_site,omitempty"`
 }
 
-// Session carries the identity a fetch ran with so later requests can reuse it.
-// ProxyURL and Headers are never serialised to JSON.
 type Session struct {
 	UserAgent string            `json:"user_agent,omitempty"`
 	Cookies   []Cookie          `json:"cookies,omitempty"`
@@ -47,15 +36,10 @@ type Session struct {
 	Headers   map[string]string `json:"-"`
 }
 
-// Replayable reports whether the session has the proxy, headers, and cookies
-// needed to replay a browser session through an HTTP client.
 func (s Session) Replayable() bool {
 	return s.ProxyURL != "" && len(s.Headers) > 0 && len(s.Cookies) > 0
 }
 
-// Document is the result of fetching one URL with any provider.
-// HTML holds markup for HTML responses and Text holds plain-text bodies;
-// Challenge, Traffic, and ExploredURLs are set only by providers that produce them.
 type Document struct {
 	Provider     Provider
 	StatusCode   int
@@ -71,18 +55,14 @@ type Document struct {
 	ExploredURLs []string
 }
 
-// ChallengeVendor identifies the bot-protection vendor behind a Challenge.
 type ChallengeVendor string
 
-// ChallengeVendor values for the challenges PageLode can detect.
 const (
 	ChallengeCloudflare ChallengeVendor = "cloudflare"
 	ChallengeDataDome   ChallengeVendor = "datadome"
 	ChallengeRecaptcha  ChallengeVendor = "recaptcha"
 )
 
-// Challenge describes a bot-protection challenge detected on a page, with the
-// parameters a solver needs; SiteKey and DataS apply to reCAPTCHA.
 type Challenge struct {
 	Vendor  ChallengeVendor `json:"vendor"`
 	URL     string          `json:"url,omitempty"`

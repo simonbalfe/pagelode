@@ -35,7 +35,6 @@ func (s scope) contains(value *url.URL) bool {
 	return host == s.host || s.subdomains && strings.HasSuffix(host, "."+s.host)
 }
 
-// normalize resolves raw against base and returns a canonical in-scope page URL, or "" when the URL is out of scope or not a page.
 func (s scope) normalize(raw, base string) string {
 	parent, err := url.Parse(base)
 	if err != nil {
@@ -85,7 +84,6 @@ type sitemapDocument struct {
 	Sitemaps []sitemapEntry `xml:"sitemap"`
 }
 
-// parseSitemap returns ok=false when body is not a sitemap or sitemap index.
 func parseSitemap(body string) (sitemapDocument, bool) {
 	var document sitemapDocument
 	if xml.Unmarshal([]byte(body), &document) != nil {
@@ -131,7 +129,6 @@ func pageLinks(rawHTML string) []string {
 	return result
 }
 
-// globs matches URL paths; * matches any run of characters, including /.
 type globs []*regexp.Regexp
 
 func compileGlobs(patterns []string) globs {

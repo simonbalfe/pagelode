@@ -18,6 +18,11 @@ PageLode is the Go-first successor experiment for OpenExtract.
 - `cmd/pagelode` only wires packages together.
 - Promote a package out of `internal/` only when another project needs to import it.
 
+## Code
+
+- Never write code comments of any kind, including doc comments. Only `//go:` directives are allowed.
+- Build the whole feature and run one end-to-end check before writing tests.
+
 ## Validation
 
 - Run `go test ./...`, `go vet ./...`, and `go test -race ./...` after Go changes.

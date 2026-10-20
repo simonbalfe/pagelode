@@ -9,15 +9,12 @@ import (
 	"github.com/simonbalfe/pagelode/page"
 )
 
-// Clearance is a persisted replayable session for Host, valid until Expires.
 type Clearance struct {
 	Host    string
 	Session page.Session
 	Expires time.Time
 }
 
-// ClearanceStore persists clearances. LoadClearances should return only
-// clearances still valid at now; SaveClearance upserts by host.
 type ClearanceStore interface {
 	LoadClearances(now time.Time) ([]Clearance, error)
 	SaveClearance(Clearance) error
@@ -29,8 +26,6 @@ type clearance struct {
 	expires time.Time
 }
 
-// Clearances caches replayable challenge-cleared sessions per host. It is
-// safe for concurrent use.
 type Clearances struct {
 	mu      sync.Mutex
 	ttl     time.Duration
@@ -39,13 +34,10 @@ type Clearances struct {
 	now     func() time.Time
 }
 
-// NewClearances returns in-memory Clearances whose entries live for ttl.
 func NewClearances(ttl time.Duration) *Clearances {
 	return &Clearances{ttl: ttl, entries: make(map[string]clearance), now: time.Now}
 }
 
-// Restore loads unexpired clearances from store and writes later changes
-// through to it.
 func (c *Clearances) Restore(store ClearanceStore) error {
 	clearances, err := store.LoadClearances(c.now())
 	if err != nil {
@@ -60,7 +52,6 @@ func (c *Clearances) Restore(store ClearanceStore) error {
 	return nil
 }
 
-// Get returns the unexpired session cleared for host.
 func (c *Clearances) Get(host string) (page.Session, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -75,7 +66,6 @@ func (c *Clearances) Get(host string) (page.Session, bool) {
 	return entry.session, true
 }
 
-// Record stores session for host if it is replayable; others are ignored.
 func (c *Clearances) Record(host string, session page.Session) {
 	if !session.Replayable() {
 		return
@@ -93,7 +83,6 @@ func (c *Clearances) Record(host string, session page.Session) {
 	}
 }
 
-// Forget removes host's clearance, for example after it stops working.
 func (c *Clearances) Forget(host string) {
 	host = normalizeHost(host)
 	c.mu.Lock()

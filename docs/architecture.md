@@ -210,7 +210,7 @@ flowchart LR
     BQ -->|queue full| Saturated[429 saturated: error attempt]
 ```
 
-The extraction limiter bounds complete request lifetimes, with up to `PAGELODE_MAX_WAITING` waiting requests, and the API rejects overload instead of allowing unbounded memory growth. Browser capacity has one limit, in the browser service (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`). Go has no browser limiter; a `429 saturated` reply counts as an `error` attempt.
+The extraction limiter bounds complete request lifetimes, with up to `PAGELODE_MAX_WAITING` waiting requests, and the API rejects overload instead of allowing unbounded memory growth. Go sends at most `PAGELODE_BROWSER_NODE_SLOTS` renders to each browser service node at once; the service also queues itself (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`). A `429 saturated` reply counts as an `error` attempt. An unreachable node is skipped for 15 seconds and the render retried once on the next node; with no reachable node the render fails with `limit.ErrUnavailable`.
 
 Request contexts carry deadlines through the API, orchestrator, loaders, and browser service request.
 
@@ -242,6 +242,8 @@ Request contexts carry deadlines through the API, orchestrator, loaders, and bro
 | `urlshape` | URL shapes, sampling, and path templates |
 | `profile` | Named browser profile name validation |
 | `internal/emailstore` | SQLite persistence for bulk email jobs |
+| `queue` | Shared Postgres URL queue: import, leased claims, completion, retry, counts |
+| `batch` | Two-stage bulk runner over `queue`, per-host limits, rolling JSONL.gz output; see [batch scraping](batch.md) |
 | `browser-service/src` | Bun + Hono browser service: Patchright renders, identities, sessions, profiles, request validation |
 
 ## Failure behaviour

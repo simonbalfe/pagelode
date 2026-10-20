@@ -2,7 +2,10 @@ package browser
 
 import (
 	"context"
+	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,11 +25,11 @@ func (g generations) SaveGeneration(name string, generation int) error {
 func TestRepeatedBlocksRotateToNewIdentityAndSession(t *testing.T) {
 	server, requests := fakeService(t, http.StatusOK, `{"status_code":403}`)
 	store := generations{}
-	identities, err := NewIdentities("http://user-{session}:secret@proxy.example:1000", store)
+	identities, err := NewIdentities("http://user-{session}:secret@proxy.example:1000", 1, store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, err := New(server.URL, "", 0, identities)
+	client, err := New([]string{server.URL}, "", 0, 4, identities)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,11 +59,11 @@ func TestRepeatedBlocksRotateToNewIdentityAndSession(t *testing.T) {
 		t.Errorf("stored generations = %v, want the rotation persisted", store)
 	}
 
-	restarted, err := NewIdentities("http://user-{session}:secret@proxy.example:1000", store)
+	restarted, err := NewIdentities("http://user-{session}:secret@proxy.example:1000", 1, store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if key, _ := restarted.current(); key != third.body["identity"] {
+	if _, key, _ := restarted.identity("shop.example"); key != third.body["identity"] {
 		t.Errorf("identity after restart = %q, want %v so a blocked session is not reused", key, third.body["identity"])
 	}
 }
@@ -92,4 +95,110 @@ func fetch(t *testing.T, client *Client, ctx context.Context) {
 	if _, err := client.Fetch(ctx, "https://shop.example/item", page.Session{}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+const stickyTemplate = "http://user-{session}:secret@proxy.example:1000"
+
+func TestIdentitiesMapHostsToStableSlots(t *testing.T) {
+	identities, err := NewIdentities(stickyTemplate, 4, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxies := map[int]string{}
+	for index := range 64 {
+		host := fmt.Sprintf("host-%d.example", index)
+		slot, key, proxyURL := identities.identity(host)
+		againSlot, againKey, againProxy := identities.identity(strings.ToUpper(host))
+		if againSlot != slot || againKey != key || againProxy != proxyURL {
+			t.Errorf("identity(%q) = %d %s %s, identity(upper) = %d %s %s; want the same identity", host, slot, key, proxyURL, againSlot, againKey, againProxy)
+		}
+		if got := identities.ProxyFor(host); got != proxyURL {
+			t.Errorf("ProxyFor(%q) = %q, want the browser identity's proxy %q", host, got, proxyURL)
+		}
+		proxies[slot] = proxyURL
+	}
+	if got, want := len(proxies), 4; got != want {
+		t.Fatalf("slots used by 64 hosts = %d, want %d", got, want)
+	}
+	if got := slices.Compact(slices.Sorted(maps.Values(proxies))); len(got) != 4 {
+		t.Errorf("distinct slot proxies = %v, want one session per slot", got)
+	}
+}
+
+func TestRotationOnlyMovesBlockedSlot(t *testing.T) {
+	base := "pl-" + shortHash(stickyTemplate)
+	legacyKeys := []string{base + "-g0", base + "-s1-g0", base + "-s2-g0"}
+	for _, test := range []struct {
+		name      string
+		blocked   int
+		wantKeys  []string
+		wantStore generations
+	}{
+		{name: "slot 0 keeps legacy name", blocked: 0, wantKeys: []string{base + "-g1", base + "-s1-g0", base + "-s2-g0"}, wantStore: generations{base: 1}},
+		{name: "slot 2", blocked: 2, wantKeys: []string{base + "-g0", base + "-s1-g0", base + "-s2-g1"}, wantStore: generations{base + "-s2": 1}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := generations{}
+			identities, err := NewIdentities(stickyTemplate, 3, store)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hosts := hostPerSlot(t, identities)
+			if got := slotKeys(identities, hosts); !slices.Equal(got, legacyKeys) {
+				t.Fatalf("initial keys = %v, want %v", got, legacyKeys)
+			}
+			host := hosts[test.blocked]
+			var retired string
+			for range rotateAfterBlocks {
+				_, key, _ := identities.identity(host)
+				retired, _, err = identities.observe(key, host, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if retired != legacyKeys[test.blocked] {
+				t.Errorf("retired = %q, want %q", retired, legacyKeys[test.blocked])
+			}
+			if got := slotKeys(identities, hosts); !slices.Equal(got, test.wantKeys) {
+				t.Errorf("keys after rotation = %v, want %v", got, test.wantKeys)
+			}
+			if !maps.Equal(store, test.wantStore) {
+				t.Errorf("stored generations = %v, want %v", store, test.wantStore)
+			}
+		})
+	}
+}
+
+func TestSingleSlotResumesLegacyGeneration(t *testing.T) {
+	base := "pl-" + shortHash(stickyTemplate)
+	identities, err := NewIdentities(stickyTemplate, 1, generations{base: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, got, _ := identities.identity("shop.example"); got != base+"-g3" {
+		t.Errorf("key = %q, want %q", got, base+"-g3")
+	}
+}
+
+func hostPerSlot(t *testing.T, identities *Identities) []string {
+	t.Helper()
+	hosts := make([]string, len(identities.slots))
+	for index := 0; index < 1000 && slices.Contains(hosts, ""); index++ {
+		host := fmt.Sprintf("site-%d.example", index)
+		if slot := identities.slotFor(host); hosts[slot] == "" {
+			hosts[slot] = host
+		}
+	}
+	if slices.Contains(hosts, "") {
+		t.Fatalf("hosts per slot = %q, want every slot covered", hosts)
+	}
+	return hosts
+}
+
+func slotKeys(identities *Identities, hosts []string) []string {
+	keys := make([]string, len(hosts))
+	for index, host := range hosts {
+		_, keys[index], _ = identities.identity(host)
+	}
+	return keys
 }

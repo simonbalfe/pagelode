@@ -24,11 +24,11 @@ func profileCommand(configuration config.Config, args []string, stdout, stderr i
 	if err != nil {
 		return err
 	}
-	identities, err := browser.NewIdentities(configuration.ProxyURL, nil)
+	identities, err := browser.NewIdentities(configuration.ProxyURL, configuration.BrowserIdentities, nil)
 	if err != nil {
 		return fmt.Errorf("configure browser identities: %w", err)
 	}
-	client, err := browser.New(configuration.BrowserURL, configuration.BrowserToken, configuration.BrowserSettle, identities)
+	client, err := browser.New(configuration.BrowserURLs, configuration.BrowserToken, configuration.BrowserSettle, configuration.BrowserNodeSlots, identities)
 	if err != nil {
 		return fmt.Errorf("configure browser service: %w", err)
 	}

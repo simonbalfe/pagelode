@@ -10,12 +10,10 @@ import (
 	"github.com/simonbalfe/pagelode/page"
 )
 
-// HAR is the subset of an HTTP Archive document that discovery reads.
 type HAR struct {
 	Log HARLog `json:"log"`
 }
 
-// UnmarshalJSON decodes a HAR document, ignoring fields discovery does not use.
 func (h *HAR) UnmarshalJSON(data []byte) error {
 	type wire HAR
 	var parsed wire
@@ -26,18 +24,15 @@ func (h *HAR) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// HARLog holds the recorded entries of a HAR document.
 type HARLog struct {
 	Entries []HAREntry `json:"entries"`
 }
 
-// HARHeader is one request or response header recorded in a HAR entry.
 type HARHeader struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
-// HAREntry is one recorded request/response exchange; ResourceType maps the Chrome `_resourceType` extension.
 type HAREntry struct {
 	StartedDateTime string `json:"startedDateTime"`
 	Request         struct {
@@ -61,9 +56,6 @@ type HAREntry struct {
 	ResourceType string `json:"_resourceType"`
 }
 
-// AnalyzeHAR converts a HAR capture into page traffic and analyzes it like a browser capture.
-// Entries beyond page.MaxCaptureRequests are dropped and bodies over the capture byte budgets are marked truncated.
-// An empty target defaults to the first entry's URL.
 func AnalyzeHAR(har HAR, target string) Report {
 	capture := &page.Capture{Entries: []page.Exchange{}}
 	remaining := page.MaxCaptureTotalBytes

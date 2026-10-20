@@ -1,6 +1,3 @@
-// Package discovery reverse-engineers the data endpoints a page calls by analyzing its network traffic.
-// Traffic comes from a live browser capture or an uploaded HAR file; reports describe inferred endpoints,
-// schemas, auth, protections, and pagination, none of which have been replayed.
 package discovery
 
 import (
@@ -18,26 +15,21 @@ import (
 	"github.com/simonbalfe/pagelode/profile"
 )
 
-// Capturer loads a page in a browser and returns the document with its recorded network traffic.
 type Capturer interface {
 	Capture(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error)
 }
 
-// Service runs discovery requests against a browser Capturer.
 type Service struct {
 	browser         Capturer
 	proxyConfigured bool
 }
 
-// ErrStealthProxy reports a stealth request on a server without PAGELODE_PROXY_URL.
 var ErrStealthProxy = errors.New("stealth discovery requires PAGELODE_PROXY_URL")
 
-// New returns a Service that captures pages with browser, which may be nil when only HAR analysis is needed.
 func New(browser Capturer) *Service {
 	return &Service{browser: browser}
 }
 
-// Request describes one discovery run; when HAR is set it is analyzed instead of loading URL in a browser.
 type Request struct {
 	URL     string `json:"url"`
 	WaitMS  int    `json:"waitMs,omitempty"`
@@ -47,8 +39,6 @@ type Request struct {
 	Verbose bool   `json:"verbose,omitempty"`
 }
 
-// Validate returns a normalized copy of r with defaults applied, or an error describing the first invalid field.
-// Browser-only options (WaitMS, Profile, Stealth) are rejected for HAR requests.
 func (r Request) Validate() (Request, error) {
 	if r.Profile != "" {
 		if err := profile.Validate(r.Profile); err != nil {
@@ -86,8 +76,6 @@ func (r Request) Validate() (Request, error) {
 	return r, nil
 }
 
-// Discover validates request and returns its discovery report.
-// It returns ErrStealthProxy for stealth requests without a proxy, and passes through context and limit.ErrSaturated errors unwrapped.
 func (s *Service) Discover(ctx context.Context, request Request) (Report, error) {
 	request, err := request.Validate()
 	if err != nil {
@@ -144,7 +132,6 @@ func captureError(err error) string {
 	return message
 }
 
-// WithProxy records whether the browsers route through PAGELODE_PROXY_URL, which stealth requests require.
 func (s *Service) WithProxy(configured bool) *Service {
 	s.proxyConfigured = configured
 	return s

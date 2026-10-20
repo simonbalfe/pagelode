@@ -1,4 +1,3 @@
-// Package config loads and validates PageLode's configuration from environment variables.
 package config
 
 import (
@@ -16,13 +15,16 @@ import (
 
 type Config struct {
 	Address           string
-	BrowserURL        string
+	BrowserURLs       []string
 	BrowserToken      string
 	BrowserSettle     time.Duration
+	BrowserIdentities int
+	BrowserNodeSlots  int
 	CapSolverAPIKey   string
 	CapSolverURL      string
 	CapSolverProxyURL string
 	ProxyURL          string
+	QueueURL          string
 	ProtectedDomains  []string
 	MaxConcurrency    int
 	MaxWaiting        int
@@ -47,6 +49,14 @@ func Load() (Config, error) {
 	settleMS, err := integer("PAGELODE_BROWSER_SETTLE_MS", 2000, 0)
 	if err != nil || settleMS > 10_000 {
 		return Config{}, fmt.Errorf("config: PAGELODE_BROWSER_SETTLE_MS must be between 0 and 10000")
+	}
+	browserIdentities, err := integer("PAGELODE_BROWSER_IDENTITIES", 1, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	browserNodeSlots, err := integer("PAGELODE_BROWSER_NODE_SLOTS", 4, 1)
+	if err != nil {
+		return Config{}, err
 	}
 	requestTimeout, err := duration("PAGELODE_REQUEST_TIMEOUT", 90*time.Second)
 	if err != nil {
@@ -76,9 +86,20 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("config: invalid PAGELODE_CAPSOLVER_URL: %w", err)
 	}
 
-	browserURL := value("PAGELODE_BROWSER_URL", "http://127.0.0.1:8090")
-	if err := validateURL(browserURL, "http", "https"); err != nil {
-		return Config{}, fmt.Errorf("config: invalid PAGELODE_BROWSER_URL: %w", err)
+	browserURLs := list(value("PAGELODE_BROWSER_URL", "http://127.0.0.1:8090"))
+	if len(browserURLs) == 0 {
+		return Config{}, fmt.Errorf("config: PAGELODE_BROWSER_URL must list at least one URL")
+	}
+	for _, browserURL := range browserURLs {
+		if err := validateURL(browserURL, "http", "https"); err != nil {
+			return Config{}, fmt.Errorf("config: invalid PAGELODE_BROWSER_URL %q: %w", browserURL, err)
+		}
+	}
+	queueURL := os.Getenv("PAGELODE_QUEUE_URL")
+	if queueURL != "" {
+		if err := validateURL(queueURL, "postgres", "postgresql"); err != nil {
+			return Config{}, fmt.Errorf("config: invalid PAGELODE_QUEUE_URL: %w", err)
+		}
 	}
 	statePath, err := defaultStatePath()
 	if err != nil {
@@ -86,13 +107,16 @@ func Load() (Config, error) {
 	}
 	return Config{
 		Address:           fmt.Sprintf(":%d", port),
-		BrowserURL:        browserURL,
+		BrowserURLs:       browserURLs,
 		BrowserToken:      os.Getenv("PAGELODE_BROWSER_TOKEN"),
 		BrowserSettle:     time.Duration(settleMS) * time.Millisecond,
+		BrowserIdentities: browserIdentities,
+		BrowserNodeSlots:  browserNodeSlots,
 		CapSolverAPIKey:   os.Getenv("CAPSOLVER_API_KEY"),
 		CapSolverURL:      capSolverURL,
 		CapSolverProxyURL: capSolverProxyURL,
 		ProxyURL:          proxyURL,
+		QueueURL:          queueURL,
 		ProtectedDomains:  domains(value("PAGELODE_PROTECTED_DOMAINS", "crunchbase.com")),
 		MaxConcurrency:    maxConcurrency,
 		MaxWaiting:        maxWaiting,
@@ -154,11 +178,18 @@ func value(name string, fallback string) string {
 }
 
 func domains(raw string) []string {
+	result := list(raw)
+	for index, current := range result {
+		result[index] = strings.ToLower(current)
+	}
+	return result
+}
+
+func list(raw string) []string {
 	values := strings.Split(raw, ",")
 	result := make([]string, 0, len(values))
 	for _, current := range values {
-		current = strings.ToLower(strings.TrimSpace(current))
-		if current != "" {
+		if current = strings.TrimSpace(current); current != "" {
 			result = append(result, current)
 		}
 	}

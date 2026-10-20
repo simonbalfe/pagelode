@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -53,11 +55,11 @@ func fakeService(t *testing.T, status int, response string) (*httptest.Server, c
 
 func newClient(t *testing.T, baseURL, token, proxyURL string) *Client {
 	t.Helper()
-	identities, err := NewIdentities(proxyURL, nil)
+	identities, err := NewIdentities(proxyURL, 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, err := New(baseURL, token, 500*time.Millisecond, identities)
+	client, err := New([]string{baseURL}, token, 500*time.Millisecond, 4, identities)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +68,7 @@ func newClient(t *testing.T, baseURL, token, proxyURL string) *Client {
 
 func TestNewRejectsInvalidURL(t *testing.T) {
 	for _, baseURL := range []string{"", "127.0.0.1:8090", "ftp://host", "http://"} {
-		if _, err := New(baseURL, "", 0, nil); err == nil {
+		if _, err := New([]string{baseURL}, "", 0, 4, nil); err == nil {
 			t.Errorf("New(%q) error = nil, want error", baseURL)
 		}
 	}
@@ -350,5 +352,86 @@ func TestCloseSessionNotFound(t *testing.T) {
 	err := client.CloseSession(context.Background(), "missing")
 	if err == nil || err.Error() != "patchright: not_found: unknown session" {
 		t.Errorf("CloseSession() error = %v, want not_found", err)
+	}
+}
+
+func closedNode(t *testing.T) string {
+	t.Helper()
+	server := httptest.NewServer(http.NotFoundHandler())
+	server.Close()
+	return server.URL
+}
+
+func TestRenderFailsOverToReachableNode(t *testing.T) {
+	live, requests := fakeService(t, http.StatusOK, `{"status_code":200}`)
+	client, err := New([]string{closedNode(t), live.URL}, "", 0, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for attempt := range 2 {
+		document, err := client.Fetch(ctx, "https://example.org/", page.Session{})
+		if err != nil {
+			t.Fatalf("Fetch() attempt %d error = %v, want success on the reachable node", attempt, err)
+		}
+		if document.StatusCode != http.StatusOK {
+			t.Errorf("attempt %d StatusCode = %d, want 200", attempt, document.StatusCode)
+		}
+	}
+	if got, want := len(requests), 2; got != want {
+		t.Errorf("renders on reachable node = %d, want %d", got, want)
+	}
+}
+
+func TestRenderWithoutReachableNodeIsUnavailable(t *testing.T) {
+	client, err := New([]string{closedNode(t), closedNode(t)}, "", 0, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for _, attempt := range []string{"nodes refuse connections", "nodes already marked down"} {
+		_, err := client.Fetch(ctx, "https://example.org/", page.Session{})
+		if !errors.Is(err, limit.ErrUnavailable) {
+			t.Errorf("%s: Fetch() error = %v, want limit.ErrUnavailable", attempt, err)
+		}
+	}
+}
+
+func TestNodeSlotsBoundConcurrentRenders(t *testing.T) {
+	var active, peak atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		current := active.Add(1)
+		for {
+			previous := peak.Load()
+			if current <= previous || peak.CompareAndSwap(previous, current) {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+		active.Add(-1)
+		if _, err := io.WriteString(w, `{"status_code":200}`); err != nil {
+			t.Error(err)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client, err := New([]string{server.URL}, "", 0, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var group sync.WaitGroup
+	for range 6 {
+		group.Go(func() {
+			if _, err := client.Fetch(ctx, "https://example.org/", page.Session{}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	group.Wait()
+	if got, want := peak.Load(), int32(1); got != want {
+		t.Errorf("peak concurrent renders on one node = %d, want %d", got, want)
 	}
 }

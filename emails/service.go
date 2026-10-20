@@ -1,5 +1,3 @@
-// Package emails crawls a site within its scope to find email addresses and the pages they appear on.
-// Pages load over HTTP first and fall back to a browser and challenge solver when needed.
 package emails
 
 import (
@@ -13,19 +11,16 @@ import (
 	"github.com/simonbalfe/pagelode/page"
 )
 
-// PageLoader loads one page for the email crawl.
 type PageLoader interface {
 	Load(context.Context, string, Options) (page.Document, error)
 }
 
-// Service crawls sites for email addresses, bounding work with a shared limit.Limiter.
 type Service struct {
 	loader      PageLoader
 	limiter     *limit.Limiter
 	concurrency int
 }
 
-// New returns a Service that loads up to concurrency pages at once, clamped to between 1 and 4.
 func New(loader PageLoader, limiter *limit.Limiter, concurrency int) *Service {
 	if concurrency < 1 {
 		concurrency = 1
@@ -36,8 +31,6 @@ func New(loader PageLoader, limiter *limit.Limiter, concurrency int) *Service {
 	return &Service{loader: loader, limiter: limiter, concurrency: concurrency}
 }
 
-// Find validates request and crawls its site until the page, email, or duration limit is reached.
-// Hitting the duration limit yields a partial report with a warning; limit.ErrSaturated and caller context errors are returned instead.
 func (s *Service) Find(ctx context.Context, request Request) (Report, error) {
 	request, err := request.Validate()
 	if err != nil {

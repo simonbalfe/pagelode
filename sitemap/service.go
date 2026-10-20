@@ -1,6 +1,3 @@
-// Package sitemap discovers a site's URLs from robots.txt, XML sitemaps, and a
-// bounded same-site link crawl, optionally rendering pages in a browser, and
-// reports the URLs, script-referenced endpoints, and URL templates it found.
 package sitemap
 
 import (
@@ -23,22 +20,16 @@ const (
 	fetchTimeout     = 10 * time.Second
 )
 
-// Service maps sites using an HTTP fetcher gated by a shared limiter. It is
-// safe for concurrent use once configured.
 type Service struct {
 	fetcher orchestrator.Fetcher
 	limiter *limit.Limiter
 	browser Browser
 }
 
-// New returns a Service that fetches over fetcher and runs every fetch through limiter.
 func New(fetcher orchestrator.Fetcher, limiter *limit.Limiter) *Service {
 	return &Service{fetcher: fetcher, limiter: limiter}
 }
 
-// WithBrowser sets the browser used for rendering and exploring pages and
-// returns s. Call it before the Service is shared; without it, render
-// requests fall back to HTTP with a warning.
 func (s *Service) WithBrowser(browser Browser) *Service {
 	s.browser = browser
 	return s
@@ -55,10 +46,6 @@ type run struct {
 	pageRead     bool
 }
 
-// Map validates request and discovers URLs within its scope until the URL
-// limit or duration is reached. Hitting a limit is reported through warnings
-// and Summary.Limited rather than an error; errors are returned for invalid
-// requests, limit.ErrSaturated, and cancellation of ctx.
 func (s *Service) Map(ctx context.Context, request Request) (Report, error) {
 	request, err := request.Validate()
 	if err != nil {
@@ -220,7 +207,6 @@ func (r *run) add(normalized, source, lastModified string) {
 	r.report.URLs = append(r.report.URLs, Entry{URL: normalized, Source: source, LastModified: strings.TrimSpace(lastModified)})
 }
 
-// consumeSitemap records the page URLs of a sitemap and returns the locations of child sitemaps.
 func (r *run) consumeSitemap(result loaded) []string {
 	document := result.document
 	if result.err != nil || document.StatusCode >= 400 {

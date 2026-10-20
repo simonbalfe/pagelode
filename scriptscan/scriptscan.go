@@ -1,6 +1,3 @@
-// Package scriptscan finds same-site script URLs in HTML and extracts quoted
-// path-like endpoints from JavaScript source. The approach is inspired by
-// Katana (see licenses/katana.txt).
 package scriptscan
 
 import (
@@ -26,9 +23,6 @@ var staticExtensions = map[string]struct{}{
 	"css": {}, "woff": {}, "woff2": {}, "ttf": {}, "map": {}, "mp4": {},
 }
 
-// Endpoints returns the distinct quoted absolute paths in source, in order of
-// appearance, skipping MIME types, static assets, and implausible values, and
-// capped at a fixed count.
 func Endpoints(source string) []string {
 	var endpoints []string
 	seen := make(map[string]struct{})
@@ -79,9 +73,6 @@ func staticAsset(value string) bool {
 	return ok
 }
 
-// ScriptURLs returns the distinct HTTP(S) script src URLs in rawHTML that
-// resolve against base to the same site (ignoring a www. prefix), capped at a
-// fixed count. It returns nil when base is nil or the HTML cannot be parsed.
 func ScriptURLs(rawHTML string, base *url.URL) []string {
 	if base == nil {
 		return nil

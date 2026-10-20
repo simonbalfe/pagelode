@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/simonbalfe/pagelode/internal/config"
 )
 
 const rootDescription = "PageLode extracts Markdown, maps sites, discovers page data endpoints, and finds emails."
@@ -24,6 +26,32 @@ type commandSpec struct {
 
 func commandSpecs() []commandSpec {
 	return []commandSpec{
+		{
+			name:    "batch",
+			summary: "Scrape millions of URLs from a shared Postgres queue",
+			long: `Queues URLs in Postgres and scrapes them with any number of processes on any number of
+machines. "run" loads each URL over HTTP first and sends only the pages that need a
+browser to the browser stage, which spreads renders over every PAGELODE_BROWSER_URL
+node. A full or unreachable browser puts the URL back for later instead of failing it.
+Pages go to rolling gzipped JSONL files in --out; the queue records where each one is.
+
+Subcommands:
+  import <file|->   add URLs or domains, one per line; duplicates are ignored
+  run               scrape until interrupted, or until empty with --until-empty
+  status            count URLs per state
+  retry             move URLs back, by default from failed to pending
+
+The queue URL comes from --queue or PAGELODE_QUEUE_URL. The flags below are for run.`,
+			usage: []string{"pagelode batch import [--queue URL] <file|->", "pagelode batch run [flags]", "pagelode batch status [--queue URL]", "pagelode batch retry [--state failed] [--to pending]"},
+			examples: []string{
+				"export PAGELODE_QUEUE_URL=postgres://user:pass@host/db",
+				"pagelode batch import urls.txt",
+				"pagelode batch run --http-workers 400 --out /data/pages",
+				"PAGELODE_BROWSER_URL=http://b1:8090,http://b2:8090 pagelode batch run --until-empty",
+				"pagelode batch status",
+			},
+			flags: func(flags *flag.FlagSet) { defineBatchRunFlags(flags, config.Config{}) },
+		},
 		{
 			name:    "discover",
 			summary: "Find the data endpoints behind a page",

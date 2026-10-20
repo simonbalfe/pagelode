@@ -1,7 +1,3 @@
-// Package urlshape groups URLs by structure: Shape and Sampler cap how many
-// URLs of one shape a crawl follows, and Templates summarises URL lists as
-// wildcard patterns. The approach is inspired by Katana (see
-// licenses/katana.txt).
 package urlshape
 
 import (
@@ -19,9 +15,6 @@ const (
 	minHexLength   = 8
 )
 
-// Shape returns a key combining the host, first path segment (with ID-like
-// segments masked), segment count, and query parameter names of rawURL.
-// Unparseable input is returned unchanged.
 func Shape(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -49,19 +42,16 @@ func Shape(rawURL string) string {
 	return b.String()
 }
 
-// Sampler admits a bounded number of URLs per Shape. It is safe for concurrent use.
 type Sampler struct {
 	mu     sync.Mutex
 	limit  int
 	counts map[string]int
 }
 
-// NewSampler returns a Sampler allowing limit URLs per shape; limit <= 0 allows all.
 func NewSampler(limit int) *Sampler {
 	return &Sampler{limit: limit, counts: make(map[string]int)}
 }
 
-// Allow reports whether rawURL may be followed, counting it against its shape when it may.
 func (s *Sampler) Allow(rawURL string) bool {
 	if s.limit <= 0 {
 		return true
@@ -76,8 +66,6 @@ func (s *Sampler) Allow(rawURL string) bool {
 	return true
 }
 
-// Template is a URL pattern with "*" for ID-like or high-variety path
-// segments, the number of URLs matching it, and up to three sample URLs.
 type Template struct {
 	Pattern string   `json:"pattern"`
 	Count   int      `json:"count"`
@@ -124,9 +112,6 @@ type parsedURL struct {
 	query    string
 }
 
-// Templates groups urls into patterns per host, collapsing any non-root path
-// position with at least threshold distinct children into "*" (threshold <= 0
-// disables collapsing). Results are sorted by descending count, then pattern.
 func Templates(urls []string, threshold int) []Template {
 	parsed := make([]parsedURL, 0, len(urls))
 	roots := make(map[string]*trieNode)

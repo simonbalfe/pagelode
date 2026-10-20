@@ -1,5 +1,3 @@
-// Package proxy rewrites proxy URLs to pin a sticky session ID, supporting
-// both {session} placeholders and provider-style "_session-" password tokens.
 package proxy
 
 import (
@@ -13,8 +11,6 @@ var (
 	passwordSession = regexp.MustCompile(`(_(?:hard|locked)?session-)[A-Za-z0-9]+`)
 )
 
-// Sticky reports whether raw contains a session placeholder or a session
-// token in its password that WithSession can rewrite.
 func Sticky(raw string) bool {
 	for _, placeholder := range placeholders {
 		if strings.Contains(raw, placeholder) {
@@ -25,8 +21,6 @@ func Sticky(raw string) bool {
 	return ok && passwordSession.MatchString(password)
 }
 
-// WithSession returns raw with its session placeholder or password session
-// token replaced by id. It returns raw unchanged when the URL is not sticky.
 func WithSession(raw string, id string) string {
 	for _, placeholder := range placeholders {
 		if strings.Contains(raw, placeholder) {

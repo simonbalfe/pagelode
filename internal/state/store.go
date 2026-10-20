@@ -1,4 +1,3 @@
-// Package state persists learned routes, challenge clearances, and browser identity generations in SQLite across restarts.
 package state
 
 import (

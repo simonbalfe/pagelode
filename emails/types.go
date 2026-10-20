@@ -9,7 +9,6 @@ import (
 	"github.com/simonbalfe/pagelode/profile"
 )
 
-// Request describes one email crawl rooted at URL.
 type Request struct {
 	URL           string `json:"url"`
 	MaxPages      int    `json:"maxPages,omitempty"`
@@ -19,7 +18,6 @@ type Request struct {
 	Render        string `json:"render,omitempty"`
 }
 
-// Validate returns a normalized copy of r with defaults applied, or an error describing the first invalid field.
 func (r Request) Validate() (Request, error) {
 	if !strings.Contains(r.URL, "://") {
 		r.URL = "https://" + r.URL
@@ -68,7 +66,6 @@ func (r Request) Validate() (Request, error) {
 	return r, nil
 }
 
-// Report is the result of an email crawl.
 type Report struct {
 	URL      string    `json:"url"`
 	Outcome  string    `json:"outcome"`
@@ -78,19 +75,16 @@ type Report struct {
 	Warnings []string  `json:"warnings,omitempty"`
 }
 
-// Address is one discovered email address and every place it was found.
 type Address struct {
 	Address string   `json:"address"`
 	Sources []Source `json:"sources"`
 }
 
-// Source is one page where an address was found and the part of the page it came from.
 type Source struct {
 	URL     string `json:"url"`
 	FoundIn string `json:"foundIn"`
 }
 
-// Page records the outcome of loading one crawled page.
 type Page struct {
 	URL      string        `json:"url"`
 	FinalURL string        `json:"finalUrl,omitempty"`
@@ -99,7 +93,6 @@ type Page struct {
 	Outcome  string        `json:"outcome"`
 }
 
-// Summary totals a crawl; Limited reports whether a page, email, or duration limit stopped it early.
 type Summary struct {
 	PagesVisited int   `json:"pagesVisited"`
 	PagesFailed  int   `json:"pagesFailed"`
@@ -108,7 +101,6 @@ type Summary struct {
 	Limited      bool  `json:"limited"`
 }
 
-// Options controls how a single page is loaded.
 type Options struct {
 	Profile string
 	Render  string

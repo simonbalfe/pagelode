@@ -9,8 +9,11 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 | Variable | Default | Purpose |
 |---|---:|---|
 | `PORT` | `8083` | HTTP server port |
-| `PAGELODE_BROWSER_URL` | `http://127.0.0.1:8090` | Base URL of the browser service (`http` or `https`) |
-| `PAGELODE_BROWSER_TOKEN` | empty | Bearer token sent to the browser service; must match `BROWSER_SERVICE_TOKEN` |
+| `PAGELODE_BROWSER_URL` | `http://127.0.0.1:8090` | Base URL of the browser service (`http` or `https`). A comma-separated list spreads renders over several browser service nodes |
+| `PAGELODE_BROWSER_TOKEN` | empty | Bearer token sent to every browser service node; must match `BROWSER_SERVICE_TOKEN` |
+| `PAGELODE_BROWSER_IDENTITIES` | `1` | Browser identities, each with its own proxy session. Hosts are spread over them by a stable hash, each rotates on its own, and identity `n` renders on node `n` modulo the node count |
+| `PAGELODE_BROWSER_NODE_SLOTS` | `4` | Renders PageLode sends to one browser service node at once; match that node's `BROWSER_SERVICE_CONCURRENCY` |
+| `PAGELODE_QUEUE_URL` | empty | Postgres URL (`postgres://` or `postgresql://`) of the shared queue used by `pagelode batch` |
 | `PAGELODE_PROXY_URL` | empty | Shared HTTP, HTTPS, SOCKS4, or SOCKS5 proxy template for every loader; see [proxies](#proxies) |
 | `CAPSOLVER_API_KEY` | empty | Enable CapSolver: the Cloudflare fallback, Google `/sorry`, and DataDome sliders. Only the PageLode process reads it |
 | `PAGELODE_CAPSOLVER_URL` | `https://api.capsolver.com` | CapSolver API base URL |
@@ -23,7 +26,7 @@ PageLode has two processes: the Go service (`PAGELODE_*` variables) and the brow
 | `PAGELODE_BROWSER_SETTLE_MS` | `2000` | Longest wait for a browser render to go quiet after load, 0–10000 ms; sent as `settle_ms`. Quiet pages return sooner |
 | `PAGELODE_STATE_PATH` | user configuration directory plus `pagelode/state.sqlite` | SQLite file for learned routes, clearances, and identity generations |
 
-Browser concurrency is limited only by the browser service (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`). When its queue is full it answers `429 saturated`; PageLode records an `error` attempt.
+PageLode sends at most `PAGELODE_BROWSER_NODE_SLOTS` renders to each browser service node at once; further renders wait for a slot within their deadline. The service also limits itself (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`). When its queue is full it answers `429 saturated`; PageLode records an `error` attempt. A node that cannot be reached is skipped for 15 seconds and the render is retried once on the next node; when no node is reachable the render fails with `limit.ErrUnavailable`.
 
 ### State file
 

@@ -46,6 +46,9 @@ pagelode discover --har <capture.har> [<URL>]
 pagelode map [--limit 500] [--max-duration 30s] [--depth 2] [--render never] [--explore] [--include <path>] [--exclude <path>] [--subdomains] [--json] <URL>
 pagelode emails [--max-pages 20] [--max-emails 100] [--max-duration 30s] [--render auto] [--profile <name>] [--verbose] <URL>
 pagelode emails-bulk [--db data/emails.sqlite] [--workers 32] [--max-pages 8] [--max-emails 50] [--max-duration 20s] [--render never] <file|->
+pagelode batch import [--queue <postgres-url>] <file|->
+pagelode batch run [--http-workers 100] [--browser-workers -1] [--out data/pages] [--until-empty]
+pagelode batch status | retry [--state failed] [--to pending]
 pagelode profile login <name> <URL>
 pagelode serve
 pagelode version
@@ -106,6 +109,7 @@ Settings come from environment variables; see docs/configuration.md.
 | `discover` | Where does this page's data come from? | JSON endpoint report | Always (one capture), except `--har` |
 | `emails` | Which email addresses does this site publish? | One address per line | Optional: `--render` |
 | `emails-bulk` | The same, for a list of sites | SQLite database | Optional: `--render` |
+| `batch` | `extract` for millions of URLs across many machines | Gzipped JSONL files; state in Postgres | Only for pages that need it, spread over every node |
 | `profile login` | Save a signed-in browser for later runs | Named profile | Always |
 | `serve` | Run all of the above over HTTP | API on `PORT` | As needed |
 | `version`, `help` | Print the version or usage | Text | No |
@@ -187,6 +191,10 @@ Crawls many sites in parallel and writes the results to SQLite. The input is a f
 | `--render` | `never` | `auto`, `never`, or `always`; `never` stays on fast HTTP |
 
 The `sites` table holds one row per crawled site with its outcome, page counts, duration, and any error. The `emails` table holds one row per address and source page. Sites already in `sites` are skipped, so interrupting with Ctrl-C and rerunning resumes. Delete the database to start over.
+
+### `pagelode batch`
+
+Queues URLs in Postgres (`PAGELODE_QUEUE_URL` or `--queue`) and scrapes them with any number of `batch run` processes. Each URL is loaded over HTTP first; only pages that need a browser go to the browser stage, which spreads renders over every `PAGELODE_BROWSER_URL` node. A full or unreachable browser puts the URL back without using an attempt. See [batch scraping](docs/batch.md).
 
 ### `pagelode profile login <name> <URL>`
 
@@ -343,6 +351,9 @@ The packages at the module root are importable; `internal/` holds the app's HTTP
   - `similarity` — simhash near-duplicate detection.
   - `urlshape` — URL shapes and path templates.
   - `profile` — named profile validation.
+- Bulk scraping:
+  - `queue` — shared Postgres URL queue with leased claims.
+  - `batch` — two-stage runner over `queue` that writes rolling JSONL.gz files.
 
 ```sh
 go get github.com/simonbalfe/pagelode
@@ -384,6 +395,7 @@ It does not guarantee access to protected websites. The optional CapSolver fallb
 - [What PageLode can take from Katana](docs/katana.md)
 - [Endpoint discovery](docs/discovery.md)
 - [Email finding](docs/emails.md)
+- [Batch scraping](docs/batch.md)
 - [Configuration](docs/configuration.md)
 - [Cloudflare fallback status](docs/cloudflare-status.md)
 - [OpenExtract migration plan](docs/migration.md)

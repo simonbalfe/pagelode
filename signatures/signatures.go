@@ -1,4 +1,3 @@
-// Package signatures embeds the shared block-page and challenge signatures used to classify fetched pages.
 package signatures
 
 import (

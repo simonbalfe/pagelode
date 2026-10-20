@@ -1,5 +1,3 @@
-// Package classify decides what to do with a fetched page: accept it, render
-// it in a browser, treat it as blocked, retry it, or drop it as dead.
 package classify
 
 import (
@@ -12,12 +10,8 @@ import (
 	"github.com/simonbalfe/pagelode/signatures"
 )
 
-// Kind is the action a classification recommends for a fetched page.
 type Kind string
 
-// Kind values: Accept uses the page as is, NeedsRender wants a browser,
-// Blocked means bot protection, Retryable a transient or client error,
-// and Dead a 404 or 410.
 const (
 	Accept      Kind = "accept"
 	NeedsRender Kind = "needs_render"
@@ -26,9 +20,6 @@ const (
 	Dead        Kind = "dead"
 )
 
-// Result is a classification with a human-readable Reason.
-// RenderScore sums JavaScript-shell signals, with 10 or more meaning
-// NeedsRender; VisibleText counts visible body runes for HTML pages.
 type Result struct {
 	Kind        Kind
 	Reason      string
@@ -42,8 +33,6 @@ var (
 	domMutation        = regexp.MustCompile(`(?i)(?:appendChild|replaceChildren|insertAdjacentHTML|createElement|document\.write)\s*\(`)
 )
 
-// Document classifies document from its status, challenge signals, block
-// signatures, and how much visible text its HTML holds.
 func Document(document page.Document) Result {
 	if document.StatusCode == 404 || document.StatusCode == 410 {
 		return Result{Kind: Dead, Reason: fmt.Sprintf("HTTP %d", document.StatusCode)}

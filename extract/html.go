@@ -1,5 +1,3 @@
-// Package extract converts HTML pages into Markdown content, a title, and
-// same-site links for downstream crawling and indexing.
 package extract
 
 import (
@@ -21,17 +19,12 @@ const (
 	maximumStructuredChars   = 2_500
 )
 
-// Result is the content extracted from one HTML page.
-// Links holds at most 100 sorted, fragment-free http(s) URLs on the page's host.
 type Result struct {
 	Content string
 	Links   []string
 	Title   string
 }
 
-// HTML extracts Markdown content from rawHTML, resolving links against
-// baseURL. Content is the readable article, or the whole body when no article
-// is found, prefixed with any JSON-LD structured data.
 func HTML(rawHTML string, baseURL string) (Result, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {

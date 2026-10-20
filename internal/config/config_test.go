@@ -21,8 +21,8 @@ func TestLoadDefaults(t *testing.T) {
 	if got.Address != ":8083" {
 		t.Errorf("Load().Address = %q, want :8083", got.Address)
 	}
-	if got.BrowserURL != "http://127.0.0.1:8090" {
-		t.Errorf("Load().BrowserURL = %q, want http://127.0.0.1:8090", got.BrowserURL)
+	if len(got.BrowserURLs) != 1 || got.BrowserURLs[0] != "http://127.0.0.1:8090" {
+		t.Errorf("Load().BrowserURLs = %q, want [http://127.0.0.1:8090]", got.BrowserURLs)
 	}
 	if filepath.Base(got.StatePath) != "state.sqlite" || filepath.Base(filepath.Dir(got.StatePath)) != "pagelode" {
 		t.Errorf("Load().StatePath = %q, want <config dir>/pagelode/state.sqlite", got.StatePath)

@@ -1,5 +1,3 @@
-// Command pagelode extracts page content, discovers data endpoints, finds emails, and maps sites,
-// either as one-shot CLI commands or as an HTTP server via "pagelode serve".
 package main
 
 import (
@@ -70,6 +68,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer) error {
 	if args[0] == "emails-bulk" {
 		return emailsBulk(configuration, args[1:], stdout, stderr)
 	}
+	if args[0] == "batch" {
+		return batchCommand(configuration, args[1:], stdout, stderr)
+	}
 	app, err := newApplication(configuration)
 	if err != nil {
 		return err
@@ -125,16 +126,16 @@ func wire(configuration config.Config, store *state.Store) (*application, error)
 	if err := clearances.Restore(store); err != nil {
 		return nil, err
 	}
-	identities, err := browser.NewIdentities(configuration.ProxyURL, store)
+	identities, err := browser.NewIdentities(configuration.ProxyURL, configuration.BrowserIdentities, store)
 	if err != nil {
 		return nil, err
 	}
-	browserClient, err := browser.New(configuration.BrowserURL, configuration.BrowserToken, configuration.BrowserSettle, identities)
+	browserClient, err := browser.New(configuration.BrowserURLs, configuration.BrowserToken, configuration.BrowserSettle, configuration.BrowserNodeSlots, identities)
 	if err != nil {
 		return nil, fmt.Errorf("configure browser service: %w", err)
 	}
 	extractLimiter := limit.New(configuration.MaxConcurrency, configuration.MaxWaiting)
-	httpClient := httpfetch.Following(identities.CurrentProxy)
+	httpClient := httpfetch.Following(identities.ProxyFor)
 	capSolverFetcher, captchaTasks, err := capSolver(configuration)
 	if err != nil {
 		return nil, err

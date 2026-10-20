@@ -11,8 +11,6 @@ import (
 	"github.com/simonbalfe/pagelode/page"
 )
 
-// Analyze builds a discovery report from document's recorded traffic and embedded JSON.
-// URLs in the report are sanitized: credentials and fragments are removed and query values redacted.
 func Analyze(target string, document page.Document) Report {
 	result := Report{Page: PageInfo{URL: sanitizeURL(target), FinalURL: sanitizeURL(document.FinalURL), Title: document.Title, Provider: document.Provider, Status: document.StatusCode}, Outcome: "ok", Endpoints: []Endpoint{}, Evidence: []Evidence{}, Protocols: []Signal{}, Auth: []Signal{}, Protections: []Signal{}, Sequences: []Sequence{}, Pagination: []Signal{}, DataSources: []DataSource{}, Warnings: []string{}, Attempts: []orchestrator.Attempt{}}
 	if document.Traffic == nil {

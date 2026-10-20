@@ -1,6 +1,3 @@
-// Package captcha wraps a browser renderer so Google "sorry" reCAPTCHA pages
-// and DataDome sliders are solved through CapSolver and the page is reloaded
-// with the resulting cookies.
 package captcha
 
 import (
@@ -19,47 +16,36 @@ import (
 
 const googleExemption = "GOOGLE_ABUSE_EXEMPTION"
 
-// Renderer loads pages in a browser; Solver wraps it.
 type Renderer interface {
 	Fetch(context.Context, string, page.Session) (page.Document, error)
 	Capture(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error)
 }
 
-// Tasks solves captcha tasks; *capsolver.API implements it.
 type Tasks interface {
 	Recaptcha(context.Context, capsolver.RecaptchaTask) (string, error)
 	DataDome(context.Context, capsolver.DataDomeTask) (string, error)
 }
 
-// Submitter posts a form with a session; Solver uses it to submit the solved
-// Google reCAPTCHA form.
 type Submitter interface {
 	Submit(context.Context, httpfetch.Form, page.Session) (page.Document, error)
 }
 
-// Solver renders pages and, when a supported captcha is detected, solves it
-// and renders once more with the merged cookies.
 type Solver struct {
 	renderer  Renderer
 	tasks     Tasks
 	submitter Submitter
 }
 
-// New returns a Solver. A nil tasks disables solving, making Solver a plain
-// pass-through to renderer.
 func New(renderer Renderer, tasks Tasks, submitter Submitter) *Solver {
 	return &Solver{renderer: renderer, tasks: tasks, submitter: submitter}
 }
 
-// Fetch renders targetURL, solving a supported captcha and retrying once.
-// Unsupported or unsolvable challenges return the original document.
 func (s *Solver) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
 	return s.render(ctx, session, func(session page.Session) (page.Document, error) {
 		return s.renderer.Fetch(ctx, targetURL, session)
 	})
 }
 
-// Capture is Fetch for network capture, using renderer.Capture.
 func (s *Solver) Capture(ctx context.Context, targetURL string, session page.Session, options page.CaptureOptions) (page.Document, error) {
 	return s.render(ctx, session, func(session page.Session) (page.Document, error) {
 		return s.renderer.Capture(ctx, targetURL, session, options)

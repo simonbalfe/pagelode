@@ -15,9 +15,6 @@ const (
 	maximumPatternLen = 200
 )
 
-// Request describes a site map run. Zero values for Limit, MaxDurationMS,
-// Depth, and Render select defaults in Validate. Include and Exclude are path
-// glob patterns; Render is "never", "auto", or "always".
 type Request struct {
 	URL           string   `json:"url"`
 	Limit         int      `json:"limit,omitempty"`
@@ -30,8 +27,6 @@ type Request struct {
 	Explore       bool     `json:"explore,omitempty"`
 }
 
-// Validate returns a copy of r with the URL normalised and defaults applied,
-// or an error describing the first invalid field.
 func (r Request) Validate() (Request, error) {
 	if !strings.Contains(r.URL, "://") {
 		r.URL = "https://" + r.URL
@@ -86,8 +81,6 @@ func (r Request) Validate() (Request, error) {
 	return r, nil
 }
 
-// Report is the result of Map. Outcome is "ok", or "failed" when no sitemap
-// or page could be read and no URLs were found.
 type Report struct {
 	URL       string              `json:"url"`
 	Outcome   string              `json:"outcome"`
@@ -98,16 +91,12 @@ type Report struct {
 	Templates []urlshape.Template `json:"templates,omitempty"`
 }
 
-// Entry is a discovered URL; Source records how it was found ("sitemap",
-// "page", "link", "rendered", or "explore").
 type Entry struct {
 	URL          string `json:"url"`
 	Source       string `json:"source"`
 	LastModified string `json:"lastModified,omitempty"`
 }
 
-// Summary holds counters for a Map run; Limited reports that a URL, page, or
-// duration limit cut the run short.
 type Summary struct {
 	URLsFound     int   `json:"urlsFound"`
 	SitemapsRead  int   `json:"sitemapsRead"`

@@ -14,12 +14,10 @@ import (
 	"github.com/simonbalfe/pagelode/page"
 )
 
-// Capturer renders a page in a browser.
 type Capturer interface {
 	Capture(context.Context, string, page.Session, page.CaptureOptions) (page.Document, error)
 }
 
-// Loader is the PageLoader that tries HTTP, then browser rendering, then the challenge solver.
 type Loader struct {
 	http      orchestrator.Fetcher
 	browser   Capturer
@@ -27,14 +25,10 @@ type Loader struct {
 	routes    *memory.Routes
 }
 
-// NewLoader returns a Loader; browser and capsolver may be nil to disable those fallbacks.
-// Successful unauthenticated renders are recorded in routes so later pages on the host go straight to the browser.
 func NewLoader(http orchestrator.Fetcher, browser Capturer, capsolver orchestrator.Fetcher, routes *memory.Routes) *Loader {
 	return &Loader{http: http, browser: browser, capsolver: capsolver, routes: routes}
 }
 
-// Load fetches target according to options.Render ("auto", "never", or "always").
-// Authenticated profiles always render in the browser.
 func (l *Loader) Load(ctx context.Context, target string, options Options) (page.Document, error) {
 	if options.Profile != "" {
 		return l.render(ctx, target, page.Session{}, options)

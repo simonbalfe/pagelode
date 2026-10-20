@@ -1,4 +1,3 @@
-// Package browsertest starts a real Bun browser service for integration tests.
 package browsertest
 
 import (
@@ -19,9 +18,6 @@ import (
 
 const startTimeout = 20 * time.Second
 
-// Start launches browser-service/src/server.ts with bun on a free local port,
-// waits until it is healthy, and returns its base URL. The process is killed
-// on test cleanup; Start fails the test if the service does not come up.
 func Start(t testing.TB) string {
 	t.Helper()
 	root := repositoryRoot(t)

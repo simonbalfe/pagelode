@@ -131,7 +131,7 @@ flowchart TD
 ### Rules
 
 - **Each provider runs at most once per request.**
-- **Browser limit.** Go has no browser limiter. The browser service's own queue (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`) is the only browser limit. Its `429 saturated` reply becomes `limit.ErrSaturated` in Go and counts as an `error` attempt; a cancelled context does too. The waterfall then moves on to the next step.
+- **Browser limit.** Go sends at most `PAGELODE_BROWSER_NODE_SLOTS` renders to each browser service node at once; the service's own queue (`BROWSER_SERVICE_CONCURRENCY`, `BROWSER_SERVICE_MAX_WAITING`) limits it too. Its `429 saturated` reply becomes `limit.ErrSaturated` in Go and counts as an `error` attempt; an unreachable node set becomes `limit.ErrUnavailable`, and a cancelled context also counts as an `error` attempt. The waterfall then moves on to the next step.
 - **Route learning.** A usable browser result records `patchright` for the hostname, valid for `PAGELODE_ROUTE_TTL`, and records the browser session as the host's clearance. HTTP, replay, and CapSolver successes are not recorded.
 - **Evidence.** Every attempt is recorded with its provider, outcome, status, duration, classification, reason, and render score.
 

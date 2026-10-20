@@ -1,4 +1,3 @@
-// Package emailstore records emails-bulk results per site in SQLite so interrupted runs can resume.
 package emailstore
 
 import (

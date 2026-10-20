@@ -1,5 +1,3 @@
-// Package httpfetch fetches pages and submits forms over HTTP with a
-// Chrome-impersonating TLS client, returning provider-neutral page documents.
 package httpfetch
 
 import (
@@ -24,16 +22,11 @@ const (
 	userAgent        = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
 )
 
-// Client fetches URLs through an optional proxy. Each call builds a fresh TLS
-// client and cookie jar, so a Client holds no per-request state and is safe
-// for concurrent use.
 type Client struct {
 	proxyURL string
-	current  func() string
+	current  func(host string) string
 }
 
-// Form is an HTML form submission; Method other than POST is sent as GET with
-// Values in the query string.
 type Form struct {
 	Method  string
 	Action  string
@@ -41,21 +34,14 @@ type Form struct {
 	Referer string
 }
 
-// New returns a Client that sends every request through proxyURL, or directly
-// when proxyURL is empty.
 func New(proxyURL string) *Client {
 	return &Client{proxyURL: proxyURL}
 }
 
-// Following returns a Client that calls current before each request to pick
-// the proxy URL, so proxy rotation takes effect without rebuilding the Client.
-func Following(current func() string) *Client {
+func Following(current func(host string) string) *Client {
 	return &Client{current: current}
 }
 
-// Fetch GETs targetURL with session's cookies, user agent, and proxy, and
-// returns the response as a Document with the resulting cookies in its
-// Session. Non-2xx statuses are not errors; responses over 12 MiB are.
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
 	parsedTargetURL, err := url.Parse(targetURL)
 	if err != nil {
@@ -157,8 +143,6 @@ func responseHeaders(header http.Header) map[string]string {
 	return headers
 }
 
-// Submit sends form without following redirects and returns a Document
-// carrying the status and resulting cookies but no body.
 func (c *Client) Submit(ctx context.Context, form Form, session page.Session) (page.Document, error) {
 	action, err := url.Parse(form.Action)
 	if err != nil {
@@ -227,7 +211,7 @@ func (c *Client) client(target *url.URL, session page.Session, extra ...tlsclien
 	}, extra...)
 	proxyURL := c.proxyURL
 	if c.current != nil {
-		proxyURL = c.current()
+		proxyURL = c.current(target.Hostname())
 	}
 	if session.ProxyURL != "" {
 		proxyURL = session.ProxyURL

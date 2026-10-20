@@ -1,4 +1,3 @@
-// Package api serves PageLode's extract, discover, emails, and map operations over HTTP.
 package api
 
 import (

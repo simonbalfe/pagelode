@@ -40,7 +40,7 @@ func TestAuthenticatedEmailCrawl(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	client, err := browser.New(browsertest.Start(t), "", 500*time.Millisecond, nil)
+	client, err := browser.New([]string{browsertest.Start(t)}, "", 500*time.Millisecond, 4, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

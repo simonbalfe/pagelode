@@ -1,5 +1,3 @@
-// Package capsolver solves Cloudflare, reCAPTCHA v2, and DataDome challenges
-// through the CapSolver task API and replays the solved session.
 package capsolver
 
 import (
@@ -13,14 +11,10 @@ import (
 	"github.com/simonbalfe/pagelode/page"
 )
 
-// Fetcher fetches a page for a session; Client uses one to load the
-// challenge page and another to replay the solved session.
 type Fetcher interface {
 	Fetch(context.Context, string, page.Session) (page.Document, error)
 }
 
-// Client fetches Cloudflare-protected pages by solving an AntiCloudflareTask
-// and replaying the target with the returned user agent and cookies.
 type Client struct {
 	api              *API
 	proxy            string
@@ -28,9 +22,6 @@ type Client struct {
 	solvedFetcher    Fetcher
 }
 
-// New returns a Client that solves through api using proxyURL, which must
-// carry a username and password. It returns nil, nil when api is nil or
-// proxyURL is empty, meaning solving is disabled.
 func New(api *API, proxyURL string, challengeFetcher Fetcher, solvedFetcher Fetcher) (*Client, error) {
 	if api == nil || proxyURL == "" {
 		return nil, nil
@@ -47,9 +38,6 @@ func New(api *API, proxyURL string, challengeFetcher Fetcher, solvedFetcher Fetc
 	}, nil
 }
 
-// ResolveProxy rewrites the proxy host in raw to its CNAME target, or else to
-// its first IPv4 address, so CapSolver connects to the same exit as local
-// requests. IP-literal hosts are returned unchanged.
 func ResolveProxy(ctx context.Context, raw string) (string, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil {
@@ -81,9 +69,6 @@ func ResolveProxy(ctx context.Context, raw string) (string, error) {
 	return "", errors.New("capsolver: proxy host has no IPv4 address")
 }
 
-// Fetch loads targetURL with the challenge fetcher, solves the challenge,
-// merges the solution cookies into the session, and refetches with the
-// solved fetcher. The returned document's Provider is ProviderCapSolver.
 func (c *Client) Fetch(ctx context.Context, targetURL string, session page.Session) (page.Document, error) {
 	bootstrap, err := c.challengeFetcher.Fetch(ctx, targetURL, session)
 	if err != nil {
