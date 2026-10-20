@@ -68,7 +68,7 @@ duckdb -c "select url, title, provider, length(content) from read_json_auto('/da
 
 ## Measured
 
-20 October 2026, Apple M4 Pro, home IP, no proxy, Postgres 17 in Docker, two headless browser nodes with 3 slots each, 4 identities:
+20 October 2026, Apple M4 Pro behind a VPN (exit IP in Oslo on AS9009 M247, a datacenter range), no proxy, Postgres 17 in Docker, two headless browser nodes with 3 slots each, 4 identities:
 
 | Run | Result |
 |---|---|
@@ -77,3 +77,5 @@ duckdb -c "select url, title, provider, length(content) from read_json_auto('/da
 | Both nodes killed, then restarted | 368 URLs put back, attempts unchanged; all finished after restart |
 | `SIGINT` mid-run | Exited in 0.1 s; 0 URLs left leased |
 | Two processes on one queue, 578 URLs | 474 done, 8 dead, 96 failed; every URL processed once, no duplicate records |
+
+17 of the browser failures were 45 s page-load timeouts. 14 of those sites drop TCP connections from the M247 exit IP but accept them from other countries (checked with check-host.net); they sit on shared hosting such as Host Europe, All-Inkl, GoDaddy, and DreamHost. Of the other 3, one site was down everywhere, one accepted connections only from Russia, and one sent a body labelled gzip that is not valid gzip. HTTP had already failed to connect to all of them before they reached the browser.
