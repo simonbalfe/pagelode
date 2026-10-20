@@ -54,6 +54,21 @@ pagelode help
 
 Put options before the URL. A bare domain such as `example.com` is accepted wherever a URL is. Every command reads its settings from environment variables; see [configuration](docs/configuration.md) for proxies, browser mode, CapSolver, and limits.
 
+### Commands at a glance
+
+| Command | Question it answers | Output | Browser service |
+|---|---|---|---|
+| `pagelode <URL>`, `extract` | What does this page say? | Markdown (or `--json`) | Only when the page needs it |
+| `map` | Which pages does this site have, and which page types? | URL list (or `--json` with sources, templates, endpoints) | Optional: `--render`, `--explore` |
+| `discover` | Where does this page's data come from? | JSON endpoint report | Always (one capture), except `--har` |
+| `emails` | Which email addresses does this site publish? | One address per line | Optional: `--render` |
+| `emails-bulk` | The same, for a list of sites | SQLite database | Optional: `--render` |
+| `profile login` | Save a signed-in browser for later runs | Named profile | Always |
+| `serve` | Run all of the above over HTTP | API on `PORT` | As needed |
+| `version`, `help` | Print the version or usage | Text | No |
+
+A typical workflow: `map` the site to find its page types and endpoints, `extract` a sample page of each type, `discover` the data endpoints behind the interesting ones, then `emails` for contacts.
+
 ### `pagelode <URL>` / `pagelode extract <URL>`
 
 Loads one page through the waterfall and prints clean Markdown.
@@ -146,7 +161,7 @@ Starts the HTTP API on `PORT` (default `8083`).
 
 ### Exit status
 
-`0` on success. `1` on any error, including a failed extraction or a discovery whose outcome is not `ok`. The JSON output is still printed before a failed `--json` extraction or discovery exits. `emails` exits `0` on a partial crawl and `1` only when every page failed.
+`0` on success. `1` on any error, including a failed extraction or a discovery whose outcome is not `ok`. The JSON output is still printed before a failed `--json` extraction or discovery exits. `emails` exits `0` on a partial crawl and `1` only when every page failed. `map` exits `1` only when it found no URL and could not load the site.
 
 ## Run as a service
 
@@ -169,6 +184,54 @@ The response contains:
 - `links`: same-site links found on the page
 - `provider`: the loader that succeeded
 - `attempts`: what PageLode tried and why it escalated
+
+The API serves the same operations as the CLI:
+
+| Endpoint | CLI equivalent | Body |
+|---|---|---|
+| `POST /extract` | `pagelode <URL>` | `{"url"}` |
+| `POST /map` | `pagelode map` | `{"url", "limit", "maxDurationMs", "subdomains", "include", "exclude", "depth", "render", "explore"}` |
+| `POST /discover` | `pagelode discover` | `{"url", "waitMs", "profile", "stealth", "verbose"}` or `{"har"}` for an offline capture |
+| `POST /emails` | `pagelode emails` | `{"url", "maxPages", "maxEmails", "maxDurationMs", "profile", "render"}` |
+| `GET /healthz` | none | none |
+
+`emails-bulk`, `profile login`, and `version` have no API form.
+
+## Map a site
+
+```sh
+pagelode map example.com
+pagelode map --depth 3 --limit 2000 example.com
+pagelode map --include '/blog/*' --exclude '/blog/tag/*' example.com
+pagelode map --render auto --explore https://app.example.com
+pagelode map --json example.com
+```
+
+Or use the API:
+
+```sh
+curl -sS http://localhost:8083/map \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://example.com","depth":3,"render":"auto"}'
+```
+
+`--json` returns the URLs with the source that found each one, the page templates, and the endpoint paths found in scripts:
+
+```json
+{
+  "url": "https://example.com/",
+  "outcome": "ok",
+  "urls": [
+    { "url": "https://example.com/pricing", "source": "sitemap" },
+    { "url": "https://example.com/blog/hello", "source": "link" }
+  ],
+  "summary": { "urlsFound": 214, "sitemapsRead": 2, "pagesCrawled": 61, "pagesRendered": 3, "robotsSkipped": 4, "durationMs": 5210, "limited": false },
+  "endpoints": ["https://example.com/api/products"],
+  "templates": [{ "pattern": "/blog/*", "count": 120, "samples": ["https://example.com/blog/hello"] }]
+}
+```
+
+Scrape one sample of each template rather than every URL. Depth, sampling, robots rules, and rendering are described under [`pagelode map`](#pagelode-map). `scripts/discovery-bench.sh <site>` compares a map with Katana, when it is installed.
 
 ## Discover page data endpoints
 
