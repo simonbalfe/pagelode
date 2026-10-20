@@ -14,7 +14,12 @@ var (
 	uuidSegmentPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 	hashSegmentPattern = regexp.MustCompile(`(?i)^[0-9a-f]{32,}$`)
 	numericPattern     = regexp.MustCompile(`^\d+$`)
+	soapEnvelopeStart  = regexp.MustCompile(`(?i)<(?:[a-z0-9_.-]+:)?envelope[\s>]`)
 )
+
+const maxEnvelopeProbe = 4096
+
+var restPathSegments = []string{"/api/", "/v1/", "/v2/", "/v3/", "/rest/", "/rpc/", "/jsonrpc", "/.well-known/", "/oauth/", "/openapi"}
 
 func defaultBlocklist() []string {
 	return []string{
@@ -78,6 +83,8 @@ func scoreEntry(entry page.Exchange, blocklist []string) int {
 		score++
 	}
 
+	score += structuredAPIBonus(entry, requestType, responseType, path)
+
 	if hostMatchesBlocklist(host, blocklist) {
 		score -= 3
 	}
@@ -97,6 +104,68 @@ func scoreEntry(entry page.Exchange, blocklist []string) int {
 	}
 
 	return score
+}
+
+func structuredAPIBonus(entry page.Exchange, requestType, responseType, path string) int {
+	if isSOAP(entry, requestType, responseType) ||
+		strings.Contains(requestType, "application/grpc") || strings.Contains(responseType, "application/grpc") ||
+		strings.Contains(requestType, "application/graphql") || strings.Contains(responseType, "application/graphql") {
+		return 2
+	}
+	mutating := isMutatingMethod(entry.Method)
+	if strings.Contains(requestType, "application/xml") || strings.Contains(responseType, "application/xml") {
+		if mutating || matchesRESTPath(path) {
+			return 2
+		}
+	}
+	if mutating && strings.Contains(requestType, "multipart/form-data") {
+		return 1
+	}
+	return 0
+}
+
+func isSOAP(entry page.Exchange, requestType, responseType string) bool {
+	if hasHeader(entry.RequestHeaders, "SOAPAction") ||
+		strings.Contains(requestType, "soap+xml") || strings.Contains(responseType, "soap+xml") {
+		return true
+	}
+	if !strings.Contains(requestType, "xml") && !strings.Contains(responseType, "xml") {
+		return false
+	}
+	return hasSOAPEnvelope(entry.RequestBody) || hasSOAPEnvelope(entry.ResponseBody)
+}
+
+func hasSOAPEnvelope(body string) bool {
+	if len(body) > maxEnvelopeProbe {
+		body = body[:maxEnvelopeProbe]
+	}
+	return soapEnvelopeStart.MatchString(body) && strings.Contains(strings.ToLower(body), "soap")
+}
+
+func isMutatingMethod(method string) bool {
+	switch strings.ToUpper(strings.TrimSpace(method)) {
+	case "POST", "PUT", "PATCH", "DELETE":
+		return true
+	}
+	return false
+}
+
+func matchesRESTPath(path string) bool {
+	for _, segment := range restPathSegments {
+		if strings.Contains(path, segment) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasHeader(headers map[string]string, want string) bool {
+	for key := range headers {
+		if strings.EqualFold(key, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func getHeaderValue(headers map[string]string, want string) string {

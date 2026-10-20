@@ -9,40 +9,53 @@ import (
 )
 
 func detectProtocol(entry page.Exchange) (string, string) {
-	if operations := graphqlBatch(entry.RequestBody); len(operations) > 0 {
-		return "graphql_batch", strings.Join(operations, ",")
+	mime := strings.ToLower(entry.MIMEType)
+	requestType := strings.ToLower(header(entry.RequestHeaders, "content-type"))
+	if isSOAP(entry, requestType, mime) {
+		return "soap", ""
+	}
+	value, _ := parseJSON(entry.RequestBody)
+	if batch, ok := value.([]any); ok {
+		if protocol, operations := batchProtocol(batch); protocol != "" {
+			return protocol, strings.Join(operations, ",")
+		}
 	}
 	parsed, err := url.Parse(entry.URL)
 	if err != nil {
 		return "http", ""
 	}
 	path := strings.ToLower(parsed.Path)
-	mime := strings.ToLower(entry.MIMEType)
-	requestType := strings.ToLower(header(entry.RequestHeaders, "content-type"))
-	value, _ := parseJSON(entry.RequestBody)
+	query := parsed.Query()
 	payload, object := value.(map[string]any)
 	operation := ""
-	graphql := strings.Contains(path, "graphql")
+	graphql := strings.Contains(path, "graphql") || strings.Contains(requestType, "application/graphql") || strings.Contains(mime, "application/graphql")
 	if object {
-		if _, ok := payload["query"]; ok {
+		if document, ok := payload["query"].(string); ok && graphqlDocument(document) {
 			graphql = true
 		}
 		if name, ok := payload["operationName"].(string); ok {
 			operation = safeName(name)
 			graphql = true
 		}
-		if extensions, ok := payload["extensions"].(map[string]any); ok {
-			if _, ok := extensions["persistedQuery"]; ok {
-				return "graphql_persisted_query", operation
-			}
+		if persistedQuery(payload["extensions"]) {
+			return "graphql_persisted_query", operation
 		}
 		if _, ok := payload["jsonrpc"]; ok {
 			return "json_rpc", ""
 		}
 	}
-	if name := parsed.Query().Get("operationName"); name != "" {
+	if name := query.Get("operationName"); name != "" {
 		operation = safeName(name)
 		graphql = true
+	}
+	if graphqlDocument(query.Get("query")) {
+		graphql = true
+	}
+	if raw := query.Get("extensions"); raw != "" {
+		var extensions any
+		if json.Unmarshal([]byte(raw), &extensions) == nil && persistedQuery(extensions) {
+			return "graphql_persisted_query", operation
+		}
 	}
 	if graphql {
 		return "graphql", operation
@@ -53,7 +66,7 @@ func detectProtocol(entry page.Exchange) (string, string) {
 	if strings.Contains(path, "/trpc") {
 		return "trpc", ""
 	}
-	if strings.Contains(mime, "grpc") || strings.Contains(requestType, "grpc") {
+	if strings.Contains(mime, "grpc") || strings.Contains(requestType, "grpc") || hasHeader(entry.RequestHeaders, "x-grpc-web") {
 		return "grpc_web", ""
 	}
 	if parsed.Scheme == "ws" || parsed.Scheme == "wss" || strings.EqualFold(entry.ResourceType, "websocket") {
@@ -77,11 +90,16 @@ func authSignals(entry page.Exchange) []string {
 		lower := strings.ToLower(name)
 		switch {
 		case lower == "authorization":
-			kind := "authorization"
-			if strings.HasPrefix(strings.ToLower(value), "bearer ") {
-				kind = "bearer"
+			scheme, _, _ := strings.Cut(strings.TrimSpace(strings.ToLower(value)), " ")
+			switch scheme {
+			case "bearer":
+				result = appendUnique(result, "bearer")
+			case "basic", "digest", "negotiate", "ntlm":
+				result = appendUnique(result, "authorization")
+				result = appendUnique(result, scheme)
+			default:
+				result = appendUnique(result, "authorization")
 			}
-			result = appendUnique(result, kind)
 		case lower == "cookie":
 			result = appendUnique(result, "cookies")
 		case strings.Contains(lower, "csrf") || strings.Contains(lower, "xsrf"):
@@ -176,17 +194,47 @@ func protectionSignals(entry page.Exchange) []string {
 	return result
 }
 
-func graphqlBatch(body string) []string {
-	var payloads []map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(body), &payloads); err != nil {
-		return nil
-	}
-	result := []string{}
-	for _, payload := range payloads {
-		var name string
-		if err := json.Unmarshal(payload["operationName"], &name); err == nil && name != "" {
-			result = appendUnique(result, safeName(name))
+func batchProtocol(batch []any) (string, []string) {
+	protocol := ""
+	operations := []string{}
+	for _, item := range batch {
+		member, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, ok := member["jsonrpc"]; ok {
+			return "json_rpc", nil
+		}
+		document, _ := member["query"].(string)
+		name, named := member["operationName"].(string)
+		if named || graphqlDocument(document) || persistedQuery(member["extensions"]) {
+			protocol = "graphql_batch"
+		}
+		if named && name != "" {
+			operations = appendUnique(operations, safeName(name))
 		}
 	}
-	return result
+	return protocol, operations
+}
+
+func persistedQuery(extensions any) bool {
+	object, ok := extensions.(map[string]any)
+	if !ok {
+		return false
+	}
+	_, ok = object["persistedQuery"]
+	return ok
+}
+
+func graphqlDocument(value string) bool {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "{") {
+		return true
+	}
+	for _, keyword := range []string{"query", "mutation", "subscription", "fragment"} {
+		if rest, ok := strings.CutPrefix(value, keyword); ok && rest != "" && strings.ContainsRune(" \t\r\n{(@", rune(rest[0])) && strings.Contains(rest, "{") {
+			return true
+		}
+	}
+	return false
 }

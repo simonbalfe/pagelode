@@ -43,7 +43,7 @@ Malformed input returns HTTP 400, a saturated queue returns 429, a request deadl
 | `summary` | Captured, data, noise, dropped, incomplete, and truncated request counts; duration and endpoint count |
 | `endpoints` | Groups of requests sharing a host, method, and normalized path; GraphQL operations are metadata |
 | `evidence` (verbose) | Sanitized request URLs, status, resource classification, frame/initiator where available, and timing |
-| `protocols` | Inferred REST/JSON, GraphQL, persisted queries, batch GraphQL, RPC, gRPC-Web, WebSocket, SSE, or HTML |
+| `protocols` | Inferred REST/JSON, SOAP, GraphQL, persisted queries, batch GraphQL, JSON-RPC, gRPC-Web, WebSocket, SSE, or HTML |
 | `auth` | Observed authorization, cookie, CSRF, API-key, or credential-query signals, linked to endpoints |
 | `protections` | Access denial, authentication, throttling, retry-delay, and browser challenge evidence |
 | `sequences` (verbose) | Observed request order; it does not establish causal dependencies |
@@ -88,7 +88,21 @@ The classifier and path matcher are ported from CLI Printing Press commit `39cbc
 | Response content type starts with image, CSS, HTML, JavaScript, or font types | −2 |
 | Lowercased complete URL ends with a recognized asset suffix | −1 |
 
+PageLode adds one further term for structured traffic the upstream rules cannot see, because it has no JSON body or content type. It applies once, before the blocklist penalty, so a blocked host still scores as noise:
+
+| Observation | Score |
+|---|---:|
+| SOAP: a `SOAPAction` header (an empty value counts), an `application/soap+xml` content type on either side, or an XML body whose root is a SOAP `Envelope` | +2 |
+| gRPC or gRPC-Web content type (`application/grpc…`) on either side | +2 |
+| `application/graphql` content type on either side | +2 |
+| `application/xml` on either side with a mutating method or an API-looking path (`/api/`, `/v1/`–`/v3/`, `/rest/`, `/rpc/`, `/jsonrpc`, `/.well-known/`, `/oauth/`, `/openapi`) | +2 |
+| `multipart/form-data` request with a mutating method | +1 |
+
+The SOAP, GraphQL, XML, and multipart rules follow Katana's knowledge-base endpoint classifier (see [Katana](katana.md)); gRPC-Web is added because the protocol label already existed but such requests scored as noise. The upstream fixture contains none of these inputs, so its scores are unchanged.
+
 A score greater than zero identifies an API request. Scores of zero or less identify noise. A blocklist match is a score penalty, not an unconditional veto. Resource type alone does not identify an API. These rules deliberately preserve upstream behavior, including full-URL suffix matching and UUID version/variant constraints.
+
+Protocol labels are assigned after classification, first match winning: `soap`; a JSON array body, which is `json_rpc` when any member has a `jsonrpc` field and `graphql_batch` when any member has an `operationName`, a GraphQL document, or a persisted-query extension; `graphql_persisted_query` (`extensions.persistedQuery` in a body or in a GET `extensions` parameter); `json_rpc` (`jsonrpc` field); `graphql` (a `graphql` path, an `application/graphql` content type, an `operationName` in the body or query string, or a `query` that opens like a GraphQL document, so `{"query":"running shoes"}` and `?query=shoes` stay REST); then `google_batchexecute`, `trpc`, `grpc_web` (a `grpc` content type or an `X-Grpc-Web` request header), `websocket`, `sse`, `rest_json`, `html`, and `http`. Auth signals name `bearer`, `cookies`, `csrf`, `api_key`, `query_credential`, and `authorization`; a Basic, Digest, Negotiate, or NTLM scheme adds its lowercase name alongside `authorization`.
 
 Endpoint groups use lowercase hostname, uppercase trimmed method, and normalized decoded path. Query values, ports, schemes, and GraphQL operation names do not split groups. Multiple GraphQL operations are listed in `operations`; `operation` is present only when a single named operation was observed. Other analysis fields remain PageLode's implementations; this port establishes classifier and endpoint grouping parity, not complete parity with Printing Press's analysis report.
 
